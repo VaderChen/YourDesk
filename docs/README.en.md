@@ -77,3 +77,9 @@ Thanks to the authors of FSR, QuickSRNet/SESR and RIFE. Full [FSR](FSR-LICENSE.t
 ## Remote terminal
 
 Choose Desktop or Terminal, or double-click a site to select a mode. Independent terminal windows support multiple sites; unsupported older peers show an update prompt. Run Linux as a regular user. CLI supports `-secret "password"`; `LC_ALL → LC_MESSAGES → LANG` selects Traditional Chinese, English, Japanese or Korean, with English fallback. See the ZIP README for usage.
+
+## Support development
+
+If YourDesk is useful to you, consider buying me a coffee to support continued development.
+
+[☕ Buy Me a Coffee](https://buymeacoffee.com/vaderchen)

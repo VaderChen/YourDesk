@@ -76,3 +76,9 @@ FSR, QuickSRNet/SESR, RIFE 제작자에게 감사드립니다. [FSR](FSR-LICENSE
 ## 원격 터미널
 
 데스크톱 또는 터미널을 선택하거나 연결을 더블 클릭하여 모드를 선택하세요. 독립 창으로 여러 연결을 사용할 수 있고 미지원 구버전에는 업데이트 안내가 표시됩니다. Linux는 일반 사용자로 실행하세요. `-secret "암호"`를 지원하며 `LC_ALL → LC_MESSAGES → LANG`에 따라 번체 중국어, 영어, 일본어, 한국어를 선택합니다. 미지원 언어는 영어로 표시합니다. 사용법은 ZIP의 README를 확인하세요.
+
+## 개발 후원
+
+YourDesk가 도움이 되었다면 커피 한 잔으로 지속적인 개발을 응원해 주세요.
+
+[☕ Buy Me a Coffee](https://buymeacoffee.com/vaderchen)

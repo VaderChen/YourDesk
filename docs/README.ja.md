@@ -76,3 +76,9 @@ FSR、QuickSRNet／SESR、RIFE の作者に感謝します。[FSR](FSR-LICENSE.t
 ## リモートターミナル
 
 デスクトップとターミナルを選択でき、ダブルクリックでも選べます。別々のウィンドウで複数の接続先を操作でき、非対応の旧版には更新を案内します。Linux は一般ユーザーで実行してください。`-secret "パスワード"` に対応し、`LC_ALL → LC_MESSAGES → LANG` に従って繁体中国語・英語・日本語・韓国語を選択します。非対応の言語は英語です。使い方は ZIP の README を参照してください。
+
+## 開発を支援
+
+YourDesk が役に立ったら、コーヒー一杯で継続的な開発を応援していただけると嬉しいです。
+
+[☕ Buy Me a Coffee](https://buymeacoffee.com/vaderchen)

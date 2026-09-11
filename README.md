@@ -84,3 +84,9 @@ macOS 首次使用需允許「螢幕錄製」與「輔助使用」權限。Windo
 ## 遠端命令列
 
 站台提供桌面與命令列兩種模式，雙擊可選擇。命令列使用獨立視窗，可同時操作不同站台；舊版不支援時會提示更新。Linux 請以一般使用者執行，CLI 支援 `-secret "密碼"`，語系依 `LC_ALL → LC_MESSAGES → LANG` 選擇繁中、英、日、韓，不支援時使用英文。Linux ZIP 的 README 提供完整使用方式。
+
+## 支持開發
+
+如果 YourDesk 對你有幫助，歡迎請我喝杯咖啡，支持持續開發。
+
+[☕ Buy Me a Coffee](https://buymeacoffee.com/vaderchen)
