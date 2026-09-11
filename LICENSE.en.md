@@ -3,9 +3,9 @@
 Version 1.0  
 Copyright (C) 2026 VaderChen. All rights reserved.
 
-[繁體中文](LICENSE) · **English** · [日本語](LICENSE.ja.md) · [한국어](LICENSE.ko.md)
+[繁體中文](LICENSE.md) · **English** · [日本語](LICENSE.ja.md) · [한국어](LICENSE.ko.md)
 
-This is a translation of the complete Traditional Chinese license. In case of inconsistency or ambiguity, the [Traditional Chinese text](LICENSE) governs.
+This is a translation of the complete Traditional Chinese license. In case of inconsistency or ambiguity, the [Traditional Chinese text](LICENSE.md) governs.
 
 ## 1. Scope
 
@@ -29,7 +29,11 @@ You must not, directly or indirectly, in exchange for money or other considerati
 
 Entirely voluntary support that is not a condition of receiving the Software, features, access, support or other benefits is not considered selling. Mandatory, disguised or conditional contributions involving an exchange do not qualify for this exception.
 
-If you intend to sell or integrate the Software, contact the copyright holder to discuss the scope and terms of a separate license. Until both parties enter into a separate written license agreement, this license continues to govern; inquiries or discussions alone do not grant permission. A separate license applies only within the scope expressly agreed in writing. Matters not covered remain governed by this license, and third-party licenses are unaffected.
+If you intend to sell or integrate the Software, contact the copyright holder to discuss the scope and terms of a separate license.
+
+- Until both parties enter into a separate written license agreement, this license continues to govern; inquiries or discussions alone do not grant permission.
+- A separate license applies only within the scope expressly agreed in writing.
+- Matters not covered remain governed by this license, and third-party licenses are unaffected.
 
 ## 4. Conditions for modification and free distribution
 
