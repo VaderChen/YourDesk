@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>YourDesk · 裝置與站台</title><link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar"><a class="brand" href="/" aria-label="YourDesk 首頁"><img class="brand-mark" src="app-icon.png" alt="" width="26" height="26">YourDesk<span class="brand-caption">遠端工作空間</span></a><div class="header-room"><label for="device-room">本機 ID</label><code id="device-room">—</code><button class="icon-button" id="copy-room" aria-label="複製本機 ID" data-tooltip="複製本機 ID">⧉</button></div><div class="local-badge"><i></i><span id="host-status">Client 啟動中</span></div></header>
+  <main>
+    <section class="sites-section" aria-label="站台管理">
+      <div class="section-heading"><button id="open-settings" class="icon-button settings-button" type="button" aria-label="設定" data-tooltip="設定" aria-haspopup="dialog" aria-controls="settings-dialog"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 3-.6 2.4-1.7 1L4.3 6 2 10l1.8 1.7v2L2 15.4l2.3 4 2.4-.4 1.7 1L9 22h4.6l.6-2 1.7-1 2.4.4 2.3-4-1.8-1.7v-2l1.8-1.7-2.3-4-2.4.4-1.7-1L13.6 3Z"/><circle cx="11.3" cy="12.5" r="3.2"/></svg></button><button id="stop-incoming" class="icon-button stop-incoming" type="button" aria-label="關閉遠端連線" data-tooltip="關閉遠端連線" hidden><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2" fill="currentColor"/></svg></button><div id="password-reminder" class="password-reminder" role="status" hidden><span>請到設定修改初始連線密碼。</span><button type="button" id="change-initial-password" class="button">修改密碼</button><button type="button" id="dismiss-password-reminder" class="icon-button" aria-label="關閉提醒">×</button></div><form id="quick-form" class="quick-connect"><label for="quick-room">快速連線</label><input id="quick-room" name="room" required maxlength="200" placeholder="貼上遠端 ID 或 IP" autocomplete="off" spellcheck="false"><button id="quick-submit" class="button" type="submit">連線 ↗</button><button id="quick-stop" class="icon-button" type="button" hidden aria-label="取消快速連線" data-tooltip="取消快速連線">×</button></form><div class="actions"><button id="add-site" class="button primary">＋ 新增站台</button></div></div>
+      <p id="quick-status" class="quick-status" role="status" aria-live="polite" hidden></p>
+      <div class="library-layout"><aside class="sidebar" aria-label="站台群組"><div class="sidebar-label"><span>群組</span><button id="sidebar-add-group" class="icon-button" type="button" data-tooltip="新增群組" aria-label="新增群組">＋</button></div><nav id="groups"></nav></aside><div class="site-content"><div class="toolbar"><div class="filter-title"><h3 id="filter-name">所有站台</h3><span id="filter-count">0 個站台</span></div><label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="搜尋名稱、裝置 ID 或備註" aria-label="搜尋站台"></label></div><div id="site-list" class="site-list"></div></div></div>
+    </section>
+    <footer class="page-footer"><span>YourDesk · P2P 遠端桌面</span><span id="footer-version" data-no-i18n>—</span></footer>
+  </main>
+  <div id="notice" role="status" aria-live="polite" hidden></div>
+  <div id="connection-error" role="alert" hidden></div>
+  <dialog id="settings-dialog" aria-labelledby="settings-title">
+    <form method="dialog" class="settings-shell">
+      <div class="modal-heading"><h2 id="settings-title">設定</h2><button type="button" class="close icon-button" aria-label="關閉設定">×</button></div>
+      <div class="settings-layout">
+        <nav class="settings-nav" role="tablist" aria-label="設定功能" aria-orientation="vertical">
+          <button type="button" id="settings-tab-general" class="settings-tab" role="tab" aria-selected="true" aria-controls="settings-panel-general" data-settings-tab="general">一般設定</button>
+          <button type="button" id="settings-tab-security" class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-panel-security" data-settings-tab="security" tabindex="-1">網路安全</button>
+          <button type="button" id="settings-tab-stream" class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-panel-stream" data-settings-tab="stream" tabindex="-1">串流方式</button>
+          <button type="button" id="settings-tab-enhancement" class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-panel-enhancement" data-settings-tab="enhancement" tabindex="-1">畫面增強</button>
+          <button type="button" id="settings-tab-mcp" class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-panel-mcp" data-settings-tab="mcp" tabindex="-1">MCP 設定</button>
+          <button type="button" id="settings-tab-about" class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-panel-about" data-settings-tab="about" tabindex="-1">關於</button>
+        </nav>
+        <div class="settings-content">
+          <section id="settings-panel-general" role="tabpanel" aria-labelledby="settings-tab-general" tabindex="0">
+            <h3 class="settings-panel-title">一般設定</h3>
+            <div class="preference-row"><label for="ui-language">多國語言</label><select id="ui-language"><option value="auto">AUTO</option><option value="zh-Hant">繁體中文</option><option value="en">英文</option><option value="ja">日文</option><option value="ko">韓文</option></select></div>
+            <div class="preference-row"><label for="ui-theme">介面風格</label><select id="ui-theme"><option value="default">預設</option><option value="light">明亮</option><option value="dark">暗調</option></select></div>
+            <div class="preference-row"><label for="ui-hints">泡泡提示</label><input id="ui-hints" class="preference-switch" type="checkbox" role="switch" checked></div>
+            <div class="preference-row"><label for="ui-key-mapping">MacOS/Windows 按鍵映射</label><input id="ui-key-mapping" class="preference-switch" type="checkbox" role="switch" checked></div>
+            <div class="preference-row"><label for="ui-fit-window" data-tooltip="自動調整 遠端顯示 視窗比例，完整顯示遠端畫面。全螢幕不調整。">調整畫面滿版</label><input id="ui-fit-window" class="preference-switch" type="checkbox" role="switch"></div>
+            <p class="form-note">AUTO 跟隨系統語言；預設風格跟隨系統明暗模式。設定會自動儲存。</p>
+            <dl class="settings-details"><div><dt>主機名稱</dt><dd id="settings-hostname">—</dd></div><div><dt>站台設定檔</dt><dd class="settings-config"><span id="settings-path">—</span><span class="config-actions"><button id="import-config" type="button" class="button" data-tooltip="匯入站台設定檔">匯入</button><button id="export-config" type="button" class="button" data-tooltip="匯出站台設定檔">匯出</button></span><input id="import-config-file" type="file" accept=".json,application/json" hidden></dd></div></dl>
+          </section>
+          <section id="settings-panel-security" role="tabpanel" aria-labelledby="settings-tab-security" tabindex="0" hidden>
+            <h3 class="settings-panel-title">網路安全</h3>
+            <dl class="settings-details"><div><dt>本機 ID</dt><dd id="settings-room">—</dd></div></dl>
+			<div class="preference-row"><label for="direct-listen">允許 IP 直連</label><input id="direct-listen" class="preference-switch" type="checkbox" role="switch"></div><p class="form-note">預設關閉。啟用後才會在 TCP 47823 接受通過密碼驗證的直連。</p>
+            <div class="preference-row experimental-unavailable" tabindex="0" data-tooltip="開機後尚未登入 OS 時允許遠端連線。目前版本尚未提供系統服務，暫不支援。"><label for="prelogin-access"><span>未登入開機</span> <span class="experimental-badge">實驗性功能</span></label><input id="prelogin-access" class="preference-switch" type="checkbox" role="switch" disabled aria-describedby="prelogin-access-reason"><span id="prelogin-access-reason" class="experimental-reason">開機後尚未登入 OS 時允許遠端連線。目前版本尚未提供系統服務，暫不支援。</span></div>
+            <p id="prelogin-progress" class="form-note" role="status" aria-live="polite"></p>
+            <div class="preference-row experimental-unavailable" tabindex="0" data-tooltip="透過網路喚醒本機，需硬體、電源設定及可用的喚醒節點支援。目前版本尚未提供此功能。"><label for="remote-wake"><span>遠端開機</span> <span class="experimental-badge">實驗性功能</span></label><input id="remote-wake" class="preference-switch" type="checkbox" role="switch" disabled aria-describedby="remote-wake-reason"><span id="remote-wake-reason" class="experimental-reason">透過網路喚醒本機，需硬體、電源設定及可用的喚醒節點支援。目前版本尚未提供此功能。</span></div>
+            <label for="local-secret" class="settings-section-title">連線密碼</label><div class="copy-row settings-secret"><input id="local-secret" type="password" readonly aria-label="本機連線密碼"><button class="icon-button" id="toggle-secret" type="button" aria-label="顯示連線密碼">顯示</button></div><label for="new-local-secret">新連線密碼</label><div class="change-password-row"><input id="new-local-secret" type="password" minlength="6" maxlength="1000" autocomplete="new-password" placeholder="至少 6 個字元"><button id="save-local-password" class="button" type="button">儲存密碼</button></div><p class="form-note">修改後會重新啟動本機 Client，現有連線將中斷。</p>
+          </section>
+          <section id="settings-panel-stream" role="tabpanel" aria-labelledby="settings-tab-stream" tabindex="0" hidden>
+            <h3 class="settings-panel-title">串流方式</h3>
+            <div class="preference-row" data-tooltip="FPS 範圍 5～60，碼率範圍 1～64 Mbps。碼率限制 H.264／HEVC 的目標值，瞬間流量可能超過。"><label for="ui-source-fps">來源 FPS 上限</label><input id="ui-source-fps" type="number" required min="5" max="60" step="1" value="20"></div>
+            <div class="preference-row" data-tooltip="FPS 範圍 5～60，碼率範圍 1～64 Mbps。碼率限制 H.264／HEVC 的目標值，瞬間流量可能超過。"><label for="ui-bitrate-limit">碼率上限（Mbps）</label><input id="ui-bitrate-limit" type="number" required min="1" max="64" step="1" value="12"></div>
+
+            <div class="preference-row" data-tooltip="每隔指定張數要求關鍵影格；1 為每張。僅適用 H.264／HEVC。"><label for="ui-gop">GOP（關鍵影格間隔）</label><input id="ui-gop" type="number" required min="1" max="300" step="1" value="10"></div>
+            <div class="preference-row"><label for="stream-codec">影像傳輸</label><select id="stream-codec"></select></div><p class="form-note">變更後會重新啟動本機 Client，現有遠端連線將中斷。不支援的方式無法選取。</p><dl class="settings-details"><div><dt>連線方式</dt><dd>WebRTC P2P 直連</dd></div><div><dt>畫面通道</dt><dd>低延遲、不重傳</dd></div><div><dt>控制通道</dt><dd>可靠、有序傳輸</dd></div></dl>
+          <div class="stream-auto-actions">
+ <button type="button" class="button" id="stream-auto-latency" data-tooltip="依遠端實測調整 FPS 與 GOP，優先減少等待；保留畫質、解析度、碼率與影像傳輸設定。設定會套用到所有 遠端顯示。">自動配置/延遲優先</button>
+ <button type="button" class="button" id="stream-auto-traffic" data-tooltip="降低每秒傳送張數，減少完整畫面傳送；保留畫質、解析度、碼率與影像傳輸設定。動作會較不流暢，流量依內容而定。設定會套用到所有 遠端顯示。">自動配置/流量優先</button>
+ </div><p id="stream-auto-status" class="form-note" role="status" aria-live="polite" hidden></p>
+ </section>
+          <section id="settings-panel-enhancement" role="tabpanel" aria-labelledby="settings-tab-enhancement" tabindex="0" hidden>
+            <h3 class="settings-panel-title">畫面增強</h3>
+            <div class="preference-row"><label for="ui-enhancement">啟用畫面增強（實驗性）</label><input id="ui-enhancement" class="preference-switch" type="checkbox" role="switch"></div>
+            <div class="preference-row"><label for="ui-super-resolution">超解析度</label><select id="ui-super-resolution"></select></div>
+            <div id="coreml-model-row" class="preference-row" hidden><label for="ui-coreml-model">Core ML 模型</label><select id="ui-coreml-model"></select></div>
+            <div class="preference-row"><label for="ui-enhancement-strategy">增強策略</label><select id="ui-enhancement-strategy"><option value="quality">自動調整</option><option value="smooth">畫面流暢優先</option><option value="traffic">網路負載優先</option></select></div>
+            <div id="enhancement-budget-row" class="preference-row" hidden><label for="ui-enhancement-budget">基準碼率（Mbps）</label><input id="ui-enhancement-budget" type="number" required min="1" max="100" step="1" value="12"></div>
+            <div class="preference-row"><label for="ui-interpolation">2× 補幀（實驗性）</label><input id="ui-interpolation" class="preference-switch" type="checkbox" role="switch"></div>
+            <div class="preference-row"><label for="ui-interpolation-method">補幀方式</label><select id="ui-interpolation-method"><option value="">自動（Apple 優先）</option><option value="apple">Apple 低延遲</option><option value="rife">RIFE 4.25 Lite</option></select></div>
+            <dl class="settings-details"><div><dt>傳輸尺寸</dt><dd>寬、高各 75%</dd></div><div><dt>目標碼率</dt><dd id="enhancement-rate-summary">沿用原畫質設定，不額外降低</dd></div></dl>
+
+
+          </section>
+          <section id="settings-panel-mcp" role="tabpanel" aria-labelledby="settings-tab-mcp" tabindex="0" hidden>
+            <h3 class="settings-panel-title">MCP 設定</h3>
+            <div class="preference-row"><label for="ui-mcp-enabled" data-tooltip="允許 Agent 查詢狀態及操作已授權的遠端連線。預設關閉，切換後立即生效。">啟用 MCP</label><input id="ui-mcp-enabled" class="preference-switch" type="checkbox" role="switch"></div>
+            <div class="preference-row"><label for="ui-mcp-open-display" data-tooltip="開啟後，MCP 接管時自動顯示遠端畫面；關閉時在背景操作，可從 Tray 開啟或隱藏。">MCP 接管後開啟畫面</label><input id="ui-mcp-open-display" class="preference-switch" type="checkbox" role="switch"></div>
+            <div class="preference-row"><label for="ui-mcp-whitelist-enabled">啟用 IP 白名單</label><input id="ui-mcp-whitelist-enabled" class="preference-switch" type="checkbox" role="switch" checked></div>
+            <label for="ui-mcp-whitelist">允許的 IP 位址</label>
+            <textarea id="ui-mcp-whitelist" rows="4" spellcheck="false" aria-describedby="mcp-whitelist-note">127.0.0.1</textarea>
+            <p id="mcp-whitelist-note" class="form-note">每行一個 IP。白名單啟用時，名單內免 Token、名單外禁止連線；關閉時所有來源皆需 Token。</p>
+            <dl class="settings-details"><div><dt>服務位址</dt><dd class="mcp-address"><span id="mcp-address">http://127.0.0.1:12345/mcp</span><button type="button" class="icon-button" id="copy-mcp-address" aria-label="複製 MCP 位址" data-tooltip="複製 MCP 位址">⧉</button></dd></div></dl>
+            <p class="form-note">連線需要獨立 Token；關閉後，Agent 將無法透過 MCP 操作。</p>
+          </section>
+          <section id="settings-panel-about" role="tabpanel" aria-labelledby="settings-tab-about" tabindex="0" hidden>
+
+            <h3 class="settings-panel-title">關於</h3><div class="settings-about-heading"><div class="settings-about-brand"><img src="app-icon.png" alt="" width="40" height="40">YourDesk</div><button id="check-update" class="button" type="button">檢查更新</button></div><p class="settings-description">P2P 遠端桌面</p>
+            <dl class="settings-details"><div><dt>版本</dt><dd id="settings-version">—</dd></div><div><dt>系統 / 架構</dt><dd id="settings-platform">—</dd></div><div><dt>GitHub</dt><dd><a id="project-github" href="https://github.com/VaderChen/YourDesk" target="_blank" rel="noopener noreferrer" data-no-i18n>github.com/VaderChen/YourDesk ↗</a></dd></div></dl><div class="preference-row"><label for="force-update" data-tooltip="忽略版本高低，下載最新正式 Release。">強制更新</label><input id="force-update" class="preference-switch" type="checkbox" role="switch"></div><div class="settings-update-area"><button id="download-update" class="button primary" type="button" hidden>下載更新</button><p id="update-status" class="form-note" role="status"></p></div>
+          </section>
+        </div>
+      </div>
+      <div class="modal-actions"><button class="button primary" type="submit">關閉</button></div>
+    </form>
+  </dialog>
+  <dialog id="site-dialog"><form id="site-form"><div class="modal-heading"><div><p class="eyebrow">SITE DETAILS</p><h2 id="site-dialog-title">新增站台</h2></div><button type="button" class="close icon-button" aria-label="關閉">×</button></div><input name="id" type="hidden"><label>站台名稱<input name="name" required maxlength="200" placeholder="例如：辦公室 Mac mini" autocomplete="off"></label><label>裝置 ID <span>ROOM</span><input name="room" required maxlength="200" placeholder="YD-XXXX-XXXX-XXXX-XXXX-XXXX 或 IP" autocomplete="off" spellcheck="false"></label><label>收納群組<select name="group"></select></label><label>備註 <span>選填</span><textarea name="note" rows="2" maxlength="2000" placeholder="記下裝置的位置或用途"></textarea></label><p class="form-note">連線時輸入連線密碼，可勾選「記住我」。</p><div class="modal-actions"><button type="button" class="button close">取消</button><button class="button primary" type="submit">儲存站台</button></div></form></dialog>
+  <dialog id="group-dialog"><form id="group-form"><div class="modal-heading"><h2 id="group-dialog-title">新增群組</h2><button type="button" class="close icon-button" aria-label="關閉">×</button></div><input name="id" type="hidden"><label>群組名稱<input name="name" required maxlength="200" placeholder="例如：公司、家中、客戶站台" autocomplete="off"></label><div class="modal-actions"><button type="button" class="button close">取消</button><button class="button primary" type="submit">儲存群組</button></div></form></dialog>
+  <dialog id="quick-password-dialog" aria-labelledby="quick-password-title"><form id="quick-password-form"><div class="modal-heading"><h2 id="quick-password-title">輸入連線密碼</h2><button type="button" class="icon-button quick-cancel" aria-label="取消連線">×</button></div><p id="quick-password-message" class="settings-description"></p><code id="quick-password-room"></code><label>連線密碼<input name="secret" type="password" required maxlength="1000" autocomplete="off" placeholder="輸入遠端提供的連線密碼"></label><label class="remember-row"><input name="remember" type="checkbox">記住我</label><div class="modal-actions"><button type="button" class="button quick-cancel">取消連線</button><button type="submit" class="button primary">確認連線</button></div></form></dialog>
+  <dialog id="connect-dialog"><form id="connect-form"><div class="modal-heading"><div><p class="eyebrow">REMOTE CONNECTION</p><h2>連接站台</h2></div><button type="button" class="close icon-button" aria-label="關閉">×</button></div><p id="connect-name"></p><code id="connect-room"></code><input name="id" type="hidden"><label>連線密碼<input name="secret" type="password" required autocomplete="off" placeholder="輸入被控端提供的密碼"></label><label class="remember-row"><input name="remember" type="checkbox">記住我</label><p class="form-note">將開啟原生 遠端顯示 視窗。被控端必須已啟動 Client。</p><div class="modal-actions"><button type="button" class="button close">取消</button><button class="button primary" type="submit">連到遠端 ↗</button></div></form></dialog>
+  <dialog id="confirm-dialog"><form id="confirm-form"><div class="modal-heading"><h2 id="confirm-title">刪除項目</h2><button type="button" class="close icon-button" aria-label="關閉">×</button></div><p id="confirm-description"></p><div class="modal-actions"><button type="button" class="button close">取消</button><button type="submit" class="button danger">確認刪除</button></div></form></dialog>
+<dialog id="connection-progress-dialog" aria-labelledby="connection-progress-title">
+ <form method="dialog">
+  <div class="connection-spinner" aria-hidden="true"></div>
+  <h2 id="connection-progress-title">正在建立連線</h2>
+  <p id="connection-progress-name"></p>
+  <p id="connection-progress-status" role="status" aria-live="polite">等待遠端回應…</p>
+  <div class="modal-actions"><button type="button" class="button" id="connection-progress-cancel">取消連線</button></div>
+ </form>
+</dialog>
+<dialog id="release-dialog" aria-labelledby="release-title">
+ <div class="modal-heading"><h2 id="release-title">發現新版本</h2><button type="button" class="icon-button" id="release-close" aria-label="關閉">×</button></div>
+ <p id="release-version"></p>
+ <p id="release-status" role="status" aria-live="polite"></p>
+ <div id="release-progress-area" hidden><progress id="release-progress" max="100" value="0" aria-label="下載進度"></progress><p id="release-progress-label" data-no-i18n></p></div>
+ <p id="release-path" data-no-i18n></p>
+ <div class="modal-actions"><button type="button" class="button" id="release-later">稍後</button><button type="button" class="button primary" id="release-download">下載更新</button></div>
+</dialog>
+<dialog id="diagnostic-dialog" aria-labelledby="diagnostic-title">
+ <form method="dialog">
+  <div class="modal-heading"><h2 id="diagnostic-title">連線分析</h2><button type="button" class="close icon-button" aria-label="關閉">×</button></div>
+  <p id="diagnostic-site" data-no-i18n></p>
+  <p id="diagnostic-status" role="status" aria-live="polite"></p>
+  <progress id="diagnostic-progress" max="10" value="0" aria-label="分析進度"></progress>
+  <div id="diagnostic-report" data-no-i18n></div>
+  <p class="form-note">自動取樣目前連線，無需操作遠端。結果不代表網路最高速度。</p>
+  <div class="modal-actions"><button type="button" class="button" id="diagnostic-retry">重新分析</button><button type="button" class="button close primary">關閉</button></div>
+ </form>
+</dialog>
+  <dialog id="stream-auto-dialog" aria-labelledby="stream-auto-title">
+    <div class="modal-heading"><h2 id="stream-auto-title">自動配置偵測</h2><button id="stream-auto-close" type="button" class="icon-button" aria-label="關閉">×</button></div>
+    <p id="stream-auto-message" role="status" aria-live="polite"></p>
+    <progress id="stream-auto-progress" max="100" value="0" aria-label="分析進度"></progress>
+    <ol id="stream-auto-steps">
+      <li>確認遠端連線</li><li>收集有效畫面樣本</li><li>計算建議配置</li><li>套用並儲存設定</li>
+    </ol>
+    <p class="form-note">依目前連線的動態樣本計算，不代表網路最高速度；資料不足時不變更設定。</p>
+    <div id="stream-auto-result" class="settings-details" aria-live="polite"></div>
+    <div class="modal-actions"><button id="stream-auto-cancel" type="button" class="button">取消</button></div>
+  </dialog>
+  <script src="i18n.js"></script>
+  <script src="tooltips.js"></script>
+  <script src="app.js"></script>
+  <script src="diagnostics.js"></script>
+</body>
+</html>

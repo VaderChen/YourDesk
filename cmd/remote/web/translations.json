@@ -1,0 +1,617 @@
+{
+  "低流量": [
+    "Low bandwidth",
+    "低通信量",
+    "저대역폭"
+  ],
+  "標準": [
+    "Standard",
+    "標準",
+    "표준"
+  ],
+  "高畫質": [
+    "High quality",
+    "高画質",
+    "고화질"
+  ],
+  "原始解析度（1:1）": [
+    "Original resolution (1:1)",
+    "元の解像度（1:1）",
+    "원본 해상도 (1:1)"
+  ],
+  "自動符合視窗": [
+    "Fit to window",
+    "ウィンドウに合わせる",
+    "창에 맞추기"
+  ],
+  "只縮小，不放大": [
+    "Shrink only",
+    "縮小のみ",
+    "축소만"
+  ],
+  "離開全螢幕": [
+    "Exit fullscreen",
+    "フルスクリーンを終了",
+    "전체 화면 종료"
+  ],
+  "進入全螢幕": [
+    "Enter fullscreen",
+    "フルスクリーンにする",
+    "전체 화면 시작"
+  ],
+  "螢幕 %d": [
+    "Display %d",
+    "ディスプレイ %d",
+    "디스플레이 %d"
+  ],
+  "關閉 遠端顯示": [
+    "Close Remote Display",
+    "リモート画面 を閉じる",
+    "원격 화면 닫기"
+  ],
+  "最小化": [
+    "Minimize",
+    "最小化",
+    "최소화"
+  ],
+  "全螢幕／視窗": [
+    "Fullscreen / window",
+    "フルスクリーン／ウィンドウ",
+    "전체 화면 / 창"
+  ],
+  "畫質：低流量／標準／高畫質": [
+    "Quality: Low bandwidth / Standard / High",
+    "画質：低通信量／標準／高画質",
+    "화질: 저대역폭 / 표준 / 고화질"
+  ],
+  "畫質": [
+    "Quality",
+    "画質",
+    "화질"
+  ],
+  "縮放與全螢幕": [
+    "Scaling and fullscreen",
+    "拡大縮小とフルスクリーン",
+    "배율 및 전체 화면"
+  ],
+  "選擇螢幕": [
+    "Select display",
+    "ディスプレイを選択",
+    "디스플레이 선택"
+  ],
+  "遠端畫面每秒更新影格數": [
+    "Remote frame updates per second",
+    "リモート画面の毎秒更新フレーム数",
+    "초당 원격 화면 갱신 프레임 수"
+  ],
+  "此連線的傳送與接收速度": [
+    "Connection upload and download speed",
+    "接続の送受信速度",
+    "연결 송수신 속도"
+  ],
+  "正在切換螢幕": [
+    "Switching display",
+    "ディスプレイを切り替え中",
+    "디스플레이 전환 중"
+  ],
+  "螢幕 {current}/{count} · 點擊選擇螢幕": [
+    "Display {current}/{count} · Click to select",
+    "ディスプレイ {current}/{count} · クリックして選択",
+    "디스플레이 {current}/{count} · 클릭하여 선택"
+  ],
+  "螢幕 1/1 · 遠端只有一個螢幕": [
+    "Display 1/1 · One remote display",
+    "ディスプレイ 1/1 · リモートディスプレイは1台",
+    "디스플레이 1/1 · 원격 디스플레이 1개"
+  ],
+  "遠端未提供螢幕資訊": [
+    "Remote display information unavailable",
+    "リモートのディスプレイ情報がありません",
+    "원격 디스플레이 정보 없음"
+  ],
+  "編碼狀態": [
+    "Codec status",
+    "コーデック状態",
+    "코덱 상태"
+  ],
+  "來源": [
+    "Source",
+    "送信元",
+    "송신"
+  ],
+  "接收": [
+    "Receiver",
+    "受信側",
+    "수신"
+  ],
+  "硬體": [
+    "Hardware",
+    "ハードウェア",
+    "하드웨어"
+  ],
+  "軟體": [
+    "Software",
+    "ソフトウェア",
+    "소프트웨어"
+  ],
+  "硬體解碼": [
+    "Hardware decoding",
+    "ハードウェアデコード",
+    "하드웨어 디코딩"
+  ],
+  "軟體解碼": [
+    "Software decoding",
+    "ソフトウェアデコード",
+    "소프트웨어 디코딩"
+  ],
+  "未知": [
+    "Unknown",
+    "不明",
+    "알 수 없음"
+  ],
+  "等待影格": [
+    "Waiting for frame",
+    "フレーム待機中",
+    "프레임 대기 중"
+  ],
+  "來源編碼": [
+    "Source encoding",
+    "送信側エンコード",
+    "송신 인코딩"
+  ],
+  "接收解碼": [
+    "Receiver decoding",
+    "受信側デコード",
+    "수신 디코딩"
+  ],
+  "硬體編碼": [
+    "Hardware encoding",
+    "ハードウェアエンコード",
+    "하드웨어 인코딩"
+  ],
+  "軟體編碼": [
+    "Software encoding",
+    "ソフトウェアエンコード",
+    "소프트웨어 인코딩"
+  ],
+  "再按一次即可關閉 遠端顯示": [
+    "Click again to close Remote Display",
+    "もう一度押すと リモート画面 を閉じます",
+    "한 번 더 누르면 Viewer가 닫힙니다"
+  ],
+  "最大化／還原": [
+    "Maximize / Restore",
+    "最大化／元に戻す",
+    "최대화 / 복원"
+  ],
+  "傳輸進度": [
+    "Transfer progress",
+    "転送の進行状況",
+    "전송 진행률"
+  ],
+  "關閉視窗後仍會繼續傳輸。": [
+    "Transfers continue after closing this dialog.",
+    "この画面を閉じても転送は続行します。",
+    "이 창을 닫아도 전송은 계속됩니다."
+  ],
+  "傳送至遠端": [
+    "Sending to remote",
+    "リモートに送信",
+    "원격으로 보내는 중"
+  ],
+  "從遠端接收": [
+    "Receiving from remote",
+    "リモートから受信",
+    "원격에서 받는 중"
+  ],
+  "文字": [
+    "Text",
+    "テキスト",
+    "텍스트"
+  ],
+  "圖片": [
+    "Image",
+    "画像",
+    "이미지"
+  ],
+  "檔案": [
+    "Files",
+    "ファイル",
+    "파일"
+  ],
+  "正在傳輸…": [
+    "Transferring…",
+    "転送中…",
+    "전송 중…"
+  ],
+  "等待接收端確認…": [
+    "Waiting for receiver confirmation…",
+    "受信側の確認を待っています…",
+    "수신 측 확인을 기다리는 중…"
+  ],
+  "正在驗證並寫入剪貼簿…": [
+    "Verifying and updating clipboard…",
+    "検証してクリップボードに書き込み中…",
+    "검증 후 클립보드에 쓰는 중…"
+  ],
+  "傳輸完成": [
+    "Transfer complete",
+    "転送完了",
+    "전송 완료"
+  ],
+  "傳輸未完成，請重新複製或貼上。": [
+    "Transfer did not complete. Copy or paste again.",
+    "転送が完了しませんでした。もう一度コピーまたは貼り付けてください。",
+    "전송을 완료하지 못했습니다. 다시 복사하거나 붙여 넣으세요."
+  ],
+  "畫面增強": [
+    "Image enhancement",
+    "画像強化",
+    "영상 향상"
+  ],
+  "演算法": [
+    "Algorithm",
+    "アルゴリズム",
+    "알고리즘"
+  ],
+  "來源尺寸": [
+    "Source dimensions",
+    "元の解像度",
+    "원본 해상도"
+  ],
+  "傳輸尺寸": [
+    "Stream dimensions",
+    "転送解像度",
+    "전송 해상도"
+  ],
+  "顯示尺寸": [
+    "Display dimensions",
+    "表示解像度",
+    "표시 해상도"
+  ],
+  "目標碼率": [
+    "Target bitrate",
+    "目標ビットレート",
+    "목표 비트레이트"
+  ],
+  "補幀": [
+    "Frame interpolation",
+    "フレーム補間",
+    "프레임 보간"
+  ],
+  "品質控制／未回報": [
+    "Quality control / not reported",
+    "品質制御／未報告",
+    "품질 제어 / 보고되지 않음"
+  ],
+  "未啟用，保留真實 FPS": [
+    "Off; actual FPS unchanged",
+    "無効・実 FPS を維持",
+    "꺼짐, 실제 FPS 유지"
+  ],
+  "尚未啟用": [
+    "Off",
+    "無効",
+    "꺼짐"
+  ],
+  "GPU 著色器無法使用": [
+    "GPU shader unavailable",
+    "GPU シェーダーを利用できません",
+    "GPU 셰이더 사용 불가"
+  ],
+  "遠端尚未公告支援，請確認版本": [
+    "Host support not announced; check its version",
+    "ホストの対応情報が未受信です。バージョンを確認してください",
+    "호스트 지원 정보가 없습니다. 버전을 확인하세요"
+  ],
+  "等待遠端回報增強狀態": [
+    "Waiting for host enhancement status",
+    "ホストの画像強化状態を待機中",
+    "호스트 향상 상태 대기 중"
+  ],
+  "等待遠端套用增強": [
+    "Waiting for host to apply enhancement",
+    "ホストの画像強化適用を待機中",
+    "호스트 향상 적용 대기 중"
+  ],
+  "已啟用 GPU 畫面增強": [
+    "GPU enhancement active",
+    "GPU 画像強化が有効",
+    "GPU 영상 향상 활성"
+  ],
+  "已降傳輸尺寸，目前視窗不需放大": [
+    "Stream reduced; this window needs no upscaling",
+    "転送解像度を縮小済み・現在のウィンドウでは拡大不要",
+    "전송 해상도 축소됨, 현재 창은 확대 불필요"
+  ],
+  "等待視窗尺寸穩定": [
+    "Waiting for window size to settle",
+    "ウィンドウサイズの安定を待機中",
+    "창 크기 안정화 대기 중"
+  ],
+  "正在偵測": [
+    "Detecting",
+    "検出中",
+    "감지 중"
+  ],
+  "僅支援 Apple Silicon Mac": [
+    "Requires an Apple Silicon Mac",
+    "Apple Silicon Mac のみ対応",
+    "Apple Silicon Mac만 지원"
+  ],
+  "需要 macOS 12 或更新版本": [
+    "Requires macOS 12 or later",
+    "macOS 12 以降が必要",
+    "macOS 12 이상 필요"
+  ],
+  "不支援的超解析度方式": [
+    "Unsupported super-resolution method",
+    "非対応の超解像方式",
+    "지원하지 않는 초해상도 방식"
+  ],
+  "Core ML 使用本機模型，運算裝置由系統分配。不可用時回退 FSR 1。": [
+    "Core ML uses a local model; the system selects compute devices. FSR 1 is used when unavailable.",
+    "Core ML はローカルモデルを使用し、実行デバイスはシステムが選択します。利用できない場合は FSR 1 を使用します。",
+    "Core ML은 로컬 모델을 사용하며 시스템이 연산 장치를 선택합니다. 사용할 수 없으면 FSR 1으로 전환합니다."
+  ],
+  "畫面增強已生效": [
+    "Image enhancement active",
+    "画像強化が有効",
+    "영상 향상 활성"
+  ],
+  "執行狀態": [
+    "Runtime status",
+    "実行状態",
+    "실행 상태"
+  ],
+  "Core ML 自動分配運算裝置": [
+    "Core ML selects compute devices automatically",
+    "Core ML が実行デバイスを自動選択",
+    "Core ML이 연산 장치를 자동 선택"
+  ],
+  "Core ML 未就緒，暫用 FSR 1": [
+    "Core ML not ready; using FSR 1",
+    "Core ML 準備中・FSR 1 を使用",
+    "Core ML 준비 중, FSR 1 사용"
+  ],
+  "Core ML 推論失敗，回退 FSR 1": [
+    "Core ML inference failed; using FSR 1",
+    "Core ML 推論失敗・FSR 1 を使用",
+    "Core ML 추론 실패, FSR 1 사용"
+  ],
+  "可使用": [
+    "Available",
+    "利用可能",
+    "사용 가능"
+  ],
+  "遠端拒絕串流設定": [
+    "Host rejected stream settings",
+    "ホストが配信設定を拒否しました",
+    "호스트가 스트림 설정을 거부함"
+  ],
+  "編碼後端不支援目前碼率要求，已回退品質控制": [
+    "Encoder cannot meet the bitrate request; using quality control",
+    "ビットレート要求に対応できないため品質制御に切り替えました",
+    "인코더가 비트레이트 요청을 지원하지 않아 품질 제어로 전환됨"
+  ],
+  "增強策略": [
+    "Enhancement strategy",
+    "画像強化方針",
+    "향상 전략"
+  ],
+  "流暢優先": [
+    "Prefer smoothness",
+    "滑らかさ優先",
+    "부드러움 우선"
+  ],
+  "流量優先": [
+    "Prefer lower traffic",
+    "通信量優先",
+    "트래픽 절약 우선"
+  ],
+  "基準碼率（Mbps）": [
+    "Baseline bitrate (Mbps)",
+    "基準ビットレート（Mbps）",
+    "기준 비트레이트 (Mbps)"
+  ],
+  "只降低解析度，碼率與 FPS 沿用原畫質設定。": [
+    "Reduce resolution only; retain the quality profile’s bitrate and FPS.",
+    "解像度のみ下げ、元の画質設定のビットレートと FPS を維持します。",
+    "해상도만 낮추고 기존 화질 설정의 비트레이트와 FPS를 유지합니다."
+  ],
+  "來源 FPS 上限為原模式的 2 倍，目標碼率使用完整基準預算。": [
+    "Double the source FPS limit; use the full baseline bitrate budget.",
+    "元のモードのソース FPS 上限を2倍にし、基準ビットレート全体を使用します。",
+    "원래 모드의 원본 FPS 상한을 두 배로 하고 기준 비트레이트 전체를 사용합니다."
+  ],
+  "來源 FPS 維持原模式，目標碼率使用基準預算的 50%。": [
+    "Retain source FPS; use 50% of the baseline bitrate budget.",
+    "ソース FPS を維持し、基準ビットレートの50%を使用します。",
+    "원본 FPS를 유지하고 기준 비트레이트의 50%를 사용합니다."
+  ],
+  "設定自動儲存並套用至 遠端顯示。策略需遠端支援新串流參數；不支援時維持原畫質策略。": [
+    "Settings are saved automatically and applied to Remote Display. Strategies require the new stream parameters; unsupported hosts retain the original quality policy.",
+    "設定は自動保存され リモート画面 に適用されます。方針の適用には新しい配信パラメータへの対応が必要です。非対応ホストでは元の画質方針を維持します。",
+    "설정은 자동 저장되어 Viewer에 적용됩니다. 새 스트림 매개변수를 지원하지 않는 호스트는 원래 화질 정책을 유지합니다."
+  ],
+  "遠端顯示 使用所選演算法放大。策略調整來源 FPS 上限與目標碼率；不包含補幀，實際速度取決於裝置與網路。": [
+    "Remote Display upscales with the selected algorithm. Strategies change source FPS limits and target bitrate, without frame interpolation. Actual speed depends on devices and network.",
+    "リモート画面 は選択した方式で拡大します。方針はソース FPS 上限と目標ビットレートを調整し、補間は行いません。実速度は端末とネットワークに依存します。",
+    "Viewer는 선택한 알고리즘으로 확대합니다. 전략은 원본 FPS 상한과 목표 비트레이트를 조정하며 보간은 포함하지 않습니다. 실제 속도는 장치와 네트워크에 따라 다릅니다."
+  ],
+  "遠端不支援此策略，維持原畫質策略": [
+    "Host does not support this strategy; original quality policy retained",
+    "ホストがこの方針に非対応のため元の画質方針を維持",
+    "호스트가 이 전략을 지원하지 않아 기존 화질 정책 유지"
+  ],
+  "不支援的增強策略": [
+    "Unsupported enhancement strategy",
+    "非対応の画像強化方針",
+    "지원하지 않는 향상 전략"
+  ],
+  "基準碼率必須為 1 至 100 Mbps": [
+    "Baseline bitrate must be 1–100 Mbps",
+    "基準ビットレートは1～100 Mbpsです",
+    "기준 비트레이트는 1~100 Mbps여야 합니다"
+  ],
+  "畫面流暢優先": [
+    "Prioritize visual smoothness",
+    "画面の滑らかさを優先",
+    "화면 부드러움 우선"
+  ],
+  "網路負載優先": [
+    "Prioritize lower network load",
+    "ネットワーク負荷の軽減を優先",
+    "네트워크 부하 절감 우선"
+  ],
+  "使用策略": [
+    "Strategy in use",
+    "使用方針",
+    "사용 전략"
+  ],
+  "相容模式": [
+    "Compatibility mode",
+    "互換モード",
+    "호환 모드"
+  ],
+  "等待套用": [
+    "Pending",
+    "適用待ち",
+    "적용 대기"
+  ],
+  "未套用": [
+    "Not applied",
+    "未適用",
+    "적용되지 않음"
+  ],
+  "已回退": [
+    "Fallback active",
+    "代替方式を使用",
+    "대체 방식 사용"
+  ],
+  "舊版協定僅支援半解析度，75% 需要新串流協定": [
+    "Legacy protocol uses half resolution; 75% requires the new stream protocol",
+    "旧プロトコルは半解像度のみ対応します。75%には新配信プロトコルが必要です",
+    "이전 프로토콜은 절반 해상도만 지원합니다. 75%에는 새 스트림 프로토콜이 필요합니다"
+  ],
+  "自動調整": [
+    "Automatic adjustment",
+    "自動調整",
+    "자동 조정"
+  ],
+  "2× 補幀（實驗性）": [
+    "2× frame interpolation (experimental)",
+    "2× フレーム補間（実験的）",
+    "2× 프레임 보간 (실험적)"
+  ],
+  "每兩張真實影格補一張；可能增加操作延遲，處理逾時自動回退。": [
+    "Inserts one frame between two real frames; may add input latency. Falls back on timeout.",
+    "実フレーム間に1枚補間します。操作遅延が増える場合があり、時間超過時は解除します。",
+    "실제 프레임 사이에 한 장을 보간합니다. 입력 지연이 늘 수 있으며 시간 초과 시 해제합니다."
+  ],
+  "等待穩定影格": [
+    "Waiting for stable frames",
+    "安定したフレームを待機中",
+    "안정적인 프레임 대기 중"
+  ],
+  "準備補幀": [
+    "Preparing interpolation",
+    "補間を準備中",
+    "보간 준비 중"
+  ],
+  "2× 補幀（區塊移動估計）": [
+    "2× interpolation (block motion estimation)",
+    "2× 補間（ブロック動き推定）",
+    "2× 보간 (블록 움직임 추정)"
+  ],
+  "補幀回退，顯示真實影格": [
+    "Interpolation fallback: real frames",
+    "補間を解除し実フレームを表示",
+    "보간 해제: 실제 프레임 표시"
+  ],
+  "補幀逾時，顯示真實影格": [
+    "Interpolation timeout: real frames",
+    "補間が時間超過、実フレームを表示",
+    "보간 시간 초과: 실제 프레임 표시"
+  ],
+  "遠端顯示 使用所選演算法放大。策略調整來源 FPS 上限與目標碼率；補幀另行開啟，實際速度取決於裝置與網路。": [
+    "Remote Display upscales with the selected algorithm. Strategies control source FPS limits and bitrate; interpolation is enabled separately. Actual speed depends on hardware and network.",
+    "リモート画面 は選択した方式で拡大します。戦略は元 FPS 上限とビットレートを調整し、補間は別に有効化します。速度は機器とネットワークに依存します。",
+    "Viewer는 선택한 알고리즘으로 확대합니다. 전략은 원본 FPS 제한과 비트레이트를 조정하며 보간은 별도로 켭니다. 속도는 장치와 네트워크에 따라 달라집니다."
+  ],
+  "呈現 FPS（含補幀）": [
+    "Rendered FPS (including interpolated frames)",
+    "表示 FPS（補間を含む）",
+    "렌더링 FPS (보간 포함)"
+  ],
+  "來源 FPS": [
+    "Source FPS",
+    "元の FPS",
+    "원본 FPS"
+  ],
+  "2× 補幀（RIFE 4.25 Lite）": [
+    "2× interpolation (RIFE 4.25 Lite)",
+    "2× 補間（RIFE 4.25 Lite）",
+    "2× 보간 (RIFE 4.25 Lite)"
+  ],
+  "RIFE 正在載入": [
+    "Loading RIFE",
+    "RIFE を読み込み中",
+    "RIFE 로딩 중"
+  ],
+  "RIFE 目前僅支援 Apple Silicon Mac": [
+    "RIFE currently supports Apple Silicon Macs only",
+    "RIFE は現在 Apple Silicon Mac のみ対応",
+    "RIFE는 현재 Apple Silicon Mac만 지원"
+  ],
+  "RIFE 需要 macOS 13 或更新版本": [
+    "RIFE requires macOS 13 or later",
+    "RIFE には macOS 13 以降が必要",
+    "RIFE는 macOS 13 이상 필요"
+  ],
+  "操作優先，顯示真實影格": [
+    "Interaction priority: real frames",
+    "操作優先：実フレームを表示",
+    "조작 우선: 실제 프레임 표시"
+  ],
+  "操作優先，暫用 FSR 1": [
+    "Interaction priority: using FSR 1",
+    "操作優先：FSR 1 を使用",
+    "조작 우선: FSR 1 사용"
+  ],
+  "補幀方式": [
+    "Interpolation method",
+    "補間方式",
+    "보간 방식"
+  ],
+  "自動（Apple 優先）": [
+    "Auto (prefer Apple)",
+    "自動（Apple 優先）",
+    "자동 (Apple 우선)"
+  ],
+  "Apple 低延遲": [
+    "Apple low latency",
+    "Apple 低遅延",
+    "Apple 저지연"
+  ],
+  "2× 補幀（Apple 低延遲）": [
+    "2× interpolation (Apple low latency)",
+    "2× 補間（Apple 低遅延）",
+    "2× 보간 (Apple 저지연)"
+  ],
+  "Apple 補幀需要支援的 Mac 與 macOS 26 以上": [
+    "Apple interpolation requires a supported Mac and macOS 26 or later",
+    "Apple 補間には対応 Mac と macOS 26 以降が必要です",
+    "Apple 보간은 지원되는 Mac과 macOS 26 이상이 필요합니다"
+  ],
+  "畫面靜止時會減少更新，FPS 降到 0 屬正常，可節省流量。": [
+    "When the screen is still, fewer updates save bandwidth. FPS may normally drop to 0.",
+    "画面が静止している間は更新を減らして通信量を節約します。FPS が 0 になることも正常です。",
+    "화면이 정지하면 업데이트를 줄여 대역폭을 절약합니다. FPS가 0으로 내려가도 정상입니다."
+  ],
+  "TX 為上傳、RX 為下載；畫面靜止時流量降低屬正常。": [
+    "TX is upload; RX is download. Lower traffic is normal when the screen is still.",
+    "TX は送信、RX は受信です。画面が静止している間に通信量が減るのは正常です。",
+    "TX는 업로드, RX는 다운로드입니다. 화면이 정지하면 트래픽이 줄어드는 것은 정상입니다."
+  ]
+}

@@ -1,0 +1,2122 @@
+{
+  "允許 IP 直連": [
+    "Allow direct IP connections",
+    "IP 直接接続を許可",
+    "IP 직접 연결 허용"
+  ],
+  "預設關閉。啟用後才會在 TCP 47823 接受通過密碼驗證的直連。": [
+    "Off by default. When enabled, TCP 47823 accepts only password-authenticated direct connections.",
+    "標準では無効です。有効にすると、TCP 47823 でパスワード認証済みの直接接続のみ受け付けます。",
+    "기본값은 꺼짐입니다. 활성화하면 TCP 47823에서 비밀번호 인증을 통과한 직접 연결만 허용합니다."
+  ],
+  "貼上遠端 ID 或 IP": [
+    "Paste remote ID or IP",
+    "リモート ID または IP",
+    "원격 ID 또는 IP 입력"
+  ],
+  "YD-XXXX-XXXX-XXXX-XXXX-XXXX 或 IP": [
+    "YD-XXXX-XXXX-XXXX-XXXX-XXXX or IP",
+    "YD-XXXX-XXXX-XXXX-XXXX-XXXX または IP",
+    "YD-XXXX-XXXX-XXXX-XXXX-XXXX 또는 IP"
+  ],
+  "匯入": [
+    "Import",
+    "インポート",
+    "가져오기"
+  ],
+  "匯出": [
+    "Export",
+    "エクスポート",
+    "내보내기"
+  ],
+  "匯入站台設定檔": [
+    "Import sites",
+    "接続先をインポート",
+    "사이트 가져오기"
+  ],
+  "匯出站台設定檔": [
+    "Export sites",
+    "接続先をエクスポート",
+    "사이트 내보내기"
+  ],
+  "已匯出至下載資料夾": [
+    "Exported to Downloads",
+    "ダウンロードに書き出しました",
+    "다운로드 폴더에 저장했습니다"
+  ],
+  "設定檔不可超過 1 MB": [
+    "File must not exceed 1 MB",
+    "ファイルは 1 MB 以下にしてください",
+    "파일은 1 MB 이하여야 합니다"
+  ],
+  "設定檔格式無效": [
+    "Invalid configuration file",
+    "無効な設定ファイル",
+    "잘못된 설정 파일"
+  ],
+  "匯入將取代目前的站台與群組，是否繼續？": [
+    "Import will replace current sites and groups. Continue?",
+    "現在の接続先とグループを置き換えます。続行しますか？",
+    "현재 사이트와 그룹을 바꿉니다. 계속하시겠습니까?"
+  ],
+  "確認匯入": [
+    "Confirm import",
+    "インポートを確認",
+    "가져오기 확인"
+  ],
+  "站台設定已匯入": [
+    "Sites imported",
+    "接続先をインポートしました",
+    "사이트를 가져왔습니다"
+  ],
+  "泡泡提示": [
+    "Bubble tips",
+    "吹き出しヒント",
+    "말풍선 도움말"
+  ],
+  "設定": [
+    "Settings",
+    "設定",
+    "설정"
+  ],
+  "一般設定": [
+    "General",
+    "一般設定",
+    "일반 설정"
+  ],
+  "網路安全": [
+    "Network & security",
+    "ネットワークとセキュリティ",
+    "네트워크 보안"
+  ],
+  "串流方式": [
+    "Streaming",
+    "ストリーミング",
+    "스트리밍"
+  ],
+  "關於": [
+    "About",
+    "情報",
+    "정보"
+  ],
+  "多國語言": [
+    "Language",
+    "言語",
+    "언어"
+  ],
+  "介面風格": [
+    "Appearance",
+    "外観",
+    "화면 스타일"
+  ],
+  "預設": [
+    "Default",
+    "デフォルト",
+    "기본값"
+  ],
+  "明亮": [
+    "Light",
+    "ライト",
+    "밝게"
+  ],
+  "暗調": [
+    "Dark",
+    "ダーク",
+    "어둡게"
+  ],
+  "AUTO 跟隨系統語言；預設風格跟隨系統明暗模式。設定會自動儲存。": [
+    "AUTO uses the system language. Default appearance follows the system theme. Changes are saved automatically.",
+    "AUTO はシステム言語、デフォルトの外観はシステムの明暗設定に従います。変更は自動保存されます。",
+    "AUTO는 시스템 언어를, 기본 스타일은 시스템 테마를 따릅니다. 변경 사항은 자동 저장됩니다."
+  ],
+  "本機資訊": [
+    "Device information",
+    "デバイス情報",
+    "기기 정보"
+  ],
+  "主機名稱": [
+    "Host name",
+    "ホスト名",
+    "호스트 이름"
+  ],
+  "系統 / 架構": [
+    "System / architecture",
+    "システム / アーキテクチャ",
+    "시스템 / 아키텍처"
+  ],
+  "本機 ID": [
+    "Local ID",
+    "この端末の ID",
+    "내 기기 ID"
+  ],
+  "配對服務": [
+    "Signaling server",
+    "シグナリングサーバー",
+    "시그널링 서버"
+  ],
+  "站台設定檔": [
+    "Site configuration",
+    "接続先設定ファイル",
+    "사이트 설정 파일"
+  ],
+  "連線密碼": [
+    "Connection password",
+    "ペアリングパスワード",
+    "페어링 비밀번호"
+  ],
+  "顯示": [
+    "Show",
+    "表示",
+    "표시"
+  ],
+  "隱藏": [
+    "Hide",
+    "非表示",
+    "숨기기"
+  ],
+  "常駐行為": [
+    "Background operation",
+    "バックグラウンド動作",
+    "백그라운드 동작"
+  ],
+  "Client 隨程式啟動並持續執行。關閉視窗只隱藏介面；請從 Tray 選單選擇「關閉程式」以完整結束。": [
+    "Client runs while the app is open. Closing the window hides it. Choose Quit in the tray menu to exit completely.",
+    "アプリの起動中は Client が動作します。ウィンドウを閉じても非表示になるだけです。完全に終了するにはトレイメニューから終了を選択してください。",
+    "앱이 실행되는 동안 Client가 작동합니다. 창을 닫으면 화면만 숨겨집니다. 완전히 종료하려면 트레이 메뉴에서 프로그램 종료를 선택하세요."
+  ],
+  "影像傳輸": [
+    "Image transport",
+    "映像転送",
+    "영상 전송"
+  ],
+  "增量 JPEG": [
+    "Incremental JPEG",
+    "差分 JPEG",
+    "변경 영역 JPEG"
+  ],
+  "連線方式": [
+    "Connection type",
+    "接続方式",
+    "연결 방식"
+  ],
+  "WebRTC P2P 直連": [
+    "Direct WebRTC P2P",
+    "WebRTC P2P 直接接続",
+    "WebRTC P2P 직접 연결"
+  ],
+  "畫面通道": [
+    "Screen channel",
+    "画面チャネル",
+    "화면 채널"
+  ],
+  "低延遲、不重傳": [
+    "Low latency, no retransmission",
+    "低遅延・再送なし",
+    "낮은 지연, 재전송 없음"
+  ],
+  "控制通道": [
+    "Control channel",
+    "操作チャネル",
+    "제어 채널"
+  ],
+  "可靠、有序傳輸": [
+    "Reliable, ordered delivery",
+    "信頼性のある順序付き転送",
+    "신뢰성 있는 순차 전송"
+  ],
+  "P2P 遠端桌面": [
+    "P2P remote desktop",
+    "P2P リモートデスクトップ",
+    "P2P 원격 데스크톱"
+  ],
+  "遠端工作空間": [
+    "Remote workspace",
+    "リモートワークスペース",
+    "원격 작업 공간"
+  ],
+  "Client 啟動中": [
+    "Client starting",
+    "Client 起動中",
+    "Client 시작 중"
+  ],
+  "Client 執行中": [
+    "Client running",
+    "Client 実行中",
+    "Client 실행 중"
+  ],
+  "Client 重新啟動中": [
+    "Client restarting",
+    "Client 再起動中",
+    "Client 다시 시작 중"
+  ],
+  "快速連線": [
+    "Quick connect",
+    "クイック接続",
+    "빠른 연결"
+  ],
+  "貼上遠端 ID": [
+    "Paste remote ID",
+    "接続先の ID を貼り付け",
+    "원격 ID 붙여넣기"
+  ],
+  "連線 ↗": [
+    "Connect ↗",
+    "接続 ↗",
+    "연결 ↗"
+  ],
+  "＋ 新增群組": [
+    "＋ Add group",
+    "＋ グループ追加",
+    "＋ 그룹 추가"
+  ],
+  "＋ 新增站台": [
+    "＋ Add site",
+    "＋ 接続先追加",
+    "＋ 사이트 추가"
+  ],
+  "群組": [
+    "Groups",
+    "グループ",
+    "그룹"
+  ],
+  "所有站台": [
+    "All sites",
+    "すべての接続先",
+    "모든 사이트"
+  ],
+  "未分組": [
+    "Ungrouped",
+    "未分類",
+    "미분류"
+  ],
+  "搜尋名稱、裝置 ID 或備註": [
+    "Search name, ID or notes",
+    "名前、ID、メモで検索",
+    "이름, ID 또는 메모 검색"
+  ],
+  "搜尋站台": [
+    "Search sites",
+    "接続先を検索",
+    "사이트 검색"
+  ],
+  "讓你的工作空間，從一個站台開始": [
+    "Start with your first site",
+    "最初の接続先を追加しましょう",
+    "첫 사이트를 추가하세요"
+  ],
+  "新增遠端裝置，將常用的連線整理在這裡。": [
+    "Add remote devices and organize your connections here.",
+    "リモート端末を追加して、接続先を整理できます。",
+    "원격 기기를 추가하고 자주 사용하는 연결을 정리하세요."
+  ],
+  "＋ 新增第一個站台": [
+    "＋ Add your first site",
+    "＋ 最初の接続先を追加",
+    "＋ 첫 사이트 추가"
+  ],
+  "沒有符合的站台": [
+    "No matching sites",
+    "一致する接続先がありません",
+    "일치하는 사이트 없음"
+  ],
+  "試試其他名稱、裝置 ID 或備註。": [
+    "Try another name, device ID or note.",
+    "別の名前、ID、メモで検索してください。",
+    "다른 이름, 기기 ID 또는 메모로 검색하세요."
+  ],
+  "清除搜尋": [
+    "Clear search",
+    "検索をクリア",
+    "검색 지우기"
+  ],
+  "畫面與控制資料由裝置直接傳送": [
+    "Screen and controls travel directly between devices",
+    "画面と操作データは端末間で直接転送されます",
+    "화면과 제어 데이터는 기기 간에 직접 전송됩니다"
+  ],
+  "新增站台": [
+    "Add site",
+    "接続先を追加",
+    "사이트 추가"
+  ],
+  "編輯站台": [
+    "Edit site",
+    "接続先を編集",
+    "사이트 편집"
+  ],
+  "站台名稱": [
+    "Site name",
+    "接続先名",
+    "사이트 이름"
+  ],
+  "例如：辦公室 Mac mini": [
+    "e.g. Office Mac mini",
+    "例：オフィスの Mac mini",
+    "예: 사무실 Mac mini"
+  ],
+  "裝置 ID": [
+    "Device ID",
+    "デバイス ID",
+    "기기 ID"
+  ],
+  "收納群組": [
+    "Group",
+    "グループ",
+    "그룹"
+  ],
+  "備註": [
+    "Notes",
+    "メモ",
+    "메모"
+  ],
+  "選填": [
+    "Optional",
+    "任意",
+    "선택 사항"
+  ],
+  "記下裝置的位置或用途": [
+    "Device location or purpose",
+    "端末の場所や用途を入力",
+    "기기 위치 또는 용도 입력"
+  ],
+  "連線時再輸入連線密碼，密碼不會存入站台列表。": [
+    "Enter the connection password when connecting. It is not saved with the site.",
+    "接続時にパスワードを入力します。接続先一覧には保存されません。",
+    "연결 시 비밀번호를 입력합니다. 사이트 목록에는 저장되지 않습니다."
+  ],
+  "儲存站台": [
+    "Save site",
+    "接続先を保存",
+    "사이트 저장"
+  ],
+  "新增群組": [
+    "Add group",
+    "グループを追加",
+    "그룹 추가"
+  ],
+  "編輯群組": [
+    "Edit group",
+    "グループを編集",
+    "그룹 편집"
+  ],
+  "群組名稱": [
+    "Group name",
+    "グループ名",
+    "그룹 이름"
+  ],
+  "例如：公司、家中、客戶站台": [
+    "e.g. Work, Home, Customers",
+    "例：会社、自宅、お客様",
+    "예: 회사, 집, 고객"
+  ],
+  "儲存群組": [
+    "Save group",
+    "グループを保存",
+    "그룹 저장"
+  ],
+  "連接站台": [
+    "Connect to site",
+    "接続先に接続",
+    "사이트 연결"
+  ],
+  "輸入連線密碼": [
+    "Enter connection password",
+    "パスワードを入力",
+    "페어링 비밀번호 입력"
+  ],
+  "輸入遠端提供的連線密碼": [
+    "Enter the remote device password",
+    "接続先のパスワードを入力",
+    "원격 기기의 비밀번호 입력"
+  ],
+  "輸入被控端提供的密碼": [
+    "Enter the host password",
+    "ホストのパスワードを入力",
+    "호스트 비밀번호 입력"
+  ],
+  "將開啟原生 遠端顯示 視窗。被控端必須已啟動 Client。": [
+    "Opens the native Remote Display. Client must be running on the remote device.",
+    "ネイティブ リモート画面 を開きます。接続先で Client を起動してください。",
+    "기본 원격 화면 창을 엽니다. 원격 기기에서 Client가 실행 중이어야 합니다."
+  ],
+  "連到遠端 ↗": [
+    "Connect to remote ↗",
+    "リモートに接続 ↗",
+    "원격 연결 ↗"
+  ],
+  "確認連線": [
+    "Connect",
+    "接続",
+    "연결"
+  ],
+  "取消連線": [
+    "Cancel connection",
+    "接続をキャンセル",
+    "연결 취소"
+  ],
+  "取消快速連線": [
+    "Cancel quick connection",
+    "クイック接続をキャンセル",
+    "빠른 연결 취소"
+  ],
+  "關閉快速連線": [
+    "Close quick connection",
+    "クイック接続を閉じる",
+    "빠른 연결 닫기"
+  ],
+  "關閉 遠端顯示": [
+    "Close Remote Display",
+    "リモート画面 を閉じる",
+    "원격 화면 닫기"
+  ],
+  "尚未開啟 遠端顯示": [
+    "Remote Display not open",
+    "リモート画面 未起動",
+    "원격 화면 닫힘"
+  ],
+  "● 遠端顯示 已開啟": [
+    "● Remote Display open",
+    "● リモート画面 起動中",
+    "● 원격 화면 열림"
+  ],
+  "取消": [
+    "Cancel",
+    "キャンセル",
+    "취소"
+  ],
+  "關閉": [
+    "Close",
+    "閉じる",
+    "닫기"
+  ],
+  "關閉設定": [
+    "Close settings",
+    "設定を閉じる",
+    "설정 닫기"
+  ],
+  "確認刪除": [
+    "Delete",
+    "削除",
+    "삭제"
+  ],
+  "刪除站台": [
+    "Delete site",
+    "接続先を削除",
+    "사이트 삭제"
+  ],
+  "刪除群組": [
+    "Delete group",
+    "グループを削除",
+    "그룹 삭제"
+  ],
+  "刪除項目": [
+    "Delete item",
+    "項目を削除",
+    "항목 삭제"
+  ],
+  "尚未加入備註": [
+    "No notes",
+    "メモなし",
+    "메모 없음"
+  ],
+  "本機 ID 已複製": [
+    "Local ID copied",
+    "この端末の ID をコピーしました",
+    "내 기기 ID 복사됨"
+  ],
+  "站台已儲存": [
+    "Site saved",
+    "接続先を保存しました",
+    "사이트 저장됨"
+  ],
+  "群組已儲存": [
+    "Group saved",
+    "グループを保存しました",
+    "그룹 저장됨"
+  ],
+  "站台已刪除": [
+    "Site deleted",
+    "接続先を削除しました",
+    "사이트 삭제됨"
+  ],
+  "群組已刪除，站台已保留": [
+    "Group deleted. Sites were kept.",
+    "グループを削除しました。接続先は保持されます。",
+    "그룹을 삭제했습니다. 사이트는 유지됩니다."
+  ],
+  "已送出停止指令": [
+    "Stop requested",
+    "停止を要求しました",
+    "중지 요청됨"
+  ],
+  "快速連線已關閉": [
+    "Quick connection closed",
+    "クイック接続を閉じました",
+    "빠른 연결 닫힘"
+  ],
+  "遠端顯示 已開啟，請在 遠端顯示 視窗確認畫面": [
+    "Remote Display opened. Check its window for the remote screen.",
+    "リモート画面 を開きました。ウィンドウで画面を確認してください。",
+    "Viewer가 열렸습니다. 창에서 원격 화면을 확인하세요."
+  ],
+  "等待遠端回應": [
+    "Waiting for remote device",
+    "接続先の応答を待機中",
+    "원격 기기 응답 대기 중"
+  ],
+  "等待輸入連線密碼": [
+    "Waiting for password",
+    "パスワード入力待ち",
+    "비밀번호 입력 대기 중"
+  ],
+  "正在驗證密碼": [
+    "Verifying password",
+    "パスワードを確認中",
+    "비밀번호 확인 중"
+  ],
+  "已收到遠端畫面": [
+    "Receiving remote screen",
+    "リモート画面を受信中",
+    "원격 화면 수신 중"
+  ],
+  "連線中": [
+    "Connecting",
+    "接続中",
+    "연결 중"
+  ],
+  "請先貼上遠端 ID": [
+    "Paste a remote ID first",
+    "接続先の ID を貼り付けてください",
+    "먼저 원격 ID를 붙여넣으세요"
+  ],
+  "此裝置需要連線密碼，請輸入被控端提供的密碼。": [
+    "This device requires a connection password. Enter the password from the host.",
+    "接続先のペアリングパスワードを入力してください。",
+    "이 기기는 페어링 비밀번호가 필요합니다. 호스트의 비밀번호를 입력하세요."
+  ],
+  "連線密碼不正確，請重新輸入。": [
+    "Incorrect connection password. Try again.",
+    "パスワードが正しくありません。もう一度入力してください。",
+    "비밀번호가 올바르지 않습니다. 다시 입력하세요."
+  ],
+  "複製本機 ID": [
+    "Copy local ID",
+    "この端末の ID をコピー",
+    "내 기기 ID 복사"
+  ],
+  "本機連線密碼": [
+    "Local connection password",
+    "この端末のパスワード",
+    "내 기기 페어링 비밀번호"
+  ],
+  "顯示連線密碼": [
+    "Show connection password",
+    "パスワードを表示",
+    "페어링 비밀번호 표시"
+  ],
+  "隱藏連線密碼": [
+    "Hide connection password",
+    "パスワードを非表示",
+    "페어링 비밀번호 숨기기"
+  ],
+  "設定功能": [
+    "Settings sections",
+    "設定カテゴリ",
+    "설정 항목"
+  ],
+  "站台群組": [
+    "Site groups",
+    "接続先グループ",
+    "사이트 그룹"
+  ],
+  "站台管理": [
+    "Site management",
+    "接続先の管理",
+    "사이트 관리"
+  ],
+  "YourDesk 首頁": [
+    "YourDesk home",
+    "YourDesk ホーム",
+    "YourDesk 홈"
+  ],
+  "本機資訊尚未載入，請稍後再試。": [
+    "Device information is loading. Try again shortly.",
+    "端末情報を読み込み中です。しばらくしてからお試しください。",
+    "기기 정보를 불러오는 중입니다. 잠시 후 다시 시도하세요."
+  ],
+  "操作未完成，請稍後重試。": [
+    "The operation failed. Please try again.",
+    "操作できませんでした。もう一度お試しください。",
+    "작업에 실패했습니다. 다시 시도하세요."
+  ],
+  "介面設定已儲存": [
+    "Appearance settings saved",
+    "表示設定を保存しました",
+    "화면 설정 저장됨"
+  ],
+  "程序已結束；若非手動停止，請查看啟動終端的錯誤訊息。": [
+    "The process ended. Check the launch terminal if this was unexpected.",
+    "プロセスが終了しました。予期しない場合は起動ターミナルを確認してください。",
+    "프로세스가 종료되었습니다. 예상치 못한 종료라면 시작 터미널을 확인하세요."
+  ],
+  "本機 Client UI 服務無法連線，請確認啟動終端仍在執行。": [
+    "Cannot reach Client UI. Check that the app is still running.",
+    "Client UI に接続できません。アプリが実行中か確認してください。",
+    "Client UI에 연결할 수 없습니다. 앱이 실행 중인지 확인하세요."
+  ],
+  "{0} 個站台": [
+    "{0} sites",
+    "{0} 件の接続先",
+    "사이트 {0}개"
+  ],
+  "編輯群組 {0}": [
+    "Edit group {0}",
+    "グループ {0} を編集",
+    "그룹 {0} 편집"
+  ],
+  "刪除群組 {0}": [
+    "Delete group {0}",
+    "グループ {0} を削除",
+    "그룹 {0} 삭제"
+  ],
+  "編輯 {0}": [
+    "Edit {0}",
+    "{0} を編集",
+    "{0} 편집"
+  ],
+  "刪除 {0}": [
+    "Delete {0}",
+    "{0} を削除",
+    "{0} 삭제"
+  ],
+  "確定刪除「{0}」？這只會移除本機保存的站台資料。": [
+    "Delete “{0}”? Only the locally saved site will be removed.",
+    "「{0}」を削除しますか？この端末に保存された接続先のみ削除します。",
+    "“{0}”을(를) 삭제할까요? 로컬에 저장된 사이트 정보만 삭제됩니다."
+  ],
+  "確定刪除「{0}」？群組中的站台會移到「未分組」。": [
+    "Delete “{0}”? Its sites will move to Ungrouped.",
+    "「{0}」を削除しますか？接続先は「未分類」に移動します。",
+    "“{0}”을(를) 삭제할까요? 사이트는 미분류로 이동합니다."
+  ],
+  "英文": [
+    "English",
+    "英語",
+    "영어"
+  ],
+  "日文": [
+    "Japanese",
+    "日本語",
+    "일본어"
+  ],
+  "韓文": [
+    "Korean",
+    "韓国語",
+    "한국어"
+  ],
+  "繁體中文": [
+    "Traditional Chinese",
+    "繁体字中国語",
+    "중국어 번체"
+  ],
+  "本機電腦": [
+    "This computer",
+    "このコンピューター",
+    "내 컴퓨터"
+  ],
+  "不支援的介面語言": [
+    "Unsupported language",
+    "未対応の言語です",
+    "지원하지 않는 언어"
+  ],
+  "不支援的介面風格": [
+    "Unsupported appearance",
+    "未対応の外観です",
+    "지원하지 않는 스타일"
+  ],
+  "版本": [
+    "Version",
+    "バージョン",
+    "버전"
+  ],
+  "檢查更新": [
+    "Check for updates",
+    "更新を確認",
+    "업데이트 확인"
+  ],
+  "前往下載": [
+    "Download",
+    "ダウンロード",
+    "다운로드"
+  ],
+  "正在檢查更新…": [
+    "Checking for updates…",
+    "更新を確認中…",
+    "업데이트 확인 중…"
+  ],
+  "目前沒有可取得的正式發行版本。": [
+    "No public release is currently available.",
+    "取得できる正式リリースはありません。",
+    "현재 이용 가능한 정식 릴리스가 없습니다."
+  ],
+  "目前已是最新版本。": [
+    "You are up to date.",
+    "最新バージョンです。",
+    "최신 버전입니다."
+  ],
+  "發現新版本，可前往下載。": [
+    "An update is available to download.",
+    "新しいバージョンをダウンロードできます。",
+    "새 버전을 다운로드할 수 있습니다."
+  ],
+  "發行版本格式無法比較，請前往下載頁確認。": [
+    "Cannot compare this release version. Check the download page.",
+    "バージョンを比較できません。ダウンロードページをご確認ください。",
+    "버전을 비교할 수 없습니다. 다운로드 페이지를 확인하세요."
+  ],
+  "無法連線 GitHub，請稍後重試。": [
+    "Cannot connect to GitHub. Try again later.",
+    "GitHub に接続できません。後でもう一度お試しください。",
+    "GitHub에 연결할 수 없습니다. 나중에 다시 시도하세요."
+  ],
+  "GitHub 暫時無法提供更新資訊，請稍後重試。": [
+    "GitHub update information is temporarily unavailable.",
+    "GitHub の更新情報は一時的に利用できません。",
+    "GitHub 업데이트 정보를 일시적으로 사용할 수 없습니다."
+  ],
+  "無法讀取更新資訊。": [
+    "Cannot read update information.",
+    "更新情報を読み取れません。",
+    "업데이트 정보를 읽을 수 없습니다."
+  ],
+  "無法開啟下載頁面": [
+    "Cannot open the download page",
+    "ダウンロードページを開けません",
+    "다운로드 페이지를 열 수 없습니다"
+  ],
+  "可用": [
+    "Available",
+    "利用可能",
+    "사용 가능"
+  ],
+  "不支援": [
+    "Unsupported",
+    "非対応",
+    "지원 안 됨"
+  ],
+  "自動（JPEG）": [
+    "Auto (JPEG)",
+    "自動（JPEG）",
+    "자동 (JPEG)"
+  ],
+  "增量 JPEG（軟體）": [
+    "Delta JPEG (software)",
+    "差分 JPEG（ソフトウェア）",
+    "증분 JPEG (소프트웨어)"
+  ],
+  "增量 JPEG（硬體）": [
+    "Delta JPEG (hardware)",
+    "差分 JPEG（ハードウェア）",
+    "증분 JPEG (하드웨어)"
+  ],
+  "H.264（硬體）": [
+    "H.264 (hardware)",
+    "H.264（ハードウェア）",
+    "H.264 (하드웨어)"
+  ],
+  "HEVC（硬體）": [
+    "HEVC (hardware)",
+    "HEVC（ハードウェア）",
+    "HEVC (하드웨어)"
+  ],
+  "H.264（軟體）": [
+    "H.264 (software)",
+    "H.264（ソフトウェア）",
+    "H.264 (소프트웨어)"
+  ],
+  "變更後會重新啟動本機 Client，現有遠端連線將中斷。不支援的方式無法選取。": [
+    "Changing this restarts the local Client and disconnects active remote sessions. Unsupported modes cannot be selected.",
+    "変更するとローカル Client が再起動し、接続中のセッションが切断されます。非対応の方式は選択できません。",
+    "변경하면 로컬 Client가 다시 시작되고 현재 연결이 끊깁니다. 지원하지 않는 방식은 선택할 수 없습니다."
+  ],
+  "自動（優先硬體壓縮）": [
+    "Auto (prefer hardware compression)",
+    "自動（ハードウェア圧縮優先）",
+    "자동 (하드웨어 압축 우선)"
+  ],
+  "自動 (按排列順序優先)": [
+    "Auto (priority in listed order)",
+    "自動（表示順に優先）",
+    "자동 (표시 순서대로 우선)"
+  ],
+  "HEVC (H.265) 硬體": [
+    "HEVC (H.265) hardware",
+    "HEVC (H.265) ハードウェア",
+    "HEVC (H.265) 하드웨어"
+  ],
+  "H.264 硬體": [
+    "H.264 hardware",
+    "H.264 ハードウェア",
+    "H.264 하드웨어"
+  ],
+  "JPEG 硬體": [
+    "JPEG hardware",
+    "JPEG ハードウェア",
+    "JPEG 하드웨어"
+  ],
+  "JPEG 軟體": [
+    "JPEG software",
+    "JPEG ソフトウェア",
+    "JPEG 소프트웨어"
+  ],
+  "站台順序已儲存": [
+    "Site order saved",
+    "接続先の順序を保存しました",
+    "사이트 순서를 저장했습니다"
+  ],
+  "Client 在線上": [
+    "Client online",
+    "Client オンライン",
+    "Client 온라인"
+  ],
+  "Client 不在線上": [
+    "Client offline",
+    "Client オフライン",
+    "Client 오프라인"
+  ],
+  "無法確認 Client 狀態": [
+    "Client status unavailable",
+    "Client の状態を確認できません",
+    "Client 상태를 확인할 수 없습니다"
+  ],
+  "改名": [
+    "Rename",
+    "名前を変更",
+    "이름 변경"
+  ],
+  "刪除": [
+    "Delete",
+    "削除",
+    "삭제"
+  ],
+  "群組順序已儲存": [
+    "Group order saved",
+    "グループの順序を保存しました",
+    "그룹 순서를 저장했습니다"
+  ],
+  "記住我": [
+    "Remember me",
+    "記憶する",
+    "기억하기"
+  ],
+  "連線時輸入連線密碼，可勾選「記住我」。": [
+    "Enter the connection password. You can select “Remember me”.",
+    "接続パスワードを入力し、「記憶する」を選択できます。",
+    "연결 비밀번호를 입력하고 기억하기를 선택할 수 있습니다."
+  ],
+  "請到設定修改初始連線密碼。": [
+    "Please change your initial connection password in Settings.",
+    "設定で初期接続パスワードを変更してください。",
+    "설정에서 초기 연결 비밀번호를 변경하세요."
+  ],
+  "修改密碼": [
+    "Change password",
+    "パスワードを変更",
+    "비밀번호 변경"
+  ],
+  "關閉提醒": [
+    "Dismiss reminder",
+    "通知を閉じる",
+    "알림 닫기"
+  ],
+  "新連線密碼": [
+    "New connection password",
+    "新しい接続パスワード",
+    "새 연결 비밀번호"
+  ],
+  "至少 6 個字元": [
+    "At least 6 characters",
+    "6文字以上",
+    "6자 이상"
+  ],
+  "儲存密碼": [
+    "Save password",
+    "パスワードを保存",
+    "비밀번호 저장"
+  ],
+  "連線密碼已更新": [
+    "Connection password updated",
+    "接続パスワードを更新しました",
+    "연결 비밀번호가 변경되었습니다."
+  ],
+  "修改後會重新啟動本機 Client，現有連線將中斷。": [
+    "Changing the password restarts the local Client and disconnects active sessions.",
+    "変更後にローカル Client が再起動し、接続が切断されます。",
+    "변경하면 로컬 Client가 다시 시작되고 연결이 끊깁니다."
+  ],
+  "正在建立連線": [
+    "Establishing connection",
+    "接続を確立中",
+    "연결 설정 중"
+  ],
+  "等待遠端回應…": [
+    "Waiting for the remote device…",
+    "リモート端末の応答を待っています…",
+    "원격 장치 응답을 기다리는 중…"
+  ],
+  "正在啟動 遠端顯示，等待遠端畫面…": [
+    "Starting Remote Display, waiting for the remote screen…",
+    "リモート画面 を起動中、リモート画面を待っています…",
+    "원격 화면 시작 중, 원격 화면을 기다리는 중…"
+  ],
+  "正在建立安全連線…": [
+    "Establishing a secure connection…",
+    "安全な接続を確立しています…",
+    "보안 연결을 설정하는 중…"
+  ],
+  "正在驗證密碼…": [
+    "Verifying password…",
+    "パスワードを確認しています…",
+    "비밀번호 확인 중…"
+  ],
+  "連線未完成": [
+    "Connection incomplete",
+    "接続が完了していません",
+    "연결 미완료"
+  ],
+  "遠端連線已結束，請確認網路與遠端裝置後重試。": [
+    "The remote connection ended. Check the network and remote device, then try again.",
+    "リモート接続が終了しました。ネットワークとリモート端末を確認して再試行してください。",
+    "원격 연결이 종료되었습니다. 네트워크와 원격 장치를 확인한 후 다시 시도하세요."
+  ],
+  "發現新版本": [
+    "New version available",
+    "新しいバージョンがあります",
+    "새 버전이 있습니다"
+  ],
+  "每 12 小時自動檢查 GitHub 正式發行版本。": [
+    "Automatically checks GitHub releases every 12 hours.",
+    "12時間ごとに GitHub の正式リリースを自動確認します。",
+    "12시간마다 GitHub 정식 릴리스를 자동으로 확인합니다."
+  ],
+  "稍後": [
+    "Later",
+    "後で",
+    "나중에"
+  ],
+  "下載更新": [
+    "Download update",
+    "更新をダウンロード",
+    "업데이트 다운로드"
+  ],
+  "正在下載更新…": [
+    "Downloading update…",
+    "更新をダウンロード中…",
+    "업데이트 다운로드 중…"
+  ],
+  "下載完成，請開啟安裝包。": [
+    "Download complete. Open the installer package.",
+    "ダウンロード完了。インストールパッケージを開いてください。",
+    "다운로드 완료. 설치 패키지를 여세요."
+  ],
+  "新版尚未提供此系統的安裝包。": [
+    "No installer package is available for this system yet.",
+    "このシステム用のインストールパッケージはまだありません。",
+    "이 시스템용 설치 패키지가 아직 없습니다."
+  ],
+  "無法建立下載檔案。": [
+    "Unable to create the download file.",
+    "ダウンロードファイルを作成できません。",
+    "다운로드 파일을 만들 수 없습니다."
+  ],
+  "無效的下載轉址。": [
+    "Invalid download redirect.",
+    "ダウンロードの転送先が無効です。",
+    "잘못된 다운로드 리디렉션입니다."
+  ],
+  "下載失敗，請稍後重試。": [
+    "Download failed. Try again later.",
+    "ダウンロード失敗。後でもう一度お試しください。",
+    "다운로드 실패. 나중에 다시 시도하세요."
+  ],
+  "下載檔案不完整，請重試。": [
+    "Download incomplete. Please try again.",
+    "ダウンロードが不完全です。再試行してください。",
+    "다운로드 파일이 불완전합니다. 다시 시도하세요."
+  ],
+  "下載檔案驗證失敗，請重試。": [
+    "Download verification failed. Please try again.",
+    "ダウンロードの検証に失敗しました。再試行してください。",
+    "다운로드 파일 검증에 실패했습니다. 다시 시도하세요."
+  ],
+  "無法儲存下載檔案。": [
+    "Unable to save the download.",
+    "ダウンロードを保存できません。",
+    "다운로드 파일을 저장할 수 없습니다."
+  ],
+  "下載完成": [
+    "Download complete",
+    "ダウンロード完了",
+    "다운로드 완료"
+  ],
+  "開啟安裝包": [
+    "Open installation package",
+    "インストールパッケージを開く",
+    "설치 패키지 열기"
+  ],
+  "正在開啟安裝包…": [
+    "Opening installation package…",
+    "インストールパッケージを開いています…",
+    "설치 패키지를 여는 중…"
+  ],
+  "下載完成，請先關閉原程式，再安裝並覆蓋舊版本，完成後重新啟動 YourDesk。": [
+    "Download complete. Quit the running app, then install and replace the previous version. Restart YourDesk when finished.",
+    "ダウンロード完了。実行中のアプリを終了してから旧バージョンを上書きインストールし、YourDesk を再起動してください。",
+    "다운로드가 완료되었습니다. 실행 중인 앱을 종료한 다음 이전 버전을 덮어써 설치하고 YourDesk를 다시 시작하세요."
+  ],
+  "無法自動開啟，請按「開啟安裝包」重試，或從下方路徑手動開啟。": [
+    "Unable to open automatically. Click “Open installation package” to retry, or open the path below manually.",
+    "自動で開けませんでした。「インストールパッケージを開く」で再試行するか、以下のパスから手動で開いてください。",
+    "자동으로 열 수 없습니다. “설치 패키지 열기”로 재시도하거나 아래 경로에서 직접 여세요."
+  ],
+  "下載檔案遺失或驗證失敗，請重新下載。": [
+    "The downloaded file is missing or failed verification. Please download it again.",
+    "ダウンロードしたファイルが見つからないか、検証に失敗しました。再ダウンロードしてください。",
+    "다운로드 파일이 없거나 검증에 실패했습니다. 다시 다운로드하세요."
+  ],
+  "正在解壓縮並開啟資料夾…": [
+    "Extracting and opening folder…",
+    "展開してフォルダーを開いています…",
+    "압축을 풀고 폴더를 여는 중…"
+  ],
+  "下載進度": [
+    "Download progress",
+    "ダウンロードの進行状況",
+    "다운로드 진행률"
+  ],
+  "正在驗證更新…": [
+    "Verifying update…",
+    "更新を検証しています…",
+    "업데이트 검증 중…"
+  ],
+  "關閉視窗後仍會繼續傳輸。": [
+    "Transfers continue after closing this dialog.",
+    "この画面を閉じても転送は続行します。",
+    "이 창을 닫아도 전송은 계속됩니다."
+  ],
+  "背景傳輸": [
+    "Continue in background",
+    "バックグラウンドで続行",
+    "백그라운드에서 계속"
+  ],
+  "傳送至遠端": [
+    "Sending to remote",
+    "リモートに送信",
+    "원격으로 보내는 중"
+  ],
+  "從遠端接收": [
+    "Receiving from remote",
+    "リモートから受信",
+    "원격에서 받는 중"
+  ],
+  "文字": [
+    "Text",
+    "テキスト",
+    "텍스트"
+  ],
+  "圖片": [
+    "Image",
+    "画像",
+    "이미지"
+  ],
+  "檔案": [
+    "Files",
+    "ファイル",
+    "파일"
+  ],
+  "資料": [
+    "Data",
+    "データ",
+    "데이터"
+  ],
+  "傳輸進度": [
+    "Transfer progress",
+    "転送の進行状況",
+    "전송 진행률"
+  ],
+  "正在傳輸…": [
+    "Transferring…",
+    "転送中…",
+    "전송 중…"
+  ],
+  "等待接收端確認…": [
+    "Waiting for receiver confirmation…",
+    "受信側の確認を待っています…",
+    "수신 측 확인을 기다리는 중…"
+  ],
+  "正在驗證並寫入剪貼簿…": [
+    "Verifying and updating clipboard…",
+    "検証してクリップボードに書き込み中…",
+    "검증 후 클립보드에 쓰는 중…"
+  ],
+  "傳輸完成": [
+    "Transfer complete",
+    "転送完了",
+    "전송 완료"
+  ],
+  "傳輸未完成，請重新複製或貼上。": [
+    "Transfer did not complete. Copy or paste again.",
+    "転送が完了しませんでした。もう一度コピーまたは貼り付けてください。",
+    "전송을 완료하지 못했습니다. 다시 복사하거나 붙여 넣으세요."
+  ],
+  "MacOS/Windows 按鍵映射": [
+    "macOS/Windows key mapping",
+    "macOS/Windows キーマッピング",
+    "macOS/Windows 키 매핑"
+  ],
+  "畫面增強": [
+    "Image enhancement",
+    "画像強化",
+    "영상 향상"
+  ],
+  "啟用畫面增強（實驗性）": [
+    "Enable image enhancement (experimental)",
+    "画像強化を有効にする（試験的）",
+    "영상 향상 사용 (실험적)"
+  ],
+  "超解析度": [
+    "Super resolution",
+    "超解像",
+    "초해상도"
+  ],
+  "傳輸尺寸": [
+    "Stream dimensions",
+    "転送解像度",
+    "전송 해상도"
+  ],
+  "寬、高各 50%": [
+    "50% width and height",
+    "幅・高さ各 50%",
+    "너비 및 높이 각각 50%"
+  ],
+  "目標碼率": [
+    "Target bitrate",
+    "目標ビットレート",
+    "목표 비트레이트"
+  ],
+  "原始尺寸基準預算的 50%": [
+    "50% of the original-size baseline budget",
+    "元の解像度の基準予算の 50%",
+    "원본 해상도 기준 예산의 50%"
+  ],
+  "補幀": [
+    "Frame interpolation",
+    "フレーム補間",
+    "프레임 보간"
+  ],
+  "尚未啟用": [
+    "Not yet enabled",
+    "まだ有効になっていません",
+    "아직 활성화되지 않음"
+  ],
+  "設定自動儲存並套用至 遠端顯示。保留目前真實 FPS；雙方須更新。舊版遠端維持原串流。": [
+    "Settings are saved automatically and applied to Remote Display. Actual FPS is unchanged. Update both ends; older hosts retain their original stream.",
+    "設定は自動保存され リモート画面 に適用されます。実 FPS は維持されます。両端の更新が必要です。旧ホストでは元の配信を維持します。",
+    "설정은 자동 저장되어 Viewer에 적용됩니다. 실제 FPS는 유지됩니다. 양쪽을 업데이트하세요. 이전 호스트는 기존 스트림을 유지합니다."
+  ],
+  "FSR 1 在 遠端顯示 使用 GPU 放大與銳化。H.264／HEVC 使用基準碼率折半；JPEG 僅縮圖，不保證流量減半。": [
+    "FSR 1 uses the Remote Display GPU for upscaling and sharpening. H.264/HEVC use half the baseline bitrate; JPEG only reduces dimensions, without a guaranteed 50% traffic reduction.",
+    "FSR 1 は リモート画面 の GPU で拡大と鮮鋭化を行います。H.264／HEVC は基準ビットレートの半分を使用します。JPEG は縮小のみで通信量の半減は保証しません。",
+    "FSR 1은 원격 화면 GPU에서 확대 및 선명화를 수행합니다. H.264/HEVC는 기준 비트레이트의 절반을 사용합니다. JPEG는 해상도만 줄이며 트래픽 절반 감소를 보장하지 않습니다."
+  ],
+  "正在偵測": [
+    "Detecting",
+    "検出中",
+    "감지 중"
+  ],
+  "僅支援 Apple Silicon Mac": [
+    "Requires an Apple Silicon Mac",
+    "Apple Silicon Mac のみ対応",
+    "Apple Silicon Mac만 지원"
+  ],
+  "需要 macOS 12 或更新版本": [
+    "Requires macOS 12 or later",
+    "macOS 12 以降が必要",
+    "macOS 12 이상 필요"
+  ],
+  "不支援的超解析度方式": [
+    "Unsupported super-resolution method",
+    "非対応の超解像方式",
+    "지원하지 않는 초해상도 방식"
+  ],
+  "Core ML 使用本機模型，運算裝置由系統分配。不可用時回退 FSR 1。": [
+    "Core ML uses a local model; the system selects compute devices. FSR 1 is used when unavailable.",
+    "Core ML はローカルモデルを使用し、実行デバイスはシステムが選択します。利用できない場合は FSR 1 を使用します。",
+    "Core ML은 로컬 모델을 사용하며 시스템이 연산 장치를 선택합니다. 사용할 수 없으면 FSR 1으로 전환합니다."
+  ],
+  "畫面增強已生效": [
+    "Image enhancement active",
+    "画像強化が有効",
+    "영상 향상 활성"
+  ],
+  "執行狀態": [
+    "Runtime status",
+    "実行状態",
+    "실행 상태"
+  ],
+  "Core ML 自動分配運算裝置": [
+    "Core ML selects compute devices automatically",
+    "Core ML が実行デバイスを自動選択",
+    "Core ML이 연산 장치를 자동 선택"
+  ],
+  "Core ML 未就緒，暫用 FSR 1": [
+    "Core ML not ready; using FSR 1",
+    "Core ML 準備中・FSR 1 を使用",
+    "Core ML 준비 중, FSR 1 사용"
+  ],
+  "Core ML 推論失敗，回退 FSR 1": [
+    "Core ML inference failed; using FSR 1",
+    "Core ML 推論失敗・FSR 1 を使用",
+    "Core ML 추론 실패, FSR 1 사용"
+  ],
+  "可使用": [
+    "Available",
+    "利用可能",
+    "사용 가능"
+  ],
+  "遠端顯示 使用所選演算法放大。H.264／HEVC 使用基準碼率折半；JPEG 僅縮圖，不保證流量減半。": [
+    "Remote Display upscales with the selected algorithm. H.264/HEVC use half the baseline bitrate; JPEG only reduces dimensions, without a guaranteed 50% traffic reduction.",
+    "リモート画面 は選択した方式で拡大します。H.264／HEVC は基準ビットレートの半分を使用します。JPEG は縮小のみで通信量の半減は保証しません。",
+    "Viewer는 선택한 알고리즘으로 확대합니다. H.264/HEVC는 기준 비트레이트의 절반을 사용합니다. JPEG는 해상도만 줄이며 트래픽 절반 감소를 보장하지 않습니다."
+  ],
+  "沿用原畫質設定，不額外降低": [
+    "Keep the quality profile’s bitrate policy",
+    "画質設定を維持し、追加で低減しません",
+    "화질 설정 유지, 추가 감소 없음"
+  ],
+  "遠端顯示 使用所選演算法放大。僅降低傳輸解析度，保留原畫質模式的編碼品質與碼率政策。": [
+    "Remote Display upscales with the selected algorithm. Only stream resolution is reduced; encoding quality and bitrate policy follow the original quality profile.",
+    "リモート画面 は選択した方式で拡大します。転送解像度のみを下げ、元の画質モードの符号化品質とビットレート設定を維持します。",
+    "Viewer는 선택한 알고리즘으로 확대합니다. 전송 해상도만 낮추고 기존 화질 모드의 인코딩 품질과 비트레이트 정책을 유지합니다."
+  ],
+  "增強策略": [
+    "Enhancement strategy",
+    "画像強化方針",
+    "향상 전략"
+  ],
+  "流暢優先": [
+    "Prefer smoothness",
+    "滑らかさ優先",
+    "부드러움 우선"
+  ],
+  "流量優先": [
+    "Prefer lower traffic",
+    "通信量優先",
+    "트래픽 절약 우선"
+  ],
+  "基準碼率（Mbps）": [
+    "Baseline bitrate (Mbps)",
+    "基準ビットレート（Mbps）",
+    "기준 비트레이트 (Mbps)"
+  ],
+  "只降低解析度，碼率與 FPS 沿用原畫質設定。": [
+    "Reduce resolution only; retain the quality profile’s bitrate and FPS.",
+    "解像度のみ下げ、元の画質設定のビットレートと FPS を維持します。",
+    "해상도만 낮추고 기존 화질 설정의 비트레이트와 FPS를 유지합니다."
+  ],
+  "來源 FPS 上限為原模式的 2 倍，目標碼率使用完整基準預算。": [
+    "Double the source FPS limit; use the full baseline bitrate budget.",
+    "元のモードのソース FPS 上限を2倍にし、基準ビットレート全体を使用します。",
+    "원래 모드의 원본 FPS 상한을 두 배로 하고 기준 비트레이트 전체를 사용합니다."
+  ],
+  "來源 FPS 維持原模式，目標碼率使用基準預算的 50%。": [
+    "Retain source FPS; use 50% of the baseline bitrate budget.",
+    "ソース FPS を維持し、基準ビットレートの50%を使用します。",
+    "원본 FPS를 유지하고 기준 비트레이트의 50%를 사용합니다."
+  ],
+  "設定自動儲存並套用至 遠端顯示。策略需遠端支援新串流參數；不支援時維持原畫質策略。": [
+    "Settings are saved automatically and applied to Remote Display. Strategies require the new stream parameters; unsupported hosts retain the original quality policy.",
+    "設定は自動保存され リモート画面 に適用されます。方針の適用には新しい配信パラメータへの対応が必要です。非対応ホストでは元の画質方針を維持します。",
+    "설정은 자동 저장되어 Viewer에 적용됩니다. 새 스트림 매개변수를 지원하지 않는 호스트는 원래 화질 정책을 유지합니다."
+  ],
+  "遠端顯示 使用所選演算法放大。策略調整來源 FPS 上限與目標碼率；不包含補幀，實際速度取決於裝置與網路。": [
+    "Remote Display upscales with the selected algorithm. Strategies change source FPS limits and target bitrate, without frame interpolation. Actual speed depends on devices and network.",
+    "リモート画面 は選択した方式で拡大します。方針はソース FPS 上限と目標ビットレートを調整し、補間は行いません。実速度は端末とネットワークに依存します。",
+    "Viewer는 선택한 알고리즘으로 확대합니다. 전략은 원본 FPS 상한과 목표 비트레이트를 조정하며 보간은 포함하지 않습니다. 실제 속도는 장치와 네트워크에 따라 다릅니다."
+  ],
+  "遠端不支援此策略，維持原畫質策略": [
+    "Host does not support this strategy; original quality policy retained",
+    "ホストがこの方針に非対応のため元の画質方針を維持",
+    "호스트가 이 전략을 지원하지 않아 기존 화질 정책 유지"
+  ],
+  "不支援的增強策略": [
+    "Unsupported enhancement strategy",
+    "非対応の画像強化方針",
+    "지원하지 않는 향상 전략"
+  ],
+  "基準碼率必須為 1 至 100 Mbps": [
+    "Baseline bitrate must be 1–100 Mbps",
+    "基準ビットレートは1～100 Mbpsです",
+    "기준 비트레이트는 1~100 Mbps여야 합니다"
+  ],
+  "畫面流暢優先": [
+    "Prioritize visual smoothness",
+    "画面の滑らかさを優先",
+    "화면 부드러움 우선"
+  ],
+  "網路負載優先": [
+    "Prioritize lower network load",
+    "ネットワーク負荷の軽減を優先",
+    "네트워크 부하 절감 우선"
+  ],
+  "寬、高各 75%": [
+    "75% width and height",
+    "幅・高さ各 75%",
+    "너비 및 높이 각각 75%"
+  ],
+  "自動調整": [
+    "Automatic adjustment",
+    "自動調整",
+    "자동 조정"
+  ],
+  "Core ML 模型": [
+    "Core ML model",
+    "Core ML モデル",
+    "Core ML 모델"
+  ],
+  "不支援的 Core ML 模型": [
+    "Unsupported Core ML model",
+    "未対応の Core ML モデル",
+    "지원하지 않는 Core ML 모델"
+  ],
+  "無": [
+    "None",
+    "なし",
+    "없음"
+  ],
+  "2× 補幀（實驗性）": [
+    "2× frame interpolation (experimental)",
+    "2× フレーム補間（実験的）",
+    "2× 프레임 보간 (실험적)"
+  ],
+  "每兩張真實影格補一張；可能增加操作延遲，處理逾時自動回退。": [
+    "Inserts one frame between two real frames; may add input latency. Falls back on timeout.",
+    "実フレーム間に1枚補間します。操作遅延が増える場合があり、時間超過時は解除します。",
+    "실제 프레임 사이에 한 장을 보간합니다. 입력 지연이 늘 수 있으며 시간 초과 시 해제합니다."
+  ],
+  "等待穩定影格": [
+    "Waiting for stable frames",
+    "安定したフレームを待機中",
+    "안정적인 프레임 대기 중"
+  ],
+  "準備補幀": [
+    "Preparing interpolation",
+    "補間を準備中",
+    "보간 준비 중"
+  ],
+  "2× 補幀（區塊移動估計）": [
+    "2× interpolation (block motion estimation)",
+    "2× 補間（ブロック動き推定）",
+    "2× 보간 (블록 움직임 추정)"
+  ],
+  "補幀回退，顯示真實影格": [
+    "Interpolation fallback: real frames",
+    "補間を解除し実フレームを表示",
+    "보간 해제: 실제 프레임 표시"
+  ],
+  "補幀逾時，顯示真實影格": [
+    "Interpolation timeout: real frames",
+    "補間が時間超過、実フレームを表示",
+    "보간 시간 초과: 실제 프레임 표시"
+  ],
+  "遠端顯示 使用所選演算法放大。策略調整來源 FPS 上限與目標碼率；補幀另行開啟，實際速度取決於裝置與網路。": [
+    "Remote Display upscales with the selected algorithm. Strategies control source FPS limits and bitrate; interpolation is enabled separately. Actual speed depends on hardware and network.",
+    "リモート画面 は選択した方式で拡大します。戦略は元 FPS 上限とビットレートを調整し、補間は別に有効化します。速度は機器とネットワークに依存します。",
+    "Viewer는 선택한 알고리즘으로 확대합니다. 전략은 원본 FPS 제한과 비트레이트를 조정하며 보간은 별도로 켭니다. 속도는 장치와 네트워크에 따라 달라집니다."
+  ],
+  "2× 補幀（RIFE 4.25 Lite）": [
+    "2× interpolation (RIFE 4.25 Lite)",
+    "2× 補間（RIFE 4.25 Lite）",
+    "2× 보간 (RIFE 4.25 Lite)"
+  ],
+  "RIFE 正在載入": [
+    "Loading RIFE",
+    "RIFE を読み込み中",
+    "RIFE 로딩 중"
+  ],
+  "RIFE 目前僅支援 Apple Silicon Mac": [
+    "RIFE currently supports Apple Silicon Macs only",
+    "RIFE は現在 Apple Silicon Mac のみ対応",
+    "RIFE는 현재 Apple Silicon Mac만 지원"
+  ],
+  "RIFE 需要 macOS 13 或更新版本": [
+    "RIFE requires macOS 13 or later",
+    "RIFE には macOS 13 以降が必要",
+    "RIFE는 macOS 13 이상 필요"
+  ],
+  "RIFE 4.25 Lite 需要 Apple Silicon Mac 與 macOS 13 以上。每兩張真實影格補一張，逾時回退。": [
+    "RIFE 4.25 Lite requires Apple Silicon and macOS 13 or later. Inserts one frame between two real frames; falls back on timeout.",
+    "RIFE 4.25 Lite は Apple Silicon と macOS 13 以降が必要です。実フレーム間に1枚補間し、時間超過時は解除します。",
+    "RIFE 4.25 Lite는 Apple Silicon과 macOS 13 이상이 필요합니다. 실제 프레임 사이에 한 장을 보간하며 시간 초과 시 해제합니다."
+  ],
+  "GOP（關鍵影格間隔）": [
+    "GOP (keyframe interval)",
+    "GOP（キーフレーム間隔）",
+    "GOP (키 프레임 간격)"
+  ],
+  "每隔指定張數要求關鍵影格；1 為每張。僅適用 H.264／HEVC。": [
+    "Request a keyframe every specified number of frames; 1 means every frame. H.264/HEVC only.",
+    "指定フレーム数ごとにキーフレームを要求します。1 は毎フレーム。H.264／HEVC のみ。",
+    "지정한 프레임 수마다 키 프레임을 요청합니다. 1은 매 프레임입니다. H.264/HEVC에만 적용됩니다."
+  ],
+  "GOP 必須為 1 至 300 張": [
+    "GOP must be between 1 and 300 frames.",
+    "GOP は1～300フレームで指定してください。",
+    "GOP는 1~300 프레임이어야 합니다."
+  ],
+  "來源 FPS 上限": [
+    "Source FPS limit",
+    "ソース FPS 上限",
+    "원본 FPS 상한"
+  ],
+  "碼率上限（Mbps）": [
+    "Bitrate limit (Mbps)",
+    "ビットレート上限（Mbps）",
+    "비트레이트 상한 (Mbps)"
+  ],
+  "FPS 上限必須為 5 至 60": [
+    "FPS limit must be 5–60.",
+    "FPS 上限は5～60で指定してください。",
+    "FPS 상한은 5~60이어야 합니다."
+  ],
+  "碼率上限必須為 1 至 64 Mbps": [
+    "Bitrate limit must be 1–64 Mbps.",
+    "ビットレート上限は1～64 Mbpsで指定してください。",
+    "비트레이트 상한은 1~64 Mbps이어야 합니다."
+  ],
+  "FPS 範圍 5～60，碼率範圍 1～64 Mbps。碼率限制 H.264／HEVC 的目標值，瞬間流量可能超過。": [
+    "FPS range: 5–60; bitrate range: 1–64 Mbps. The bitrate limit sets the H.264/HEVC target and may be exceeded briefly.",
+    "FPSは5～60、ビットレートは1～64 Mbpsです。H.264／HEVCの目標値を制限し、瞬間的に超える場合があります。",
+    "FPS 범위는 5~60, 비트레이트는 1~64 Mbps입니다. H.264/HEVC 목표값을 제한하며 순간적으로 초과할 수 있습니다."
+  ],
+  "補幀方式": [
+    "Interpolation method",
+    "補間方式",
+    "보간 방식"
+  ],
+  "自動（Apple 優先）": [
+    "Auto (prefer Apple)",
+    "自動（Apple 優先）",
+    "자동 (Apple 우선)"
+  ],
+  "Apple 低延遲": [
+    "Apple low latency",
+    "Apple 低遅延",
+    "Apple 저지연"
+  ],
+  "2× 補幀（Apple 低延遲）": [
+    "2× interpolation (Apple low latency)",
+    "2× 補間（Apple 低遅延）",
+    "2× 보간 (Apple 저지연)"
+  ],
+  "Apple 補幀需要支援的 Mac 與 macOS 26 以上": [
+    "Apple interpolation requires a supported Mac and macOS 26 or later",
+    "Apple 補間には対応 Mac と macOS 26 以降が必要です",
+    "Apple 보간은 지원되는 Mac과 macOS 26 이상이 필요합니다"
+  ],
+  "連線測速與分析": [
+    "Connection speed and analysis",
+    "接続速度と分析",
+    "연결 속도 및 분석"
+  ],
+  "連線分析": [
+    "Connection analysis",
+    "接続分析",
+    "연결 분석"
+  ],
+  "分析進度": [
+    "Analysis progress",
+    "分析の進捗",
+    "분석 진행률"
+  ],
+  "重新分析": [
+    "Analyze again",
+    "再分析",
+    "다시 분석"
+  ],
+  "請在遠端拖動視窗或捲動頁面。這是目前連線的實際表現，不是網路最高速度。": [
+    "Move a remote window or scroll a page. This measures the current connection, not maximum network speed.",
+    "リモートのウィンドウを動かすかページをスクロールしてください。回線の最高速度ではなく、現在の接続を測定します。",
+    "원격 창을 이동하거나 페이지를 스크롤하세요. 최대 네트워크 속도가 아닌 현재 연결 상태를 측정합니다."
+  ],
+  "正在準備分析…": [
+    "Preparing analysis…",
+    "分析を準備中…",
+    "분석 준비 중…"
+  ],
+  "分析中，請操作遠端畫面約 10 秒…": [
+    "Analyzing. Use the remote desktop for about 10 seconds…",
+    "分析中。約10秒間リモート画面を操作してください…",
+    "분석 중입니다. 약 10초 동안 원격 화면을 조작하세요…"
+  ],
+  "連線已改變，請重新分析。": [
+    "The connection changed. Please analyze again.",
+    "接続が変わりました。再分析してください。",
+    "연결이 변경되었습니다. 다시 분석하세요."
+  ],
+  "分析資料不足，請確認 遠端顯示 已更新並操作遠端畫面後重試。": [
+    "Not enough data. Update the Remote Display and try again while using the remote desktop.",
+    "データが不足しています。リモート画面 を更新し、リモート画面を操作して再試行してください。",
+    "데이터가 부족합니다. Viewer를 업데이트하고 원격 화면을 조작하면서 다시 시도하세요."
+  ],
+  "回應順暢": [
+    "Responsive",
+    "応答は良好",
+    "응답 원활"
+  ],
+  "暫無延遲資料": [
+    "Latency unavailable",
+    "遅延データなし",
+    "지연 정보 없음"
+  ],
+  "回應較慢": [
+    "Slow response",
+    "応答が遅め",
+    "응답 느림"
+  ],
+  "回應稍有延遲": [
+    "Some delay",
+    "少し遅延あり",
+    "약간 지연됨"
+  ],
+  "回應不太穩定": [
+    "Variable response",
+    "応答にばらつき",
+    "응답 불안정"
+  ],
+  "可試用有線網路，並暫停兩端的大量下載或上傳。": [
+    "Try Ethernet and pause large downloads or uploads on both devices.",
+    "有線接続を試し、両端の大量ダウンロードやアップロードを一時停止してください。",
+    "유선 연결을 사용하고 양쪽 기기의 대용량 다운로드나 업로드를 일시 중지하세요."
+  ],
+  "網路回應有起伏，可先靠近 Wi-Fi 基地台或改用有線網路。": [
+    "Response times vary. Move closer to the Wi-Fi router or try Ethernet.",
+    "応答時間が変動しています。Wi-Fi ルーターに近づくか有線接続をお試しください。",
+    "응답 시간이 변동합니다. Wi-Fi 공유기에 가까이 가거나 유선 연결을 사용하세요."
+  ],
+  "收到的畫面有缺漏，可先降低碼率上限，再重新分析。": [
+    "Some frame data was missing. Lower the bitrate limit and analyze again.",
+    "映像データに欠落があります。ビットレート上限を下げて再分析してください。",
+    "일부 화면 데이터가 누락되었습니다. 비트레이트 상한을 낮추고 다시 분석하세요."
+  ],
+  "部分畫面無法正常讀取，可重新連線，並確認兩端皆為新版。": [
+    "Some frames could not be read. Reconnect and update both devices.",
+    "一部の映像を読み取れませんでした。再接続し、両端を更新してください。",
+    "일부 화면을 읽지 못했습니다. 다시 연결하고 양쪽 기기를 업데이트하세요."
+  ],
+  "取樣期間正常": [
+    "Normal during sampling",
+    "測定中は正常",
+    "측정 중 정상"
+  ],
+  "未收到新畫面": [
+    "No new frames",
+    "新しい映像なし",
+    "새 화면 없음"
+  ],
+  "偶有畫面中斷": [
+    "Occasional interruptions",
+    "映像が時々途切れる",
+    "간헐적 화면 끊김"
+  ],
+  "畫面更新較慢": [
+    "Slow screen updates",
+    "画面更新が遅め",
+    "화면 갱신 느림"
+  ],
+  "若畫面停住，請確認遠端連線；若桌面靜止，請拖動視窗後重試。": [
+    "If the screen is stuck, check the connection. If it is idle, move a window and retry.",
+    "画面が止まっている場合は接続を確認してください。静止中ならウィンドウを動かして再試行してください。",
+    "화면이 멈췄다면 연결을 확인하세요. 정지 화면이라면 창을 이동하고 다시 시도하세요."
+  ],
+  "收到畫面的速度高於顯示速度，可先關閉畫面增強與補幀比較。": [
+    "Frames arrive faster than they are displayed. Try disabling enhancement and interpolation.",
+    "受信に表示が追いついていません。画面強化と補間を無効にして比較してください。",
+    "수신 속도보다 표시 속도가 느립니다. 화면 향상과 보간을 끄고 비교하세요."
+  ],
+  "若持續拖動仍不順，可先降低傳輸解析度；目前資料尚無法確定慢在遠端或傳輸途中。": [
+    "If dragging remains slow, try a lower streaming resolution. The data cannot yet distinguish a remote-device bottleneck from a transfer bottleneck.",
+    "ドラッグが遅い場合は転送解像度を下げてください。現状のデータではリモート端末と転送経路のどちらが原因かは特定できません。",
+    "드래그가 계속 느리면 전송 해상도를 낮춰보세요. 현재 데이터만으로는 원격 기기와 전송 경로 중 어느 쪽이 원인인지 알 수 없습니다."
+  ],
+  "目前使用圖片串流，靜止時更新較少是正常的；請以拖動時的表現判斷。": [
+    "Image streaming is active. Fewer updates when idle are normal; judge it while dragging.",
+    "画像ストリーミングを使用中です。静止時の更新が少ないのは正常です。ドラッグ中の動きで判断してください。",
+    "이미지 스트리밍 중입니다. 정지 상태에서 갱신이 적은 것은 정상입니다. 드래그 중 성능으로 판단하세요."
+  ],
+  "目前可先維持設定；若覺得不跟手，可關閉補幀比較。": [
+    "Keep the current settings. If controls feel delayed, compare with interpolation off.",
+    "現在の設定を維持できます。操作が遅く感じる場合は補間を無効にして比較してください。",
+    "현재 설정을 유지하세요. 조작이 늦게 느껴지면 보간을 끄고 비교하세요."
+  ],
+  "網路回應": [
+    "Network response",
+    "ネットワーク応答",
+    "네트워크 응답"
+  ],
+  "目前下載流量": [
+    "Current incoming traffic",
+    "現在の受信量",
+    "현재 수신 트래픽"
+  ],
+  "畫面表現": [
+    "Screen performance",
+    "画面の状態",
+    "화면 상태"
+  ],
+  "真實畫面／顯示": [
+    "Original / displayed",
+    "元映像／表示",
+    "원본 / 표시"
+  ],
+  "設定上限": [
+    "Configured limit",
+    "設定上限",
+    "설정 상한"
+  ],
+  "分析完成，以下為本次操作期間的結果。": [
+    "Analysis complete. Results reflect this sampling period.",
+    "分析完了。この操作期間の結果です。",
+    "분석 완료. 이번 측정 기간의 결과입니다."
+  ],
+  "調整畫面滿版": [
+    "Fit window to remote display",
+    "リモート画面にウィンドウを合わせる",
+    "원격 화면에 창 맞추기"
+  ],
+  "自動調整 遠端顯示 視窗比例，完整顯示遠端畫面。全螢幕不調整。": [
+    "Adjust the Remote Display window proportions to show the entire remote display. Fullscreen is unchanged.",
+    "リモート画面全体が表示されるように リモート画面 の縦横比を調整します。全画面では調整しません。",
+    "전체 원격 화면이 표시되도록 원격 화면 창 비율을 조정합니다. 전체 화면에서는 조정하지 않습니다."
+  ],
+  "自動配置/延遲優先": [
+    "Auto / Low latency",
+    "自動設定／低遅延優先",
+    "자동 설정 / 지연 우선"
+  ],
+  "自動配置/流量優先": [
+    "Auto / Low traffic",
+    "自動設定／通信量優先",
+    "자동 설정 / 트래픽 우선"
+  ],
+  "依遠端實測調整 FPS 與 GOP，優先減少等待；保留畫質、解析度、碼率與影像傳輸設定。設定會套用到所有 遠端顯示。": [
+    "Adjust FPS and GOP using remote measurements to reduce waiting. Keep quality, resolution, bitrate and codec settings. Applies to all Viewers.",
+    "実測に基づき FPS と GOP を調整し、待ち時間を抑えます。画質・解像度・ビットレート・映像方式は維持します。すべての リモート画面 に適用します。",
+    "원격 측정값에 따라 FPS와 GOP를 조정합니다. 화질, 해상도, 비트레이트, 코덱은 유지합니다. 모든 Viewer에 적용됩니다."
+  ],
+  "降低每秒傳送張數，減少完整畫面傳送；保留畫質、解析度、碼率與影像傳輸設定。動作會較不流暢，流量依內容而定。設定會套用到所有 遠端顯示。": [
+    "Send fewer frames and full-frame updates. Keep quality, resolution, bitrate and codec settings. Motion is less smooth; traffic depends on content. Applies to all Viewers.",
+    "送信フレーム数と全画面更新を減らします。画質・解像度・ビットレート・映像方式は維持します。動きの滑らかさは下がり、通信量は内容によります。すべての リモート画面 に適用します。",
+    "초당 프레임과 전체 화면 전송을 줄입니다. 화질, 해상도, 비트레이트, 코덱은 유지합니다. 동작이 덜 부드러울 수 있으며 트래픽은 화면 내용에 따라 달라집니다. 모든 Viewer에 적용됩니다."
+  ],
+  "取樣中，請持續拖動遠端視窗或捲動約 10 秒…": [
+    "Measuring. Keep moving a remote window or scrolling for about 10 seconds…",
+    "測定中。約10秒間リモートウィンドウを動かすかスクロールしてください…",
+    "측정 중입니다. 약 10초간 원격 창을 이동하거나 스크롤하세요…"
+  ],
+  "有多個遠端連線，請先對要配置的站台按測速，再回來配置。": [
+    "Multiple remotes are connected. Analyze the intended site first, then return here.",
+    "複数の接続があります。対象の接続を先に測定してから戻ってください。",
+    "여러 원격 연결이 있습니다. 대상 사이트를 먼저 측정한 후 돌아오세요."
+  ],
+  "請先連線到遠端，再使用自動配置。": [
+    "Connect to a remote before using auto configuration.",
+    "リモートに接続してから自動設定を使用してください。",
+    "먼저 원격에 연결한 후 자동 설정을 사용하세요."
+  ],
+  "畫面變化太少，請持續拖動視窗或捲動後再試。": [
+    "Too little screen activity. Move a window or scroll while trying again.",
+    "画面の変化が少なすぎます。ウィンドウを動かすかスクロールして再試行してください。",
+    "화면 변화가 너무 적습니다. 창을 이동하거나 스크롤하며 다시 시도하세요."
+  ],
+  "已取消自動配置。": [
+    "Auto configuration canceled.",
+    "自動設定をキャンセルしました。",
+    "자동 설정이 취소되었습니다."
+  ],
+  "設定已儲存": [
+    "Settings saved",
+    "設定を保存しました",
+    "설정 저장됨"
+  ],
+  "畫質與解析度設定保留，請實際操作比較。": [
+    "Quality and resolution settings were kept. Compare during actual use.",
+    "画質と解像度の設定は維持しています。実際の操作で比較してください。",
+    "화질과 해상도 설정은 유지되었습니다. 실제 조작하며 비교하세요."
+  ],
+  "不支援的自動配置": [
+    "Unsupported auto configuration",
+    "未対応の自動設定",
+    "지원하지 않는 자동 설정"
+  ],
+  "遠端版本": [
+    "Remote version",
+    "接続先のバージョン",
+    "원격 버전"
+  ],
+  "未提供": [
+    "Not provided",
+    "未提供",
+    "제공되지 않음"
+  ],
+  "正在背景分析，約需 10～15 秒…": [
+    "Analyzing in the background, about 10–15 seconds…",
+    "バックグラウンドで分析中です。約10～15秒…",
+    "백그라운드 분석 중, 약 10~15초…"
+  ],
+  "解碼區塊": [
+    "Decoded blocks",
+    "デコードしたブロック",
+    "디코딩 블록"
+  ],
+  "解碼畫面": [
+    "Decoded frames",
+    "デコードしたフレーム",
+    "디코딩 프레임"
+  ],
+  "個／秒": [
+    "per second",
+    "個／秒",
+    "개/초"
+  ],
+  "背景分析不包含畫面顯示、增強與補幀；桌面靜止時更新較少是正常的。": [
+    "Background analysis excludes display, enhancement and interpolation. Fewer updates are normal on a static desktop.",
+    "バックグラウンド分析に表示・高画質化・補間は含まれません。静止画面では更新が少なくなります。",
+    "백그라운드 분석은 표시, 향상 및 보간을 포함하지 않습니다. 정지 화면은 업데이트가 적습니다."
+  ],
+  "本次背景收件與解碼正常，可先維持設定。": [
+    "Background reception and decoding look normal. Keep the current settings.",
+    "バックグラウンド受信とデコードは正常です。現在の設定を維持できます。",
+    "백그라운드 수신과 디코딩이 정상입니다. 현재 설정을 유지하세요."
+  ],
+  "解碼速度較慢，可降低來源 FPS 後比較。": [
+    "Decoding is slow. Try a lower source FPS.",
+    "デコードが遅いため、送信元FPSを下げて比較してください。",
+    "디코딩이 느립니다. 원본 FPS를 낮춰 비교하세요."
+  ],
+  "自動取樣目前連線，無需操作遠端。結果不代表網路最高速度。": [
+    "The connection is sampled automatically; no remote interaction is needed. Results do not represent maximum network speed.",
+    "接続を自動測定するため、遠隔操作は不要です。結果は回線の最大速度ではありません。",
+    "연결을 자동으로 측정하므로 원격 조작이 필요 없습니다. 결과는 네트워크 최대 속도가 아닙니다."
+  ],
+  "本次取樣資料不足，請稍後重新分析。": [
+    "Not enough data was collected. Please try again later.",
+    "測定データが不足しています。後でもう一度分析してください。",
+    "수집된 데이터가 부족합니다. 잠시 후 다시 분석하세요."
+  ],
+  "本次未收到新畫面，可能是遠端桌面靜止，暫時無法判斷畫面更新速度。": [
+    "No new frames arrived. The remote desktop may be static, so its update speed cannot be assessed yet.",
+    "新しい画面を受信していません。接続先の画面が静止している可能性があり、更新速度はまだ判断できません。",
+    "새 화면이 수신되지 않았습니다. 원격 화면이 정지 상태일 수 있어 업데이트 속도를 판단할 수 없습니다."
+  ],
+  "取樣期間畫面更新較少，可能與桌面內容、遠端處理速度或網路有關。": [
+    "Fewer updates arrived during sampling. Desktop content, remote processing or the network may be factors.",
+    "測定中の画面更新が少なめでした。画面内容、接続先の処理速度、ネットワークなどが影響する場合があります。",
+    "측정 중 화면 업데이트가 적었습니다. 화면 내용, 원격 처리 속도 또는 네트워크가 원인일 수 있습니다."
+  ],
+  "目前使用圖片串流，桌面靜止時更新較少是正常的。": [
+    "Image streaming is in use. Fewer updates are normal when the desktop is static.",
+    "画像ストリーミングを使用中です。画面が静止している場合、更新が少ないのは正常です。",
+    "이미지 스트리밍을 사용 중입니다. 화면이 정지 상태일 때 업데이트가 적은 것은 정상입니다."
+  ],
+  "分析完成，以下為本次取樣結果。": [
+    "Analysis complete. Results from this sample are shown below.",
+    "分析が完了しました。今回の測定結果を表示します。",
+    "분석이 완료되었습니다. 이번 측정 결과입니다."
+  ],
+  "發現重複的 Host 程序": [
+    "Duplicate Host process found",
+    "重複した Host プロセスが見つかりました",
+    "중복 Host 프로세스 발견"
+  ],
+  "是否停止下列程序？該程序目前的遠端連線將會中斷。": [
+    "Stop this process? Its current remote connections will be interrupted.",
+    "このプロセスを停止しますか？現在のリモート接続は切断されます。",
+    "이 프로세스를 중지할까요? 현재 원격 연결이 끊어집니다."
+  ],
+  "停止程序": [
+    "Stop process",
+    "プロセスを停止",
+    "프로세스 중지"
+  ],
+  "關閉本程式，然後更新": [
+    "Quit and update",
+    "終了して更新",
+    "앱 종료 후 업데이트"
+  ],
+  "下載完成，已開啟安裝包。請先關閉本程式，再安裝並覆蓋舊版本。": [
+    "Download complete. The installer is open. Quit this app before installing and replacing the previous version.",
+    "ダウンロード完了。インストーラーを開きました。このアプリを終了してから、旧バージョンを置き換えてください。",
+    "다운로드 완료. 설치 프로그램을 열었습니다. 이 앱을 종료한 다음 이전 버전을 덮어쓰세요."
+  ],
+  "關閉本程式": [
+    "Quit application",
+    "アプリを終了",
+    "앱 종료"
+  ],
+  "更新流程測試：可下載目前的正式版本。": [
+    "Update flow test: download the current release.",
+    "更新フローのテスト：現在の正式版をダウンロードできます。",
+    "업데이트 흐름 테스트: 현재 정식 버전을 다운로드할 수 있습니다."
+  ],
+  "下載目錄：": [
+    "Download location:",
+    "ダウンロード先：",
+    "다운로드 위치:"
+  ],
+  "MCP 設定": [
+    "MCP settings",
+    "MCP 設定",
+    "MCP 설정"
+  ],
+  "啟用 MCP": [
+    "Enable MCP",
+    "MCP を有効にする",
+    "MCP 활성화"
+  ],
+  "允許 Agent 查詢狀態及操作已授權的遠端連線。預設關閉，切換後立即生效。": [
+    "Allow agents to check status and control authorized remote sessions. Off by default; changes apply immediately.",
+    "Agent に状態の確認と認証済みリモート接続の操作を許可します。初期状態はオフで、変更はすぐ反映されます。",
+    "Agent가 상태를 확인하고 인증된 원격 연결을 조작하도록 허용합니다. 기본값은 꺼짐이며 변경 즉시 적용됩니다."
+  ],
+  "服務位址": [
+    "Service address",
+    "サービスアドレス",
+    "서비스 주소"
+  ],
+  "連線需要獨立 Token；關閉後，Agent 將無法透過 MCP 操作。": [
+    "A separate token is required. Turning this off stops agent access through MCP.",
+    "接続には専用 Token が必要です。オフにすると Agent は MCP で操作できません。",
+    "별도의 Token이 필요합니다. 끄면 Agent가 MCP를 통해 조작할 수 없습니다."
+  ],
+  "啟用 IP 白名單": [
+    "Enable IP whitelist",
+    "IP ホワイトリストを有効にする",
+    "IP 허용 목록 활성화"
+  ],
+  "允許的 IP 位址": [
+    "Allowed IP addresses",
+    "許可する IP アドレス",
+    "허용된 IP 주소"
+  ],
+  "每行一個 IP。白名單啟用時，名單內免 Token、名單外禁止連線；關閉時所有來源皆需 Token。": [
+    "One IP per line. With the whitelist on, listed IPs need no token and other IPs are blocked. With it off, all sources require a token.",
+    "1 行に 1 つの IP。有効時はリスト内の IP は Token 不要、リスト外は接続不可です。無効時はすべての接続に Token が必要です。",
+    "한 줄에 IP 하나를 입력하세요. 목록이 켜져 있으면 목록 내 IP는 Token 없이 연결되며 나머지는 차단됩니다. 끄면 모든 연결에 Token이 필요합니다."
+  ],
+  "複製 MCP 位址": [
+    "Copy MCP address",
+    "MCP アドレスをコピー",
+    "MCP 주소 복사"
+  ],
+  "MCP 位址已複製": [
+    "MCP address copied",
+    "MCP アドレスをコピーしました",
+    "MCP 주소가 복사되었습니다"
+  ],
+  "正在準備自動安裝…": [
+    "Preparing automatic installation…",
+    "自動インストールを準備中…",
+    "자동 설치 준비 중…"
+  ],
+  "重試自動更新": [
+    "Retry automatic update",
+    "自動更新を再試行",
+    "자동 업데이트 다시 시도"
+  ],
+  "下載並自動更新": [
+    "Download and update automatically",
+    "ダウンロードして自動更新",
+    "다운로드 및 자동 업데이트"
+  ],
+  "下載完成後將自動關閉程式、安裝新版並重新啟動。遠端連線會中斷。": [
+    "After downloading, YourDesk will quit, install the update and restart automatically. Remote sessions will disconnect.",
+    "ダウンロード後、YourDesk を終了して新版をインストールし、自動で再起動します。リモート接続は切断されます。",
+    "다운로드 후 YourDesk가 자동으로 종료되고 새 버전을 설치한 뒤 다시 시작됩니다. 원격 연결은 끊어집니다."
+  ],
+  "強制更新": [
+    "Force update",
+    "強制更新",
+    "강제 업데이트"
+  ],
+  "忽略版本高低，下載最新正式 Release。": [
+    "Download the latest stable release regardless of the installed version.",
+    "現在のバージョンに関係なく、最新の正式リリースをダウンロードします。",
+    "설치된 버전에 관계없이 최신 정식 릴리스를 다운로드합니다."
+  ],
+  "立即更新": [
+    "Update now",
+    "今すぐ更新",
+    "지금 업데이트"
+  ],
+  "即將自動更新，可按取消。": [
+    "Updating soon. You can cancel.",
+    "まもなく自動更新します。キャンセルできます。",
+    "곧 자동 업데이트됩니다. 취소할 수 있습니다."
+  ],
+  "開始更新": [
+    "Start update",
+    "更新を開始",
+    "업데이트 시작"
+  ],
+  "MCP 接管後開啟畫面": [
+    "Show remote display when MCP takes control",
+    "MCP 操作開始時にリモート画面を表示",
+    "MCP 제어 시작 시 원격 화면 표시"
+  ],
+  "開啟後，MCP 接管時自動顯示遠端畫面；關閉時在背景操作，可從 Tray 開啟或隱藏。": [
+    "Show the remote display when MCP takes control. When off, operate in the background; use the tray to show or hide it.",
+    "オンの場合、MCP 操作開始時にリモート画面を表示します。オフの場合はバックグラウンドで操作し、トレイから表示・非表示を切り替えられます。",
+    "켜면 MCP 제어 시작 시 원격 화면을 표시합니다. 끄면 백그라운드로 동작하며 트레이에서 표시하거나 숨길 수 있습니다."
+  ],
+  "自動配置偵測": [
+    "Automatic configuration",
+    "自動設定の検出",
+    "자동 설정 감지"
+  ],
+  "確認遠端連線": [
+    "Check remote connection",
+    "リモート接続を確認",
+    "원격 연결 확인"
+  ],
+  "收集有效畫面樣本": [
+    "Collect valid frame samples",
+    "有効な画面サンプルを収集",
+    "유효한 화면 샘플 수집"
+  ],
+  "計算建議配置": [
+    "Calculate recommended settings",
+    "推奨設定を計算",
+    "권장 설정 계산"
+  ],
+  "套用並儲存設定": [
+    "Apply and save settings",
+    "設定を適用して保存",
+    "설정 적용 및 저장"
+  ],
+  "依目前連線的動態樣本計算，不代表網路最高速度；資料不足時不變更設定。": [
+    "Uses motion samples from this connection, not maximum network speed; settings remain unchanged if data is insufficient.",
+    "現在の接続の動的サンプルを使用し、ネットワークの最高速度は測定しません。データ不足の場合は設定を変更しません。",
+    "현재 연결의 동적 샘플을 사용하며 네트워크 최고 속도를 측정하지 않습니다. 데이터가 부족하면 설정을 변경하지 않습니다."
+  ],
+  "有效樣本不足，設定未變更；請確認遠端畫面有變化，或改用有畫面的遠端連線後重試。": [
+    "Insufficient valid samples; settings were not changed. Ensure the remote screen is changing, or retry with a visible remote session.",
+    "有効なサンプルが不足しています。設定は変更していません。画面の変化を確認するか、画面を表示するリモート接続で再試行してください。",
+    "유효한 샘플이 부족하여 설정을 변경하지 않았습니다. 원격 화면에 변화가 있는지 확인하거나 화면이 표시되는 원격 연결로 다시 시도하세요."
+  ],
+  "動態樣本平均": [
+    "Motion sample average",
+    "動的サンプルの平均",
+    "동적 샘플 평균"
+  ],
+  "有效動態取樣": [
+    "Valid motion sampling",
+    "有効な動的サンプリング",
+    "유효한 동적 샘플링"
+  ],
+  "建議來源 FPS": [
+    "Recommended source FPS",
+    "推奨ソース FPS",
+    "권장 소스 FPS"
+  ],
+  "未登入開機": [
+    "Pre-login remote access",
+    "ログイン前のリモート接続",
+    "로그인 전 원격 접속"
+  ],
+  "遠端開機": [
+    "Remote wake",
+    "リモート起動",
+    "원격 깨우기"
+  ],
+  "實驗性功能": [
+    "Experimental",
+    "実験的機能",
+    "실험적 기능"
+  ],
+  "開機後尚未登入 OS 時允許遠端連線。目前版本尚未提供系統服務，暫不支援。": [
+    "Allow remote connections after boot, before OS login. This version does not yet provide the required system service.",
+    "OS 起動後、ログイン前のリモート接続を許可します。このバージョンでは必要なシステムサービスが未実装のため利用できません。",
+    "OS 부팅 후 로그인 전 원격 접속을 허용합니다. 현재 버전에는 필요한 시스템 서비스가 아직 제공되지 않습니다."
+  ],
+  "透過網路喚醒本機，需硬體、電源設定及可用的喚醒節點支援。目前版本尚未提供此功能。": [
+    "Wake this computer over the network. Requires compatible hardware, power settings and an available wake node. Not yet implemented in this version.",
+    "ネットワーク経由でこのコンピュータを起動します。対応ハードウェア、電源設定、利用可能な起動用ノードが必要です。このバージョンでは未実装です。",
+    "네트워크로 이 컴퓨터를 깨웁니다. 지원 하드웨어, 전원 설정 및 사용 가능한 깨우기 노드가 필요합니다. 현재 버전에는 아직 구현되지 않았습니다."
+  ],
+  "此平台尚未提供未登入連線服務。": [
+    "Pre-login remote access is not yet available on this platform.",
+    "このプラットフォームではログイン前のリモート接続はまだ利用できません。",
+    "이 플랫폼에서는 로그인 전 원격 접속이 아직 제공되지 않습니다."
+  ],
+  "未登入連線需要 macOS 14.4 以上。": [
+    "Pre-login remote access requires macOS 14.4 or later.",
+    "ログイン前のリモート接続には macOS 14.4 以降が必要です。",
+    "로그인 전 원격 접속에는 macOS 14.4 이상이 필요합니다."
+  ],
+  "請從已簽署的 YourDesk.app 啟用未登入連線。": [
+    "Enable pre-login access from a signed YourDesk.app.",
+    "署名済みの YourDesk.app からログイン前の接続を有効にしてください。",
+    "서명된 YourDesk.app에서 로그인 전 접속을 활성화하세요."
+  ],
+  "實驗性功能：需管理員授權及螢幕錄製、輔助使用權限；不支援 FileVault 開機前畫面。": [
+    "Experimental: requires administrator approval, Screen Recording and Accessibility permissions. FileVault preboot screens are not supported.",
+    "実験的機能：管理者の承認、画面収録とアクセシビリティの権限が必要です。FileVault の起動前画面には対応していません。",
+    "실험적 기능: 관리자 승인, 화면 기록 및 손쉬운 사용 권한이 필요합니다. FileVault 부팅 전 화면은 지원하지 않습니다."
+  ],
+  "正在變更系統服務，請完成管理員授權。": [
+    "Changing the system service. Please complete administrator authorization.",
+    "システムサービスを変更しています。管理者の承認を完了してください。",
+    "시스템 서비스를 변경 중입니다. 관리자 승인을 완료하세요."
+  ],
+  "未登入服務正在變更，請稍候。": [
+    "The pre-login service is being changed. Please wait.",
+    "ログイン前サービスを変更中です。お待ちください。",
+    "로그인 전 서비스를 변경 중입니다. 잠시 기다려 주세요."
+  ],
+  "服務模式使用啟用時的密碼": [
+    "Service mode uses the password set when enabled",
+    "サービスモードでは有効化時のパスワードを使用します",
+    "서비스 모드는 활성화 시 설정된 비밀번호를 사용합니다"
+  ],
+  "未登入連線服務模式": [
+    "Pre-login service mode",
+    "ログイン前接続サービスモード",
+    "로그인 전 접속 서비스 모드"
+  ],
+  "請先停用未登入開機，再修改配對密碼。": [
+    "Disable pre-login access before changing the pairing password.",
+    "ペアリングパスワードを変更する前にログイン前の接続を無効にしてください。",
+    "페어링 비밀번호를 변경하기 전에 로그인 전 접속을 비활성화하세요."
+  ],
+  "請先停用未登入開機，再修改 Host 的影像傳輸或 IP 直連設定。": [
+    "Disable pre-login access before changing Host video transport or direct IP settings.",
+    "Host の映像転送や IP 直接接続の設定を変更する前にログイン前の接続を無効にしてください。",
+    "Host 영상 전송 또는 IP 직접 연결 설정을 변경하기 전에 로그인 전 접속을 비활성화하세요."
+  ],
+  "請先停用未登入開機，再更新 APP；更新後重新啟用服務。": [
+    "Disable pre-login access before updating the app, then enable the service again.",
+    "APP を更新する前にログイン前の接続を無効にし、更新後にサービスを再度有効にしてください。",
+    "앱 업데이트 전에 로그인 전 접속을 비활성화하고 업데이트 후 서비스를 다시 활성화하세요."
+  ],
+  "APP 簽章驗證失敗，請使用正式簽署版本。": [
+    "App signature verification failed. Use an officially signed build.",
+    "APP の署名検証に失敗しました。正式に署名されたバージョンを使用してください。",
+    "앱 서명 검증에 실패했습니다. 정식 서명된 버전을 사용하세요."
+  ],
+  "關閉遠端連線": [
+    "Disconnect incoming connection",
+    "受信中のリモート接続を切断",
+    "수신 원격 연결 끊기"
+  ]
+}

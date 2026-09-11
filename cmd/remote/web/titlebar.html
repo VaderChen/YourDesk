@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; font-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<!-- FONT_AWESOME_LICENSE -->
+<style>
+@font-face{font-family:YourDeskIcons;src:url(data:font/woff2;base64,FONT_AWESOME_DATA) format("woff2");font-weight:900;font-style:normal;font-display:block}.fa{font-family:YourDeskIcons;font-weight:900;font-style:normal;font-size:15px;line-height:1;display:inline-block;width:18px;text-align:center}
+:root{color-scheme:light dark;--bg:#f7f8fa;--ink:#252b34;--muted:#687180;--edge:#dfe3e9;--hover:#e7ebf1;--selected:#fff;--accent:#245bcb}
+@media(prefers-color-scheme:dark){:root{--bg:#25282e;--ink:#eceef2;--muted:#a5adba;--edge:#3b404a;--hover:#363c46;--selected:#454d59;--accent:#a8c4ff}}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:52px;overflow:hidden;font:12px -apple-system,BlinkMacSystemFont,sans-serif;user-select:none;-webkit-user-select:none;background:var(--bg);color:var(--ink)}
+header{position:relative;height:52px;display:flex;align-items:center;border-bottom:1px solid var(--edge)}
+.window{width:88px;flex:none;display:flex;gap:8px;padding:0 16px}.window button{padding:0;width:12px;height:12px;border-radius:50%;border:1px solid #0002;line-height:10px;font-size:10px;color:transparent}.window:hover button{color:#0009}.close{background:#ff5f57}.minimize{background:#febc2e}.maximize{background:#28c840}
+.title{flex:1;min-width:0;display:flex;align-items:center;gap:9px;padding:0 14px 0 4px;font-weight:600;letter-spacing:.1px}.title svg{flex:none;color:var(--muted)}#title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.actions{flex:none;width:auto;padding:0 12px 0 0;display:flex;align-items:center;justify-content:flex-end;gap:8px}
+button{font:inherit;color:var(--ink);border:0;background:transparent;cursor:default;height:34px;border-radius:7px;padding:0 10px;white-space:nowrap}button:hover{background:var(--hover)}button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}button[aria-disabled=true]{opacity:.4}button[aria-disabled=true]:hover{background:transparent}
+.modes{display:flex;padding:2px;background:var(--hover);border-radius:9px}.modes button{height:30px;width:34px;padding:0;color:var(--muted)}.modes button[aria-pressed=true]{background:var(--selected);color:var(--ink);box-shadow:0 1px 3px #0001}
+.display-button{display:flex;align-items:center;gap:6px;min-width:48px;width:auto;justify-content:center;border:1px solid var(--edge)}.icon{width:34px;padding:5px}.divider{height:18px;width:1px;background:var(--edge)}svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.display-number{font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;min-width:9px;text-align:center}
+.display-buttons{position:absolute;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:4px;border-left:1px solid var(--edge);border-right:1px solid var(--edge);padding-left:8px;padding-right:8px;margin-left:0;height:22px}.display-buttons[hidden],.display-button[hidden]{display:none}.display-button[aria-pressed=true]{background:var(--selected);color:var(--ink);border-color:#20b66a;box-shadow:0 0 0 1px #20b66a}
+.codec-status{flex:none;display:flex;align-items:center;padding-right:10px;margin-right:8px;border-right:1px solid var(--edge);height:20px}.codec-status button{color:var(--muted)}
+.enhancement-status{flex:none;display:flex;align-items:center;margin-right:2px}.enhancement-status button{color:var(--muted)}.enhancement-status button.active{color:#20d86b}
+.fps{flex:none;width:76px;height:20px;display:flex;align-items:center;justify-content:flex-end;gap:6px;padding-right:12px;margin-right:12px;border-right:1px solid var(--edge);font-size:11px;font-variant-numeric:tabular-nums;white-space:nowrap}.fps b{font-size:10px;font-weight:600;color:var(--muted)}.fps output{min-width:24px;text-align:right}.fps.render-mode output,.fps.render-mode b{color:#00c853}
+.traffic{width:184px;flex:none;display:flex;align-items:center;justify-content:flex-end;gap:12px;padding-right:12px;margin-right:4px;border-right:1px solid var(--edge);font-size:11px;font-variant-numeric:tabular-nums;white-space:nowrap;height:20px}.traffic span{display:flex;gap:4px;align-items:center}.traffic b{font-size:10px;font-weight:600;color:var(--muted)}.traffic output{display:inline-block;min-width:59px;text-align:right}
+</style></head><body><header>
+<div class="window"><button class="close" data-action="5" data-tip="關閉 遠端顯示" aria-label="關閉 遠端顯示">×</button><button class="minimize" data-action="7" data-tip="最小化" aria-label="最小化">−</button><button class="maximize" data-action="4" data-tip="全螢幕／視窗" aria-label="全螢幕／視窗">+</button></div>
+<div class="title"><svg viewBox="0 0 20 20"><rect x="2" y="3" width="16" height="11" rx="2"/><path d="M7 18h6M10 14v4"/></svg><span id="title">YourDesk</span></div>
+<div id="display-buttons" class="display-buttons" role="group" aria-label="選擇螢幕" hidden><button class="icon display-button" data-display="0" data-action="100" data-tip="選擇螢幕" aria-label="選擇螢幕" aria-pressed="false" hidden><i class="fa" aria-hidden="true">&#xf390;</i><span class="display-number">1</span></button><button class="icon display-button" data-display="1" data-action="101" data-tip="選擇螢幕" aria-label="選擇螢幕" aria-pressed="false" hidden><i class="fa" aria-hidden="true">&#xf390;</i><span class="display-number">2</span></button><button class="icon display-button" data-display="2" data-action="102" data-tip="選擇螢幕" aria-label="選擇螢幕" aria-pressed="false" hidden><i class="fa" aria-hidden="true">&#xf390;</i><span class="display-number">3</span></button><button class="icon display-button" data-display="3" data-action="103" data-tip="選擇螢幕" aria-label="選擇螢幕" aria-pressed="false" hidden><i class="fa" aria-hidden="true">&#xf390;</i><span class="display-number">4</span></button></div>
+<div class="codec-status"><button id="codec-status" class="icon" data-tip="編碼狀態" aria-label="編碼狀態"><i class="fa" aria-hidden="true">&#xf2db;</i></button></div>
+<div class="enhancement-status"><button id="enhancement-status" class="icon" data-tip="畫面增強" aria-label="畫面增強"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 2l1.7 4.3L14 8l-4.3 1.7L8 14l-1.7-4.3L2 8l4.3-1.7L8 2zM15 11l1 2.5 2.5 1-2.5 1L15 18l-1-2.5-2.5-1 2.5-1L15 11z"/></svg></button></div>
+<div class="fps" tabindex="0" data-tip="畫面靜止時會減少更新，FPS 降到 0 屬正常，可節省流量。" aria-label="遠端畫面每秒更新影格數"><b>FPS</b><output id="viewer-fps">0</output></div>
+<div class="traffic" tabindex="0" data-tip="TX 為上傳、RX 為下載；畫面靜止時流量降低屬正常。" aria-label="此連線的傳送與接收速度"><span><b>TX</b><output id="traffic-tx">0.0 KB/s</output></span><span><b>RX</b><output id="traffic-rx">0.0 KB/s</output></span></div>
+<div class="actions"><button class="icon" data-menu="quality" data-tip="畫質：低流量／標準／高畫質" aria-label="畫質" aria-haspopup="menu"><i class="fa" aria-hidden="true">&#xf03e;</i></button><button class="icon" data-menu="scale" data-tip="縮放與全螢幕" aria-label="縮放與全螢幕" aria-haspopup="menu"><i class="fa" aria-hidden="true">&#xf424;</i></button></div>
+</header><script>
+ 'use strict';
+const bridge=message=>window.windowsTitlebarBridge ? window.windowsTitlebarBridge(message) : window.webkit.messageHandlers.titlebar.postMessage(message);
+let tipTimer;
+let strings = {};
+const t = source => strings[source] || source;
+const localizedAttributes = [...document.querySelectorAll('[data-tip],[aria-label]')].flatMap(element =>
+ ['data-tip','aria-label'].filter(name => element.hasAttribute(name)).map(name => ({element,name,source:element.getAttribute(name)})));
+
+const hideTip=()=>{clearTimeout(tipTimer);bridge({tooltip:''});};
+const showTip=button=>{clearTimeout(tipTimer);const rect=button.getBoundingClientRect();bridge({tooltip:button.dataset.tip,rows:button.tooltipRows||null,x:rect.x,y:rect.y,width:rect.width,height:rect.height});};
+document.querySelectorAll('[data-tip]').forEach(button=>{button.addEventListener('mouseenter',()=>showTip(button));button.addEventListener('mouseleave',hideTip);button.addEventListener('focus',()=>showTip(button));button.addEventListener('blur',hideTip);});
+window.addEventListener('blur',hideTip);window.addEventListener('resize',hideTip);
+document.addEventListener('keydown',event=>{if(event.key==='Escape')hideTip();});
+document.addEventListener('keydown',event=>{
+ if(event.repeat||event.isComposing||event.shiftKey)return;
+ const mac=/Mac/.test(navigator.platform),command=mac?event.metaKey:event.ctrlKey;
+ let action=0;
+ if(command&&!event.altKey&&event.key.toLowerCase()==='w')action=5;
+ if(mac&&event.metaKey&&!event.ctrlKey&&!event.altKey&&event.key.toLowerCase()==='q')action=13;
+ if(!mac&&event.altKey&&!event.ctrlKey&&!event.metaKey&&event.key==='F4')action=5;
+ if(action){event.preventDefault();bridge(action);}
+},true);
+document.addEventListener('click',event=>{const button=event.target.closest('button');hideTip();if(!button||button.getAttribute('aria-disabled')==='true')return;if(button.dataset.menu){const r=button.getBoundingClientRect();bridge({menu:button.dataset.menu,x:r.x,y:r.bottom});}else if(button.dataset.action){bridge(Number(button.dataset.action));}});
+window.showCloseConfirmation=()=>{
+ clearTimeout(tipTimer);
+ const rect=document.querySelector('[data-action="5"]').getBoundingClientRect();
+ bridge({tooltip:t('再按一次即可關閉 遠端顯示'),confirmation:true,x:rect.x,y:rect.y,width:rect.width,height:rect.height});
+ tipTimer=setTimeout(hideTip,3000);
+};
+const formatRate=bytes=>{const value=Number.isFinite(bytes)?Math.max(0,bytes):0;return value>=1024*1024?(value/(1024*1024)).toFixed(1)+' MB/s':(value/1024).toFixed(1)+' KB/s';};
+let lastInteractiveRects='';
+function updateInteractiveRects(){
+ const rects=[...document.querySelectorAll('button,.fps,.traffic')].filter(button=>button.getClientRects().length).map(button=>{
+  const r=button.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};
+ });
+ const key=JSON.stringify(rects);
+ if(key!==lastInteractiveRects){lastInteractiveRects=key;bridge({interactiveRects:rects});}
+}
+function positionDisplayButtons(){
+ const group=document.getElementById('display-buttons'),title=document.querySelector('.title'),text=document.getElementById('title');
+ if(group.hidden){title.style.minWidth='';text.style.maxWidth='';updateInteractiveRects();return;}
+ const header=document.querySelector('header').getBoundingClientRect(),width=group.getBoundingClientRect().width;
+ title.style.minWidth=(width+40)+'px';
+ const area=title.getBoundingClientRect(),right=document.querySelector('.codec-status').getBoundingClientRect().left;
+ const left=Math.max(area.left+28,Math.min(header.left+(header.width-width)/2,right-width-12));
+ group.style.left=(left-header.left)+'px';
+ text.style.maxWidth=Math.max(0,left-text.getBoundingClientRect().left-12)+'px';
+ updateInteractiveRects();
+}
+window.addEventListener('resize',positionDisplayButtons);
+window.setTitlebarState=state=>{
+ window.updateWindowsTitlebar?.(state);
+ strings = state.strings || {};
+ document.documentElement.lang = state.language || 'zh-Hant';
+ localizedAttributes.forEach(({element,name,source}) => element.setAttribute(name,t(source)));
+
+ const modeLabel=mode=>t(mode==='hardware'?'硬體':mode==='software'?'軟體':'未知');
+ const enhancement=document.getElementById('enhancement-status');
+ const info=state.enhancement||{};
+ enhancement.classList.toggle('active',info.active===true);
+ const size=(w,h)=>w>0&&h>0?`${w} × ${h}`:t('等待影格');
+ enhancement.tooltipRows=[
+  {label:t('畫面增強')+'：',value:t(info.reason||'尚未啟用')},
+  {label:t('使用策略')+'：',value:t(info.strategy||'自動調整')+(info.strategyState?' · '+t(info.strategyState):'')},
+  {label:t('演算法')+'：',value:info.algorithm||'FSR 1 · EASU + RCAS'},
+  {label:t('來源尺寸')+'：',value:size(info.sourceWidth,info.sourceHeight)},
+  {label:t('傳輸尺寸')+'：',value:size(info.streamWidth,info.streamHeight)},
+  {label:t('顯示尺寸')+'：',value:size(info.renderWidth,info.renderHeight)},
+  {label:t('目標碼率')+'：',value:info.bitrate>0?(info.bitrate/1000000).toFixed(2)+' Mbps':t('品質控制／未回報')},
+  {label:t('補幀')+'：',value:t(info.interpolation||'尚未啟用')}
+ ];
+ if(info.detail)enhancement.tooltipRows.push({label:t('執行狀態')+'：',value:t(info.detail)});
+ const enhancementTip=enhancement.tooltipRows.map(row=>row.label+' '+row.value).join('\n');
+ enhancement.dataset.tip=enhancementTip;enhancement.setAttribute('aria-label',enhancementTip);
+ const status=document.getElementById('codec-status');
+ const sourceValue=modeLabel(state.sourceEncoding)+' · '+(state.videoCodec||t('等待影格'));
+ const receiverValue=modeLabel(state.receiverDecoding);
+ status.tooltipRows=[{label:t('來源編碼')+'：',value:sourceValue},{label:t('接收解碼')+'：',value:receiverValue}];
+ const statusTip=status.tooltipRows.map(row=>row.label+' '+row.value).join('\n');
+ status.dataset.tip=statusTip;status.setAttribute('aria-label',statusTip);
+ const fpsBox=document.getElementById('viewer-fps').parentElement;
+ fpsBox.classList.toggle('render-mode',state.renderFPS===true);
+ const fpsLabel=state.renderFPS?t('呈現 FPS（含補幀）'):t('遠端畫面每秒更新影格數');
+ fpsBox.dataset.tip=fpsLabel+'。'+t('畫面靜止時會減少更新，FPS 降到 0 屬正常，可節省流量。');
+ fpsBox.setAttribute('aria-label',fpsBox.dataset.tip);
+ document.getElementById('viewer-fps').textContent=String(Math.round(Number.isFinite(state.fps)?Math.max(0,state.fps):0));
+ document.getElementById('traffic-tx').textContent=formatRate(state.tx);
+ document.getElementById('traffic-rx').textContent=formatRate(state.rx);
+ document.getElementById('title').textContent=state.title;
+ document.querySelectorAll('[data-mode]').forEach(button=>button.setAttribute('aria-pressed',String(Number(button.dataset.mode)===state.mode)));
+ const count=Number.isFinite(state.count)?Math.min(4,Math.max(0,Math.floor(state.count))):0;
+ document.getElementById('display-buttons').hidden=count===0;
+ document.querySelectorAll('[data-display]').forEach(button=>{
+  const index=Number(button.dataset.display);
+  button.hidden=index>=count;
+  button.setAttribute('aria-pressed',String(index===state.display));
+  button.setAttribute('aria-disabled',String(!!state.pending||index>=count));
+  const label=state.pending?t('正在切換螢幕'):t('螢幕 %d').replace('%d',index+1);
+  button.dataset.tip=label;button.setAttribute('aria-label',label);
+ });
+ positionDisplayButtons();
+};
+</script></body></html>

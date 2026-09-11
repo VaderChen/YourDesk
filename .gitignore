@@ -1,0 +1,45 @@
+/bin/
+/dist/
+.local-run/
+.remote-run/
+*.log
+*.bak
+*.bak.*
+._*
+.DS_Store
+
+# Local configuration and credentials must never be committed.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+credentials.json
+secrets.json
+
+# 伺服器私鑰與本機 TLS 身分不得提交。
+/data/
+
+# 本機 Python 快取與連線設定。
+__pycache__/
+*.pyc
+client-secret.json
+sites.json
+
+# 本機建置與封裝入口，不上傳至 Git。
+/build.command
+/buildMac.command
+/buildWin.command
+/pack.command
+
+# 本機無終端機啟動入口（由腳本產生）。
+/clientUI.app/
+
+# 本機研究產物及直接 go build 輸出。
+/reports/
+/remote
+/remote.exe
+/client.exe

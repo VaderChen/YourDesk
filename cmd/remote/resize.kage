@@ -1,0 +1,33 @@
+//kage:unit pixels
+package main
+
+var Axis vec2
+var Ratio float
+
+func lanczos(x float) float {
+ x = abs(x)
+ if x < 0.0001 { return 1 }
+ if x >= 3 { return 0 }
+ p := 3.141592653589793 * x
+ return sin(p) * sin(p / 3) / (p * p / 3)
+}
+
+func Fragment(dstPos vec4, srcPos vec2, color vec4) vec4 {
+ origin := imageSrc0Origin()
+ size := imageSrc0Size()
+ center := srcPos - origin
+ coordinate := dot(center, Axis)
+ start := floor(coordinate - 3 * Ratio + 0.5) + 0.5
+ total := vec4(0)
+ weights := float(0)
+ // 單次最多縮小四倍；三瓣 Lanczos 的取樣範圍隨縮小比例擴展。
+ for i := 0; i < 24; i++ {
+  position := start + float(i)
+  weight := lanczos((position - coordinate) / Ratio)
+  sample := center + Axis * (position - coordinate)
+  sample = clamp(sample, vec2(0.5), size - vec2(0.5))
+  total += imageSrc0UnsafeAt(origin + sample) * weight
+  weights += weight
+ }
+ return clamp(total / weights, vec4(0), vec4(1))
+}

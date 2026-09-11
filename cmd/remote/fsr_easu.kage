@@ -1,0 +1,55 @@
+//kage:unit pixels
+// AMD FSR 1 EASU 移植：完整授權見 FSR-LICENSE.txt。
+package main
+var OutputSize vec2
+func sample(p vec2) vec3 {
+ return imageSrc0UnsafeAt(imageSrc0Origin()+clamp(p+vec2(0.5),vec2(0.5),imageSrc0Size()-vec2(0.5))).rgb
+}
+func luma(c vec3) float { return c.g+0.5*(c.r+c.b) }
+func edge(w, a,b,c,d,e float) vec3 {
+ dx := d-b
+ dy := e-a
+ x := clamp(abs(dx)/max(max(abs(d-c),abs(c-b)),0.00001),0,1)
+ y := clamp(abs(dy)/max(max(abs(e-c),abs(c-a)),0.00001),0,1)
+ return vec3(dx,dy,x*x+y*y)*w
+}
+func tap(c vec3, offset, dir, stretch vec2, lob float) vec4 {
+ v := vec2(dot(offset,dir),dot(offset,vec2(-dir.y,dir.x)))*stretch
+ d := min(dot(v,v),1/lob)
+ b := 0.4*d-1
+ a := lob*d-1
+ w := (1.5625*b*b-0.5625)*a*a
+ return vec4(c*w,w)
+}
+func Fragment(dst vec4, src vec2, color vec4) vec4 {
+ p := (dst.xy-imageDstOrigin())*imageSrc0Size()/OutputSize-vec2(0.5)
+ base := floor(p)
+ f := p-base
+ b := sample(base+vec2(0,-1)); c := sample(base+vec2(1,-1))
+ e := sample(base+vec2(-1,0)); q := sample(base); g := sample(base+vec2(1,0)); h := sample(base+vec2(2,0))
+ i := sample(base+vec2(-1,1)); j := sample(base+vec2(0,1)); k := sample(base+vec2(1,1)); l := sample(base+vec2(2,1))
+ n := sample(base+vec2(0,2)); o := sample(base+vec2(1,2))
+ v := edge((1-f.x)*(1-f.y),luma(b),luma(e),luma(q),luma(g),luma(j))
+ v += edge(f.x*(1-f.y),luma(c),luma(q),luma(g),luma(h),luma(k))
+ v += edge((1-f.x)*f.y,luma(q),luma(i),luma(j),luma(k),luma(n))
+ v += edge(f.x*f.y,luma(g),luma(j),luma(k),luma(l),luma(o))
+ dir := v.xy
+ if dot(dir,dir)<1.0/32768.0 { dir=vec2(1,0) } else { dir=normalize(dir) }
+ length := v.z*0.5
+ length *= length
+ stretch := vec2(1+(1/max(abs(dir.x),abs(dir.y))-1)*length,1-0.5*length)
+ lob := 0.5-0.29*length
+ total := tap(b,vec2(0,-1)-f,dir,stretch,lob)
+ total += tap(c,vec2(1,-1)-f,dir,stretch,lob)
+ total += tap(e,vec2(-1,0)-f,dir,stretch,lob)
+ total += tap(q,-f,dir,stretch,lob)
+ total += tap(g,vec2(1,0)-f,dir,stretch,lob)
+ total += tap(h,vec2(2,0)-f,dir,stretch,lob)
+ total += tap(i,vec2(-1,1)-f,dir,stretch,lob)
+ total += tap(j,vec2(0,1)-f,dir,stretch,lob)
+ total += tap(k,vec2(1,1)-f,dir,stretch,lob)
+ total += tap(l,vec2(2,1)-f,dir,stretch,lob)
+ total += tap(n,vec2(0,2)-f,dir,stretch,lob)
+ total += tap(o,vec2(1,2)-f,dir,stretch,lob)
+ return vec4(clamp(total.rgb/max(total.a,0.00001),min(min(q,g),min(j,k)),max(max(q,g),max(j,k))),1)
+}
