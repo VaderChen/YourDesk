@@ -90,3 +90,9 @@ macOS 首次使用需允許「螢幕錄製」與「輔助使用」權限。Windo
 如果 YourDesk 對你有幫助，歡迎請我喝杯咖啡，支持持續開發。
 
 [☕ Buy Me a Coffee](https://buymeacoffee.com/vaderchen)
+
+## 授權
+
+Copyright (C) 2026 VaderChen.
+
+本專案採雙重授權：開放原始碼使用適用 [GNU GPL v3.0 only](LICENSE)（`GPL-3.0-only`）；需要其他條款時，可另行洽談[商業授權](COMMERCIAL-LICENSE.md)。第三方元件仍依各自授權提供。

@@ -83,3 +83,9 @@ Choose Desktop or Terminal, or double-click a site to select a mode. Independent
 If YourDesk is useful to you, consider buying me a coffee to support continued development.
 
 [☕ Buy Me a Coffee](https://buymeacoffee.com/vaderchen)
+
+## License
+
+Copyright (C) 2026 VaderChen.
+
+This project is dual-licensed: open-source use is governed by [GNU GPL v3.0 only](../LICENSE) (`GPL-3.0-only`); alternative terms are available through a separate [commercial license](../COMMERCIAL-LICENSE.md). Third-party components retain their respective licenses.

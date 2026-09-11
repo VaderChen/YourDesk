@@ -82,3 +82,9 @@ FSR, QuickSRNet/SESR, RIFE 제작자에게 감사드립니다. [FSR](FSR-LICENSE
 YourDesk가 도움이 되었다면 커피 한 잔으로 지속적인 개발을 응원해 주세요.
 
 [☕ Buy Me a Coffee](https://buymeacoffee.com/vaderchen)
+
+## 라이선스
+
+Copyright (C) 2026 VaderChen.
+
+이 프로젝트는 이중 라이선스를 적용합니다. 오픈 소스 사용에는 [GNU GPL v3.0 only](../LICENSE) (`GPL-3.0-only`)가 적용되며 다른 조건이 필요한 경우 별도의 [상업용 라이선스](../COMMERCIAL-LICENSE.md)를 협의할 수 있습니다. 타사 구성 요소에는 각자의 라이선스가 적용됩니다.

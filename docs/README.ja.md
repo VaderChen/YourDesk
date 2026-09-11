@@ -82,3 +82,9 @@ FSR、QuickSRNet／SESR、RIFE の作者に感謝します。[FSR](FSR-LICENSE.t
 YourDesk が役に立ったら、コーヒー一杯で継続的な開発を応援していただけると嬉しいです。
 
 [☕ Buy Me a Coffee](https://buymeacoffee.com/vaderchen)
+
+## ライセンス
+
+Copyright (C) 2026 VaderChen.
+
+本プロジェクトはデュアルライセンスです。オープンソース利用には [GNU GPL v3.0 only](../LICENSE)（`GPL-3.0-only`）が適用されます。別の条件が必要な場合は[商用ライセンス](../COMMERCIAL-LICENSE.md)をご相談ください。第三者コンポーネントには各自のライセンスが適用されます。
