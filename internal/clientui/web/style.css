@@ -366,3 +366,8 @@ dialog .remember-row input { display: inline-block; width: 16px; height: 16px; m
 .site-action.mode-recovering svg { visibility: hidden; }
 .site-action.mode-recovering::after { content: ""; position: absolute; width: 15px; height: 15px; left: 50%; top: 50%; margin: -7.5px; border: 2px solid var(--line); border-top-color: currentColor; border-radius: 50%; animation: connection-spin .85s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .site-action.mode-recovering::after { animation: none; } }
+
+/* 設定與停止共用工具欄第一欄，顯示停止按鈕不新增 grid 欄位。 */
+.host-actions { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.host-actions > .icon-button { flex: 0 0 32px; width: 32px; height: 32px; display: grid; place-items: center; }
+.host-actions > .icon-button[hidden] { display: none; }
