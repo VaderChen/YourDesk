@@ -198,6 +198,7 @@ def mac_bundle(folder, version):
                     run(['sips', '-z', size * scale, size * scale, source, '--out', iconset / name])
             run(['iconutil', '-c', 'icns', iconset, '-o', resources / 'AppIcon.icns'])
         info['CFBundleIconFile'] = 'AppIcon.icns'
+    copy_project_licenses(resources)
     copy_model_licenses(resources)
     (app / 'Contents/Info.plist').write_bytes(plistlib.dumps(info))
     identity = signing_identity()
@@ -207,6 +208,14 @@ def mac_bundle(folder, version):
     run(['codesign', '--force', '--sign', identity, *signing, app])
     run(['codesign', '--verify', '--deep', '--strict', app])
     notarize_app(app)
+
+
+PROJECT_LICENSE_FILES = ('LICENSE.md', 'LICENSE.en.md', 'LICENSE.ja.md', 'LICENSE.ko.md')
+
+
+def copy_project_licenses(folder):
+    for name in PROJECT_LICENSE_FILES:
+        shutil.copy2(ROOT / name, folder / name)
 
 
 def copy_model_licenses(folder):
@@ -230,6 +239,7 @@ def compile_winpe(folder, version):
          '-o', folder / 'yourdesk-winpe.exe', './cmd/winpe'], env=env)
     for name in ('start-yourdesk.cmd', 'README.md'):
         shutil.copy2(ROOT / 'packaging/winpe' / name, folder / name)
+    copy_project_licenses(folder)
     licenses = folder / 'ThirdPartyLicenses'
     licenses.mkdir(exist_ok=True)
     shutil.copy2(Path(capture(['go', 'env', 'GOROOT'])) / 'LICENSE', licenses / 'Go-LICENSE')
@@ -249,7 +259,7 @@ def compile_winpe(folder, version):
 
 def winpe_zip(folder, stem):
     # 僅封裝已知 payload，重複打包不會把上一份 ZIP 放入新 ZIP。
-    payload = [folder / name for name in ('yourdesk-winpe.exe', 'start-yourdesk.cmd', 'README.md', 'ThirdPartyLicenses')]
+    payload = [folder / name for name in ('yourdesk-winpe.exe', 'start-yourdesk.cmd', 'README.md', 'ThirdPartyLicenses', *PROJECT_LICENSE_FILES)]
     if any(not item.exists() for item in payload):
         raise ValueError('WinPE 產物不完整，請重新建置')
     with tempfile.TemporaryDirectory(prefix='.winpe-pack-', dir=folder.parent) as temporary:
@@ -284,6 +294,7 @@ def build_winpe_standalone(version):
 
 
 def write_instructions(folder, system, version):
+    copy_project_licenses(folder)
     # 舊套件重新封裝時一併移除重複說明，只保留各平台的 README。
     (folder / '使用說明.txt').unlink(missing_ok=True)
     if system == 'winpe':
@@ -422,6 +433,7 @@ def pack(release, targets=None):
                 app = stage / 'YourDesk.app'
                 shutil.copytree(folder / 'YourDesk.app', app)
                 shutil.copy2(folder / 'README.txt', stage / 'README.txt')
+                copy_project_licenses(stage)
                 identity = signing_identity()
                 notarize_app(app)
                 (stage / 'Applications').symlink_to('/Applications')

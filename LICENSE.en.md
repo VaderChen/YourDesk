@@ -1,6 +1,6 @@
 # YourDesk Source-Available License — No Commercial Sales
 
-Version 1.0  
+Version 1.1  
 Copyright (C) 2026 VaderChen. All rights reserved.
 
 [繁體中文](LICENSE.md) · **English** · [日本語](LICENSE.ja.md) · [한국어](LICENSE.ko.md)
@@ -17,6 +17,8 @@ Subject to this license, any individual or organization may obtain, inspect, run
 
 Personal, educational, research, public-interest and internal company or organizational use are permitted. Being a for-profit entity, or using the Software to assist ordinary internal work, does not by itself constitute selling. However, the Software must not be used to provide others with the paid products or services listed in Section 3.
 
+Internal use includes employees installing, configuring, modifying or maintaining the Software for their organization’s internal equipment and personnel in the course of their ordinary duties. Ordinary wages for this work are not charges prohibited by Section 3. This exception does not cover paid services to external customers or external contractors charging for installation, configuration, custom development, support or maintenance of the Software. Business revenue resulting from ordinary internal work does not by itself constitute selling functionality through the Software.
+
 ## 3. Prohibited commercial sales
 
 You must not, directly or indirectly, in exchange for money or other consideration having economic value, sell, rent, resell, sublicense, distribute or provide the Software, modified versions, rights to use or access it, or functionality provided through it. Prohibited activities include, without limitation:
@@ -26,10 +28,11 @@ You must not, directly or indirectly, in exchange for money or other considerati
 3. Integrating, preinstalling or bundling the Software or modified versions into paid software, hardware, products or services.
 4. Charging for installation, configuration, custom development, technical support, maintenance or distribution of the Software.
 5. Circumventing these prohibitions through third parties, bundled pricing, membership fees, required donations, other labels or arrangements involving consideration. Describing the Software itself as free does not create an exception.
+6. Monetizing provision of the Software, its functionality or access through advertising revenue, referral or affiliate commissions, or selling, licensing or otherwise exchanging user data obtained through that provision for consideration, even when users do not pay directly. This does not cover ordinary business revenue unrelated to provision of the Software or exclude the unconditional voluntary support described below.
 
 Entirely voluntary support that is not a condition of receiving the Software, features, access, support or other benefits is not considered selling. Mandatory, disguised or conditional contributions involving an exchange do not qualify for this exception.
 
-If you intend to sell or integrate the Software, contact the copyright holder to discuss the scope and terms of a separate license.
+If you intend to engage in sales or monetization prohibited by this section, or integrate the Software into paid products or services, contact the copyright holder to discuss a separate license. Free integration and integration for internal use that comply with this license do not require separate permission.
 
 - Until both parties enter into a separate written license agreement, this license continues to govern; inquiries or discussions alone do not grant permission.
 - A separate license applies only within the scope expressly agreed in writing.
@@ -53,7 +56,13 @@ To the extent permitted by applicable law, the copyright holder and contributors
 
 ## 7. Violation
 
-If this license is violated, the permissions it grants terminate, and the user must stop the related violating use and distribution. This section does not affect rights independently obtained under law or another valid license.
+Upon violation, the permissions granted by this license terminate immediately. You must immediately stop the violation and cease use and distribution relying on this license until permission is restored under the following rules.
+
+- For a first violation involving only Section 4 obligations to include the license, retain notices or identify modifications, with no Section 3 prohibited activity, impersonation or false endorsement, permission is automatically restored upon full correction and reasonable steps to remedy omissions in copies already distributed, if completed within 30 days after receipt of the copyright holder’s written notice. The same applies if these corrections are completed before notice.
+- Section 3 prohibited activities, impersonation, false endorsement, repeat violations or failure to complete correction within that period require the copyright holder’s express written restoration before use or distribution under this license can resume. Merely stopping charges or making an inquiry does not restore permission.
+- Correction or restoration does not retroactively authorize previous violations or release accrued legal liability, unless otherwise agreed in writing.
+
+This section does not affect rights independently obtained under law or another valid license.
 
 ## 8. Nature and language of the license
 
