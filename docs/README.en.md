@@ -88,4 +88,4 @@ If YourDesk is useful to you, consider buying me a coffee to support continued d
 
 Copyright (C) 2026 VaderChen.
 
-This project uses a custom [source-available, no-commercial-sales license](../LICENSE). Non-sale use, modification and free sharing, including internal business use, are permitted. Selling, paid hosting/SaaS, paid services and integration into paid products are prohibited; no separate commercial sales license is offered. Third-party components retain their respective licenses. This is not an OSI open-source license. The Traditional Chinese LICENSE is authoritative.
+This project uses a custom [source-available, no-commercial-sales license](../LICENSE.en.md). Non-sale use, modification and free sharing, including internal business use, are permitted. Selling, paid hosting/SaaS, paid services and integration into paid products are prohibited; a separate license may be discussed for sales or integration, but this license governs until a separate written agreement is reached. Third-party components retain their respective licenses. This is not an OSI open-source license. The Traditional Chinese LICENSE is authoritative.
