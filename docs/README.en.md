@@ -8,7 +8,7 @@ YourDesk is a remote desktop app for macOS and Windows. Connect to another compu
 
 ## Features
 
-This release adds independent terminal windows, Linux CLI x64/arm64 ZIP packages and MCP interactive terminals. Disconnected windows can stay open, and icons show a spinner while waiting for the remote Host to recover. See the [release notes](RELEASE-1.26.0911-build-2132.md).
+This release adds independent terminal windows, Linux CLI x64/arm64 ZIP packages and MCP interactive terminals. Disconnected windows can stay open, and icons show a spinner while waiting for the remote Host to recover. See the [release notes](RELEASE-1.26.0911-build-2247.md).
 
 - **GUI and command-line modes:** choose remote desktop or an interactive terminal for your task. Terminals use independent windows and can connect to Linux CLI Hosts.
 - **Remote control through MCP AI agents:** AI agents can connect through MCP, operate the desktop or terminal, query site capabilities and disconnect when finished.

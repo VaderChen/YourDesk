@@ -143,7 +143,7 @@ dialog input:focus, dialog select:focus, dialog textarea:focus { outline: 2px so
 #settings-dialog { width: min(700px, calc(100% - 28px)); height: min(580px, calc(100vh - 30px)); padding: 0; overflow: hidden; }
 .settings-section-title { font-size: 13px; margin: 16px 0 8px; }
 .settings-details { margin: 0; }
-.settings-details > div { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
+.settings-details > div { display: grid; align-items: center; grid-template-columns: 90px minmax(0, 1fr); gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
 .settings-details dt { color: var(--muted); }
 .settings-details dd { margin: 0; overflow-wrap: anywhere; user-select: text; }
 .settings-description { font-size: 12px; line-height: 1.8; color: #758479; margin: 0; }

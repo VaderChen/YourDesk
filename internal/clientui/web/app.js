@@ -65,6 +65,13 @@ if (location.hash) {
 }
 let state = null;
 let selectedGroup = '*';
+let groupSaveQueue = Promise.resolve();
+function rememberGroup(id) {
+ selectedGroup = id;
+ if(state?.preferences)state.preferences.selectedGroup=id;
+ groupSaveQueue=groupSaveQueue.then(()=>api('preferences','PUT',{selectedGroup:id})).catch(error=>toast(error.message,true));
+}
+
 let busy = false;
 let toastTimer;
 let confirmAction = null;
@@ -133,6 +140,12 @@ function openDialog(id) {
   const dialog = $(id);
   dialog.querySelectorAll('.form-error').forEach(el => el.remove());
   dialog.showModal();
+  // 標題可供鍵盤查看泡泡，但初始焦點應落在實際操作欄位。
+  const visible = el => !el.disabled && el.getClientRects().length > 0;
+  const initial = [...dialog.querySelectorAll('[autofocus]')].find(visible)
+    || [...dialog.querySelectorAll('input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]), select, textarea')].find(visible)
+    || [...dialog.querySelectorAll('button')].find(visible);
+  initial?.focus({ preventScroll: true });
 }
 async function save(library) {
   await api('library', 'PUT', library);
@@ -171,17 +184,18 @@ function renderDevice() {
  $('#toggle-secret').disabled=!!state.prelogin?.enabled;
   $('#password-reminder').hidden = info.passwordNeedsChange !== 'true' || passwordReminderDismissed;
   const active = Object.hasOwn(running, 'host');
-  $('#host-status').textContent = state.prelogin?.enabled ? i18n.t('未登入連線服務模式') : active ? i18n.t('Client 執行中') : i18n.t('Client 重新啟動中');
+  $('#host-status').textContent = state.prelogin?.enabled ? i18n.t('未登入連線服務模式') : active ? i18n.t('一切就緒') : i18n.t('無法連線');
   $('.local-badge').dataset.tooltip = `${info.hostname} · ${info.platform} / ${info.architecture}`;
 
 }
 function renderLibrary() {
   const { groups, sites } = state.library;
+  if(selectedGroup!=='*' && selectedGroup!=='' && !groups.some(group=>group.id===selectedGroup))rememberGroup('*');
   $('#groups').replaceChildren();
   const options = [{ id: '*', name: i18n.t('所有站台') }, ...groups, { id: '', name: i18n.t('未分組') }];
   for (const group of options) {
     const row = text('div', '', `group-row${selectedGroup === group.id ? ' active' : ''}`);
-    const select = button('', 'group-button', () => { selectedGroup = group.id; renderLibrary(); });
+    const select = button('', 'group-button', () => { rememberGroup(group.id); renderLibrary(); });
     select.setAttribute('aria-current', selectedGroup === group.id ? 'true' : 'false');
     select.append(text('span', group.id === '*' ? '▦' : '▱'), text('span', group.name, 'group-name'), text('span', group.id === '*' ? sites.length : sites.filter(site => site.group === group.id).length, 'group-count'));
     row.append(select);
@@ -314,7 +328,7 @@ function deleteGroup(group) {
     library.groups = library.groups.filter(value => value.id !== group.id);
     library.sites.forEach(site => { if (site.group === group.id) site.group = ''; });
     await save(library);
-    if (selectedGroup === group.id) { selectedGroup = ''; renderLibrary(); }
+    if (selectedGroup === group.id) { rememberGroup('*'); renderLibrary(); }
     toast(i18n.t('群組已刪除，站台已保留'));
   });
 }
@@ -481,7 +495,7 @@ $('#open-settings').addEventListener('click', () => {
 });
 $('#add-site').addEventListener('click', () => editSite());
 $('#search').addEventListener('input', () => { if (state) renderSites(); });
-$('.brand').addEventListener('click', event => { event.preventDefault(); selectedGroup = '*'; $('#search').value = ''; if (state) renderLibrary(); });
+$('.brand').addEventListener('click', event => { event.preventDefault(); rememberGroup('*'); $('#search').value = ''; if (state) renderLibrary(); });
 document.querySelectorAll('dialog .close').forEach(element => element.addEventListener('click', () => { if (!busy) element.closest('dialog').close(); }));
 document.querySelectorAll('dialog').forEach(dialog => dialog.addEventListener('cancel', event => { if (busy) event.preventDefault(); }));
 $('#connect-dialog').addEventListener('close', () => { $('#connect-form').elements.secret.value = ''; });
@@ -722,6 +736,7 @@ async function initialize() {
     state = await api('state');
     state.library.groups ||= [];
     state.library.sites ||= [];
+    selectedGroup=state.preferences?.selectedGroup ?? '*';
     applyPreferences(state.preferences);
     renderDevice(); renderLibrary(); renderQuick();
     refreshPresence();
@@ -953,7 +968,7 @@ $('#import-config-file').addEventListener('change', async event => {
     library = { groups: library.groups.map(g => ({ id: g.id, name: g.name })), sites: library.sites.map(s => ({ id: s.id, name: s.name, room: s.room, group: s.group || '', note: s.note || '' })) };
     confirmDelete(i18n.t('匯入站台設定檔'), i18n.t('匯入將取代目前的站台與群組，是否繼續？') + ` (${library.groups.length} / ${library.sites.length})`, async () => {
       await save(library);
-      selectedGroup = '*'; renderLibrary();
+      rememberGroup('*'); renderLibrary();
       toast(i18n.t('站台設定已匯入'));
     });
     $('#confirm-form button[type="submit"]').textContent = i18n.t('確認匯入');

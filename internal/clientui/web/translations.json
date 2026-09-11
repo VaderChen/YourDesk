@@ -2483,5 +2483,20 @@
     "Waiting for the remote Host to reconnect…",
     "リモート Host の再接続を待っています…",
     "원격 Host의 재연결을 기다리는 중…"
+  ],
+  "一切就緒": [
+    "Ready",
+    "準備完了",
+    "준비 완료"
+  ],
+  "無法連線": [
+    "Unable to connect",
+    "接続できません",
+    "연결할 수 없음"
+  ],
+  "支持開發": [
+    "Support development",
+    "開発を支援",
+    "개발 후원"
   ]
 }

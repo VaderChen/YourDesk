@@ -90,6 +90,7 @@ type process struct {
 	kind, siteID                 string
 }
 type Preferences struct {
+	SelectedGroup           string   `json:"selectedGroup"`
 	MCPWhitelistEnabled     bool     `json:"mcpWhitelistEnabled"`
 	MCPWhitelist            []string `json:"mcpWhitelist"`
 	MCPOpenDisplay          bool     `json:"mcpOpenDisplay"`
@@ -172,7 +173,7 @@ func Run(ctx context.Context, options Options) error {
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
-	s.preferences = Preferences{MCPWhitelistEnabled: true, MCPWhitelist: []string{"127.0.0.1"}, ImageEnhancement: false, Interpolation: false, BitrateLimitMbps: 12, SourceFPSLimit: 20, KeyframeInterval: 10, Language: "auto", Theme: "default", DirectListen: options.DirectListen != ""}
+	s.preferences = Preferences{SelectedGroup: "*", MCPWhitelistEnabled: true, MCPWhitelist: []string{"127.0.0.1"}, ImageEnhancement: false, Interpolation: false, BitrateLimitMbps: 12, SourceFPSLimit: 20, KeyframeInterval: 10, Language: "auto", Theme: "default", DirectListen: options.DirectListen != ""}
 	if data, readErr := os.ReadFile(filepath.Join(configDir, "preferences.json")); readErr == nil {
 		if err := json.Unmarshal(data, &s.preferences); err != nil {
 			return fmt.Errorf("無法讀取介面設定：%w", err)
