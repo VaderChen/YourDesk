@@ -33,6 +33,7 @@ sites.json
 /build.command
 /buildMac.command
 /buildWin.command
+/buildLinux.command
 /pack.command
 
 # 本機無終端機啟動入口（由腳本產生）。
