@@ -49,6 +49,15 @@ func TestHostBinaryAuthenticationSmoke(t *testing.T) {
 				result <- fmt.Errorf("%s verification: %w", kind, err)
 				return
 			}
+			if kind == KindJoin {
+				var in struct {
+					Capabilities *HostCapabilities `json:"capabilities"`
+				}
+				if json.Unmarshal(e.Payload, &in) != nil || in.Capabilities == nil || in.Capabilities.Schema != 1 || in.Capabilities.OS == "" {
+					result <- fmt.Errorf("Host 未回報本機能力")
+					return
+				}
+			}
 			if e.Kind != kind || e.Room != "binary-smoke" || e.Role != RoleHost {
 				result <- fmt.Errorf("unexpected envelope metadata")
 				return

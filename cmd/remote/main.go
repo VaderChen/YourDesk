@@ -33,11 +33,15 @@ import (
 )
 
 type game struct {
+	disconnected              bool
+	disconnectedChecked       time.Time
+	windowTitle               string
 	agentHeadless             bool
 	agentShow                 bool
 	agentDeadline             time.Time
 	agentButtons              map[int]p2p.Control
 	agentRequests             <-chan agentremote.Request
+	agentCommands             chan struct{}
 	remoteVersion             atomic.Value
 	windowFit                 windowFitState
 	localShortcut             int
@@ -132,13 +136,27 @@ func (g *game) toggleFullscreen() {
 }
 
 func (g *game) Update() error {
-	// 遠端重啟後必須結束舊視窗與 signaling，讓管理介面釋放站台。
-	// 與 MCP 隱藏模式使用相同的 P2P 生命週期，不依畫面是否更新判斷。
 	if g.peer != nil {
 		select {
 		case <-g.peer.Done():
-			slog.Info("遠端連線已結束，釋放遠端顯示工作階段")
-			return ebiten.Termination
+			if !g.disconnected {
+				g.disconnected = true
+				g.releaseRawKeys("遠端連線已結束")
+				g.clipboard.CancelKeys("遠端連線已結束")
+				emitUIEvent("disconnected", "")
+				ebiten.SetWindowTitle(g.windowTitle + " · ⏹")
+			}
+			if time.Since(g.disconnectedChecked) > time.Second {
+				refreshViewerLanguage("")
+				g.disconnectedChecked = time.Now()
+			}
+			if viewerCloseWindowOnDisconnect.Load() || !g.firstPresented {
+				return ebiten.Termination
+			}
+			if action := g.windowShortcut(false); action != 0 {
+				return g.executeWindowShortcut(action)
+			}
+			return nil
 		default:
 		}
 	}
@@ -437,6 +455,7 @@ func main() {
 	mcpHidden := flag.Bool("mcp-hidden", false, "MCP 背景操作，直到使用者開啟遠端畫面")
 	backgroundDiagnostic := flag.Bool("diagnostic", false, "背景串流診斷，不開啟 遠端顯示")
 	transport := flag.String("transport", "", "虛擬傳輸模式：空白為原生 UDP，tailcat 為實驗性 Tailcat")
+	terminalMode := flag.Bool("terminal", false, "互動式遠端終端機")
 	flag.Parse()
 	flag.Visit(func(f *flag.Flag) {
 		if f.Name == "source-fps" {
@@ -452,6 +471,12 @@ func main() {
 	}
 	if !*secretStdin {
 		fatal(fmt.Errorf("必須透過標準輸入提供連線密碼"))
+	}
+	if *terminalMode {
+		if err := runTerminal(*signalURL, *room, peertransport.Mode(*transport)); err != nil {
+			fatal(err)
+		}
+		return
 	}
 	if *backgroundDiagnostic {
 		if err := runBackgroundDiagnostic(*signalURL, *room, *codec, peertransport.Mode(*transport)); err != nil {
@@ -519,6 +544,7 @@ func main() {
 	g.controlEnabled = g.preferences.current.Control
 	g.restorePreferences, g.restoreDisplay = true, true
 	var stats viewerPipelineStats
+	var lastRecoveryRequest atomic.Int64
 	var lastVideoSequence uint64
 	var lastVideoDisplay int
 	decodeFrames := streampipeline.NewConsumer(ctx, func(f p2p.Frame) {
@@ -541,6 +567,20 @@ func main() {
 			keyframe, _ := video.IsKeyframe(video.WireCodec(f.Codec), f.JPEG)
 			if errors.Is(e, video.ErrNeedKeyframe) || (e != nil && !keyframe) {
 				stats.waiting.Add(1)
+				now := time.Now().UnixMilli()
+				previous := lastRecoveryRequest.Load()
+				if now-previous >= 2000 && lastRecoveryRequest.CompareAndSwap(previous, now) {
+					g.mu.RLock()
+					remote := g.peer
+					g.mu.RUnlock()
+					if remote != nil && remote.SupportsCommand("video.keyframe") {
+						go func() {
+							requestCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+							defer cancel()
+							_, _ = remote.CallCommand(requestCtx, "video.keyframe")
+						}()
+					}
+				}
 				return
 			}
 			if e == nil {
@@ -603,6 +643,10 @@ func main() {
 		// 封包已重組為獨立記憶體，交給解碼 worker 後即可接收下一幀。
 		decodeFrames.Submit(f)
 	}, g.receiveDisplays, func(c p2p.Control) {
+		if c.Type == "desktop-unavailable" {
+			fatal(fmt.Errorf("此裝置沒有桌面環境，請改用命令列連線。"))
+			return
+		}
 		if g.clipboard.Handle(c) {
 			return
 		}
@@ -703,6 +747,11 @@ func main() {
 	defer func() {
 		// 先解除收件回呼的反壓並等待解碼，再關閉網路及原生資源。
 		decodeFrames.Close()
+		if peer.Connected() && peer.SupportsCommand("session.disconnect") {
+			closeCtx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+			_, _ = peer.CallCommand(closeCtx, "session.disconnect")
+			cancel()
+		}
 		peer.Close()
 	}()
 	if *mcpHidden && !g.runAgentHidden(ctx) {
@@ -712,7 +761,8 @@ func main() {
 	if displayName == "" {
 		displayName = "YourDesk"
 	}
-	ebiten.SetWindowTitle(displayName + " / " + *room)
+	g.windowTitle = displayName + " / " + *room
+	ebiten.SetWindowTitle(g.windowTitle)
 	if icon := branding.Icon(); icon != nil {
 		ebiten.SetWindowIcon([]image.Image{icon})
 	}
@@ -735,7 +785,9 @@ func max(a, b int) int {
 }
 func fatal(err error) {
 	message := "遠端連線失敗，請確認遠端 Client 與網路狀態後再試。"
-	if strings.Contains(err.Error(), "時間超出") {
+	if err.Error() == "對方尚未支援命令列，請更新對方的 YourDesk 後再試。" || err.Error() == "此裝置沒有桌面環境，請改用命令列連線。" {
+		message = err.Error()
+	} else if strings.Contains(err.Error(), "時間超出") {
 		message = "遠端握手資料已過期，請重新啟動遠端 Client，並確認雙方系統時間正確。"
 	} else if strings.Contains(err.Error(), "deadline exceeded") {
 		message = "等待遠端握手逾時；Client 已註冊，但尚未完成連線。請更新或重新啟動遠端 Client 後再試。"
@@ -743,7 +795,7 @@ func fatal(err error) {
 		message = "無法完成連線服務握手，請檢查網路與遠端 Client 狀態。"
 	}
 	// 只在本次連線選用 Tailcat 時提供相容性提醒，不直接判定失敗原因。
-	if mode := flag.Lookup("transport"); mode != nil && mode.Value.String() == string(peertransport.Tailcat) {
+	if mode := flag.Lookup("transport"); mode != nil && mode.Value.String() == string(peertransport.Tailcat) && message != "此裝置沒有桌面環境，請改用命令列連線。" && message != "對方尚未支援命令列，請更新對方的 YourDesk 後再試。" {
 		message += " 對方可能尚未支援 Tailcat，請更新對方的 YourDesk，或關閉 Tailcat 後重試。"
 	}
 	emitUIEvent("error", message)

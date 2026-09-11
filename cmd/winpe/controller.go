@@ -97,7 +97,7 @@ func (h *rescueHost) start() {
 			if err == nil {
 				h.setStatus(ctx, "Waiting for connection / 等待遠端連線")
 				sessionCtx, finishSession := context.WithCancel(ctx)
-				err = hostsession.Stream(sessionCtx, sig, hostsession.Options{Version: rescueVersion, Codec: "software-jpeg", FPS: h.fps, Quality: h.quality, PrimaryDisplayOnly: true, DisableClipboard: true, OnState: func(state string) {
+				err = hostsession.Stream(sessionCtx, sig, hostsession.Options{Version: rescueVersion, Codec: "software-jpeg", FPS: h.fps, Quality: h.quality, PrimaryDisplayOnly: true, DisableClipboard: true, DisableRemoteData: true, OnState: func(state string) {
 					if state == "capture-unavailable" {
 						h.setStatus(sessionCtx, "Capture unavailable / 畫面擷取不可用")
 					} else if state == "capture-restored" {

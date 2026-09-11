@@ -48,6 +48,9 @@ type EnhancementReport struct {
 	Bitrate        int    `json:"bitrate"`
 }
 type Control struct {
+	CommandCapabilities  *CommandCapabilities       `json:"commandCapabilities,omitempty"`
+	CommandRequest       *CommandRequest            `json:"commandRequest,omitempty"`
+	CommandResponse      *CommandResponse           `json:"commandResponse,omitempty"`
 	AppVersion           string                     `json:"appVersion,omitempty"`
 	KeyframeInterval     int                        `json:"keyframeInterval,omitempty"`
 	StreamConfig         *streamconfig.Request      `json:"streamConfig,omitempty"`
@@ -80,6 +83,8 @@ type Control struct {
 
 type Peer struct {
 	transportMode  peertransport.Mode
+	commandsOnce   sync.Once
+	commands       commandState
 	pc             *webrtc.PeerConnection
 	screen         *webrtc.DataChannel
 	control        *webrtc.DataChannel
@@ -139,10 +144,10 @@ func NewHostWithTransport(ctx context.Context, signal *signaling.Client, mode pe
 			p.mu.Lock()
 			p.control = dc
 			p.mu.Unlock()
-			dc.OnOpen(func() { p.flushControl() })
+			dc.OnOpen(func() { p.flushControl(); p.announceCommands() })
 			dc.OnMessage(func(m webrtc.DataChannelMessage) {
 				var c Control
-				if decodeControl(m.Data, &c) == nil && onControl != nil {
+				if decodeControl(m.Data, &c) == nil && !p.handleCommand(c) && onControl != nil {
 					onControl(c)
 				}
 			})
@@ -167,11 +172,11 @@ func NewHostWithTransport(ctx context.Context, signal *signaling.Client, mode pe
 	// invoked for it. Bind the receive callback explicitly.
 	p.control.OnMessage(func(m webrtc.DataChannelMessage) {
 		var c Control
-		if decodeControl(m.Data, &c) == nil && onControl != nil {
+		if decodeControl(m.Data, &c) == nil && !p.handleCommand(c) && onControl != nil {
 			onControl(c)
 		}
 	})
-	p.control.OnOpen(func() { p.flushControl() })
+	p.control.OnOpen(func() { p.flushControl(); p.announceCommands() })
 	offer, err := pc.CreateOffer(nil)
 	if err != nil {
 		_ = pc.Close()
@@ -284,10 +289,10 @@ func NewViewerWithTransport(ctx context.Context, signal *signaling.Client, mode 
 			p.mu.Lock()
 			p.control = dc
 			p.mu.Unlock()
-			dc.OnOpen(func() { p.flushControl() })
+			dc.OnOpen(func() { p.flushControl(); p.announceCommands() })
 			dc.OnMessage(func(m webrtc.DataChannelMessage) {
 				var c Control
-				if decodeControl(m.Data, &c) == nil {
+				if decodeControl(m.Data, &c) == nil && !p.handleCommand(c) {
 					for _, handler := range onControl {
 						if handler != nil {
 							handler(c)

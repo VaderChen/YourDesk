@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""YourDesk 跨平台建置、macOS DMG／Windows Installer／WinPE 實驗性 ZIP 封裝。"""
+"""YourDesk 跨平台建置、macOS DMG／Windows Installer／WinPE 實驗性 ZIP／Linux 命令列封裝。"""
 import argparse
 import hashlib
 import json
@@ -19,8 +19,8 @@ from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parent.parent
 DIST = ROOT / 'dist'
-DEFAULT_TARGETS = 'darwin/arm64,windows/amd64,windows/arm64,winpe/amd64'
-SUPPORTED_TARGETS = {'darwin/arm64', 'windows/amd64', 'windows/arm64', 'winpe/amd64'}
+DEFAULT_TARGETS = 'darwin/arm64,windows/amd64,windows/arm64,winpe/amd64,linux/amd64,linux/arm64'
+SUPPORTED_TARGETS = {'darwin/arm64', 'windows/amd64', 'windows/arm64', 'winpe/amd64', 'linux/amd64', 'linux/arm64'}
 
 
 def run(args, env=None, cwd=ROOT):
@@ -86,7 +86,7 @@ def environment(target, gui):
 
 def compile_program(name, folder, target, version):
     system, _ = target.split('/')
-    gui = name in ('client', 'remote')
+    gui = system != 'linux' and name in ('client', 'remote')
     output = ('YourDesk' if name == 'desktop' else 'yourdesk-' + name) + ('.exe' if system == 'windows' else '')
     flags = f"-s -w -X 'yourdesk/internal/clientui.Version={version}'"
     if system == 'windows':
@@ -284,13 +284,17 @@ def build_winpe_standalone(version):
 
 
 def write_instructions(folder, system, version):
-    if system in ('darwin', 'winpe'):
+    # 舊套件重新封裝時一併移除重複說明，只保留各平台的 README。
+    (folder / '使用說明.txt').unlink(missing_ok=True)
+    if system == 'winpe':
+        shutil.copy2(ROOT / 'packaging/winpe/README.md', folder / 'README.md')
         return
-    copy_model_licenses(folder)
-    instructions = ROOT / 'docs' / 'README-Windows.txt'
+    if system != 'darwin':
+        copy_model_licenses(folder)
+    platform = {'darwin': 'macOS', 'windows': 'Windows', 'linux': 'Linux'}[system]
+    instructions = ROOT / 'docs' / f'README-{platform}.txt'
     content = f'YourDesk {version}\n\n' + instructions.read_text(encoding='utf-8')
-    for name in ('README.txt', '使用說明.txt'):
-        (folder / name).write_text(content, encoding='utf-8-sig')
+    (folder / 'README.txt').write_text(content, encoding='utf-8-sig')
 
 
 def reset_dist():
@@ -314,13 +318,13 @@ def build(version, targets):
     release = DIST
     selected = list(dict.fromkeys(targets.split(',')))
     if not selected or any(t not in SUPPORTED_TARGETS for t in selected):
-        raise ValueError('不支援的建置目標；macOS 僅支援 arm64，Windows 支援 amd64、arm64，WinPE 實驗版支援 amd64；Linux 暫不提供桌面套件')
+        raise ValueError('不支援的建置目標；macOS 僅支援 arm64，Windows 支援 amd64、arm64，WinPE 實驗版支援 amd64；Linux 命令列版支援 amd64、arm64')
     # 預先確認原生 UI 工具鏈，禁止用 CGO=0 產生缺少介面的桌面版。
     for target in selected:
         if target == 'winpe/amd64':
             environment('windows/amd64', False)
         else:
-            environment(target, True)
+            environment(target, not target.startswith('linux/'))
     if 'darwin/arm64' in selected:
         signing_identity()
         capture(['xcrun', 'notarytool', 'history', '--keychain-profile', notary_profile(), '--output-format', 'json'])
@@ -343,7 +347,8 @@ def build(version, targets):
             elif system == 'winpe':
                 compile_winpe(folder, version)
             else:
-                programs = ('client', 'remote', 'desktop')
+                # Linux 套件提供無桌面 Host；remote 含 Ebiten，不能以 CGO=0 編譯。
+                programs = ('client',) if system == 'linux' else ('client', 'remote', 'desktop')
                 for name in programs:
                     compile_program(name, folder, target, version)
                 write_instructions(folder, system, version)
@@ -375,7 +380,7 @@ def build(version, targets):
 
 def clean_apple_output(folder):
     # 同時相容先前版本的 --no-build，移除舊流程留下的附屬檔案。
-    for name in ('YourDesk', 'yourdesk-client', 'yourdesk-remote', 'yourdesk-server', 'README.txt', '使用說明.txt', 'SHA256SUMS'):
+    for name in ('YourDesk', 'yourdesk-client', 'yourdesk-remote', 'yourdesk-server', '使用說明.txt', 'SHA256SUMS'):
         item = folder / name
         if item.is_file() or item.is_symlink():
             item.unlink()
@@ -416,6 +421,7 @@ def pack(release, targets=None):
                 stage = Path(temporary)
                 app = stage / 'YourDesk.app'
                 shutil.copytree(folder / 'YourDesk.app', app)
+                shutil.copy2(folder / 'README.txt', stage / 'README.txt')
                 identity = signing_identity()
                 notarize_app(app)
                 (stage / 'Applications').symlink_to('/Applications')
@@ -428,6 +434,18 @@ def pack(release, targets=None):
                 run(['spctl', '--assess', '--type', 'open', '--context', 'context:primary-signature', '--verbose=2', output])
         elif system == 'windows':
             windows_installer(folder, stem, version, arch)
+        elif system == 'linux':
+            for pattern in ('YourDesk-*.tar.gz', 'YourDesk-*.zip'):
+                for previous in folder.glob(pattern):
+                    previous.unlink()
+            manifest(folder)
+            with tempfile.TemporaryDirectory(prefix='yourdesk-linux-') as temporary:
+                archive = Path(temporary) / (stem + '-cli.zip')
+                with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as output:
+                    for item in sorted(folder.rglob('*')):
+                        if item.is_file():
+                            output.write(item, item.relative_to(folder.parent))
+                shutil.move(archive, folder / archive.name)
         elif system == 'winpe':
             winpe_zip(folder, stem + '-experimental')
         if system == 'darwin':
@@ -455,7 +473,7 @@ def main():
         release = DIST
         metadata_path = release / 'release.json'
         if not metadata_path.is_file() or metadata_path.is_symlink():
-            raise ValueError('找不到 dist/release.json，請先執行 buildMac.command 或 buildWin.command；舊版版本子目錄需重新建置')
+            raise ValueError('找不到 dist/release.json，請先執行 buildMac.command、buildWin.command 或 buildLinux.command；舊版版本子目錄需重新建置')
         metadata = json.loads(metadata_path.read_text())
         if version:
             version_name(version)

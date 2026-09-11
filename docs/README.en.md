@@ -8,7 +8,7 @@ YourDesk is a remote desktop app for macOS and Windows. Connect to another compu
 
 ## Features
 
-This release adds HTTPS fallback, an experimental Tailcat transport and a WinPE x64 experimental ZIP. Automatic configuration now requires Start, then Apply. See the [release notes](RELEASE-1.26.0911-build-1733.md).
+This release adds independent terminal windows, Linux CLI x64/arm64 ZIP packages and MCP interactive terminals. Disconnected windows can stay open, and icons show a spinner while waiting for the remote Host to recover. See the [release notes](RELEASE-1.26.0911-build-2104.md).
 
 - **Hardware-accelerated encoding and decoding:** supports H.264/HEVC on macOS and H.264 on Windows, selected automatically according to both devices' capabilities. Falls back when unavailable; the toolbar shows the actual encoding and decoding status.
 - **Cross-platform control:** use your keyboard, mouse and common shortcuts between Mac and Windows.
@@ -45,6 +45,8 @@ Download the latest package from [GitHub Releases](https://github.com/VaderChen/
 | Windows x64 | x64 installer |
 | Windows on ARM | ARM64 installer |
 
+| Linux x64 / arm64 | CLI Host ZIP (no desktop / REMOTE) |
+
 1. Install and open YourDesk on both computers.
 2. Enter the remote ID or select a saved connection.
 3. Enter the connection password to start.
@@ -71,10 +73,6 @@ Thanks to the authors of FSR, QuickSRNet/SESR and RIFE. Full [FSR](FSR-LICENSE.t
 
 **Clipboard synchronization improved: the user confirmed that Mac-to-Mac text, image and bidirectional file copy work on real devices.**
 
-## Windows device ID update and duplicate Host fix
+## Remote terminal
 
-**Fixed duplicate Host occupancy caused by colliding Windows device IDs.** Older versions used CPU ProcessorId values, which can be identical on different computers. Windows now uses MachineGuid, with SMBIOS UUID as a fallback.
-
-> **Your Windows device ID will change after updating. Check the new ID and update saved connections on your other computers; stop using the old ID. Mac IDs are unchanged.**
-
-When adding/editing a connection or using Quick Connect, enter only the ID's letters and numbers; uppercase, `YD-` and four-character separators are added automatically. Full IDs and IP addresses can still be entered.
+Choose Desktop or Terminal, or double-click a site to select a mode. Independent terminal windows support multiple sites; unsupported older peers show an update prompt. Run Linux as a regular user. CLI supports `-secret "password"`; `LC_ALL → LC_MESSAGES → LANG` selects Traditional Chinese, English, Japanese or Korean, with English fallback. See the ZIP README for usage.

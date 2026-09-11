@@ -30,6 +30,9 @@ func (g *game) updateAgent() {
 	}
 	select {
 	case req := <-g.agentRequests:
+		if g.dispatchAgentCommand(req) {
+			return
+		}
 		res := g.agentAction(req)
 		data, _ := json.Marshal(res)
 		fmt.Fprintln(os.Stdout, agentremote.Prefix+string(data))
@@ -189,4 +192,56 @@ func (g *game) runAgentHidden(ctx context.Context) bool {
 			return true
 		}
 	}
+}
+
+// P2P 資料操作使用背景工作，不阻塞畫面或輸入主迴圈。
+func (g *game) dispatchAgentCommand(r agentremote.Request) bool {
+	switch r.Action {
+	case "files.roots", "files.search", "files.read", "shell.run":
+	default:
+		return false
+	}
+	reply := func(out agentremote.Response) {
+		data, _ := json.Marshal(out)
+		fmt.Fprintln(os.Stdout, agentremote.Prefix+string(data))
+	}
+	out := agentremote.Response{ID: r.ID}
+	if !g.controlEnabled || g.peer == nil || !g.peer.Connected() {
+		out.Error = "遠端尚未連線或控制已停用"
+		reply(out)
+		return true
+	}
+	if r.Expires <= time.Now().UnixMilli() {
+		out.Error = "操作已逾時，未執行"
+		reply(out)
+		return true
+	}
+	if g.agentCommands == nil {
+		g.agentCommands = make(chan struct{}, 2)
+	}
+	select {
+	case g.agentCommands <- struct{}{}:
+	default:
+		out.Error = "遠端資料操作忙碌中"
+		reply(out)
+		return true
+	}
+	peer, slots := g.peer, g.agentCommands
+	go func() {
+		defer func() { <-slots }()
+		deadline := time.UnixMilli(r.Expires)
+		if max := time.Now().Add(5 * time.Second); deadline.After(max) {
+			deadline = max
+		}
+		ctx, cancel := context.WithDeadline(context.Background(), deadline)
+		defer cancel()
+		result, err := peer.CallCommandParams(ctx, r.Action, r.Params)
+		if err != nil {
+			out.Error = err.Error()
+		} else {
+			out.Result = result.Result
+		}
+		reply(out)
+	}()
+	return true
 }

@@ -32,6 +32,7 @@ IP 白名單預設開啟，初始只有 `127.0.0.1`。在「MCP 設定」可切�
 | `connection_diagnostics` | 讀取已連線站台的串流取樣；`start=true` 開始新一輪取樣 |
 | `remote_action` | 取得遠端畫面、移動／按下／放開滑鼠、鍵盤輸入、捲動、貼上文字及切換螢幕 |
 
+新增 `get_remote_filesystem`、`search_remote_files`、`read_remote_file` 與 `run_remote_shell`，經已授權的 P2P 工作階段查詢遠端檔案與執行短時間 Shell。兩端皆須更新；參數、權限及限制見 [遠端資料與 Shell](MCP-REMOTE-DATA.md)。不提供 signaling Server 停止 Host 的管理入口。
 
 ## 背景操作與提示
 
@@ -54,3 +55,9 @@ Tray 選單會出現「開啟 MCP 遠端畫面」，開啟後切換為「隱藏 
 `connect` 使用已儲存站台並指定 `diagnostics=true`，可建立不顯示視窗的背景分析連線。MCP 不會繞過連線密碼或作業系統的螢幕擷取／輔助使用權限。
 
 實作採用官方 [MCP Go SDK](https://github.com/modelcontextprotocol/go-sdk)，使用 Streamable HTTP 與獨立 Bearer 驗證。
+
+## 命令列連線與模式選擇
+
+先用 `get_site_capabilities` 查詢站台能力。兩種模式皆可用時，Shell 指令與系統工作優先使用 `connect` 的 `terminal=true`；GUI 操作與截圖使用預設桌面模式。同一站台切換模式前先斷線。既有檔案資料工具目前需要桌面連線，命令列使用 `remote_terminal`。
+
+等待 `get_status` 顯示 connected，取得 session 與 instance，使用 `remote_terminal` 的 open／read／write／resize／close 操作。已通過本機 MCP HTTP → Remote → P2P → PTY Smoke Test，涵蓋輸入輸出、尺寸、過期 instance 拒絕及關閉清理；不代表所有跨機／平台組合皆已驗證。

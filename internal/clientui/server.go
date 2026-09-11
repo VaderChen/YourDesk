@@ -73,6 +73,9 @@ type process struct {
 	passwordProof                string
 	diagnostic                   *diagnosticRun
 	diagnosticConnection         bool
+	terminalInstance             string
+	terminalOwner                *process
+	terminalConnection           bool
 	transfers                    []clipboard.Progress
 	credentialKey, pendingSecret string
 	remember                     bool
@@ -87,28 +90,29 @@ type process struct {
 	kind, siteID                 string
 }
 type Preferences struct {
-	MCPWhitelistEnabled    bool     `json:"mcpWhitelistEnabled"`
-	MCPWhitelist           []string `json:"mcpWhitelist"`
-	MCPOpenDisplay         bool     `json:"mcpOpenDisplay"`
-	MCPEnabled             bool     `json:"mcpEnabled"`
-	FitWindow              bool     `json:"fitWindow"`
-	SourceFPSLimit         int      `json:"sourceFPSLimit"`
-	BitrateLimitMbps       int      `json:"bitrateLimitMbps"`
-	EnhancementStrategy    string   `json:"enhancementStrategy"`
-	EnhancementBitrateMbps int      `json:"enhancementBitrateMbps"`
-	KeyframeInterval       int      `json:"keyframeInterval"`
-	InterpolationMethod    string   `json:"interpolationMethod"`
-	Interpolation          bool     `json:"interpolation"`
-	CoreMLModel            string   `json:"coreMLModel"`
-	SuperResolution        string   `json:"superResolution"`
-	ImageEnhancement       bool     `json:"imageEnhancement"`
-	DisableKeyMapping      bool     `json:"disableKeyMapping"`
-	DisableHints           bool     `json:"disableHints"`
-	TailcatEnabled         bool     `json:"tailcatEnabled"`
-	DirectListen           bool     `json:"directListen"`
-	Codec                  string   `json:"codec"`
-	Language               string   `json:"language"`
-	Theme                  string   `json:"theme"`
+	MCPWhitelistEnabled     bool     `json:"mcpWhitelistEnabled"`
+	MCPWhitelist            []string `json:"mcpWhitelist"`
+	MCPOpenDisplay          bool     `json:"mcpOpenDisplay"`
+	MCPEnabled              bool     `json:"mcpEnabled"`
+	CloseWindowOnDisconnect bool     `json:"closeWindowOnDisconnect"`
+	FitWindow               bool     `json:"fitWindow"`
+	SourceFPSLimit          int      `json:"sourceFPSLimit"`
+	BitrateLimitMbps        int      `json:"bitrateLimitMbps"`
+	EnhancementStrategy     string   `json:"enhancementStrategy"`
+	EnhancementBitrateMbps  int      `json:"enhancementBitrateMbps"`
+	KeyframeInterval        int      `json:"keyframeInterval"`
+	InterpolationMethod     string   `json:"interpolationMethod"`
+	Interpolation           bool     `json:"interpolation"`
+	CoreMLModel             string   `json:"coreMLModel"`
+	SuperResolution         string   `json:"superResolution"`
+	ImageEnhancement        bool     `json:"imageEnhancement"`
+	DisableKeyMapping       bool     `json:"disableKeyMapping"`
+	DisableHints            bool     `json:"disableHints"`
+	TailcatEnabled          bool     `json:"tailcatEnabled"`
+	DirectListen            bool     `json:"directListen"`
+	Codec                   string   `json:"codec"`
+	Language                string   `json:"language"`
+	Theme                   string   `json:"theme"`
 }
 
 type server struct {
@@ -232,7 +236,7 @@ func Run(ctx context.Context, options Options) error {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "no-referrer")
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
 		mux.ServeHTTP(w, r)
 	})
 	httpServer := &http.Server{Handler: handler, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second}
@@ -342,6 +346,21 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		respond(w, 200, map[string]bool{"ok": true})
+		return
+	}
+	if r.URL.Path == "/api/terminal/preferences" && r.Method == "GET" {
+		s.mu.Lock()
+		closeWindow := s.preferences.CloseWindowOnDisconnect
+		s.mu.Unlock()
+		respond(w, 200, map[string]bool{"closeWindowOnDisconnect": closeWindow})
+		return
+	}
+	if r.URL.Path == "/api/terminal/window" && r.Method == "POST" {
+		s.openTerminalWindow(w, r)
+		return
+	}
+	if r.URL.Path == "/api/terminal" && r.Method == "POST" {
+		s.terminalAction(w, r)
 		return
 	}
 	if s.handlePrelogin(w, r) {
@@ -540,6 +559,7 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 		respond(w, 200, map[string]bool{"remembered": remembered})
 	case r.URL.Path == "/api/quick/start" && r.Method == "POST":
 		var request struct {
+			Terminal bool   `json:"terminal"`
 			Room     string `json:"room"`
 			Secret   string `json:"secret"`
 			Remember bool   `json:"remember"`
@@ -579,6 +599,9 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 				args = append(args, "-mcp-hidden")
 			}
 		}
+		if request.Terminal {
+			args = append(args, "-terminal")
+		}
 		if err := s.start("quick", "", s.viewerBinary(), args); err != nil {
 			fail(w, err)
 			return
@@ -588,6 +611,7 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 			fail(w, err)
 			return
 		}
+		s.children["quick"].terminalConnection = request.Terminal
 		s.children["quick"].credentialKey = credentialID(s.options.Signal, room)
 		s.children["quick"].pendingSecret = secret
 		s.children["quick"].remember = request.Remember
@@ -633,12 +657,17 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 	case r.URL.Path == "/api/viewer/start" && r.Method == "POST":
 		var request struct {
 			Diagnostics bool   `json:"diagnostics"`
+			Terminal    bool   `json:"terminal"`
 			ID          string `json:"id"`
 			Secret      string `json:"secret"`
 			Remember    bool   `json:"remember"`
 		}
 		if err := decode(w, r, &request); err != nil {
 			fail(w, err)
+			return
+		}
+		if request.Terminal && request.Diagnostics {
+			fail(w, errors.New("命令列不支援畫面偵測"))
 			return
 		}
 		var selected *Site
@@ -671,6 +700,9 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 				args = append(args, "-mcp-hidden")
 			}
 		}
+		if request.Terminal {
+			args = append(args, "-terminal")
+		}
 		if request.Diagnostics {
 			args = append(args, "-diagnostic")
 		}
@@ -685,6 +717,7 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		p.diagnosticConnection = request.Diagnostics
+		p.terminalConnection = request.Terminal
 		p.room = selected.Room
 		p.credentialKey = credentialID(selected.Signal, selected.Room)
 		p.pendingSecret = request.Secret
@@ -779,7 +812,7 @@ func (s *server) start(kind, siteID, binary string, args []string) error {
 	// 診斷輸出留在啟動終端，不把配對密碼寫入站台設定。
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	p := &process{mcpOwned: mcpConnection, mcpVisible: mcpConnection && s.preferences.MCPOpenDisplay, cmd: cmd, done: make(chan struct{}), kind: kind, siteID: siteID}
+	p := &process{terminalInstance: rand.Text(), mcpOwned: mcpConnection, mcpVisible: mcpConnection && s.preferences.MCPOpenDisplay, cmd: cmd, done: make(chan struct{}), kind: kind, siteID: siteID}
 	var output io.ReadCloser
 	{
 		var err error
@@ -789,7 +822,7 @@ func (s *server) start(kind, siteID, binary string, args []string) error {
 			return err
 		}
 	}
-	if kind == "quick" || kind == "viewer" || kind == "host" {
+	if kind == "quick" || kind == "viewer" || kind == "host" || kind == "terminal-window" {
 		var err error
 		p.stdin, err = cmd.StdinPipe()
 		if err != nil {
@@ -883,6 +916,8 @@ func (s *server) start(kind, siteID, binary string, args []string) error {
 						case "error":
 							p.failureMessage = event.Message
 							s.notice = event.Message
+						case "disconnected":
+							p.stage = "disconnected"
 						case "authenticated":
 							if err := s.remember(p); err != nil {
 								s.notice = "無法保存連線密碼"
@@ -896,7 +931,7 @@ func (s *server) start(kind, siteID, binary string, args []string) error {
 							p.stage = "password"
 						case "frame":
 							// 首張畫面準備好才隱藏主介面，密碼驗證成功不代表視窗已開啟。
-							if p.stage != "connected" && !p.mcpOwned && !p.diagnosticConnection {
+							if p.stage != "connected" && !p.mcpOwned && !p.diagnosticConnection && !p.terminalConnection {
 								select {
 								case s.connected <- struct{}{}:
 								default:
@@ -923,13 +958,26 @@ func (s *server) start(kind, siteID, binary string, args []string) error {
 			delete(s.children, key)
 		}
 		close(p.done)
-		if !p.mcpOwned && !p.diagnosticConnection && (p.kind == "viewer" || p.kind == "quick") {
+		if p.terminalConnection && s.preferences.CloseWindowOnDisconnect {
+			for _, window := range s.children {
+				if window.kind == "terminal-window" && window.terminalOwner == p {
+					_ = window.cmd.Process.Kill()
+				}
+			}
+		}
+		if p.kind == "terminal-window" && p.terminalOwner != nil {
+			if remote := s.children["viewer:"+p.terminalOwner.siteID]; remote != nil && remote.terminalConnection && remote == p.terminalOwner {
+				_ = remote.cmd.Process.Kill()
+			}
+		}
+		// 遠端結束時保留視窗供閱讀最後輸出，視窗的輪詢會顯示斷線狀態。
+		if !p.mcpOwned && !p.diagnosticConnection && !p.terminalConnection && (p.kind == "viewer" || p.kind == "quick") {
 			select {
 			case s.viewerClosed <- struct{}{}:
 			default:
 			}
 		}
-		if err != nil && p.failureMessage == "" && !p.diagnosticConnection {
+		if err != nil && p.failureMessage == "" && !p.diagnosticConnection && !p.terminalConnection && p.kind != "terminal-window" {
 			s.notice = "程序已結束；若非手動停止，請查看啟動終端的錯誤訊息。"
 		}
 	}()

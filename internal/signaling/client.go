@@ -71,7 +71,7 @@ func Dial(ctx context.Context, url, room string, role Role, secret []byte) (*Cli
 	}
 	authlog.Event("signaling-connected", map[string]any{"role": role, "transport": "wss"})
 	c := &Client{conn: conn, room: room, role: role, secret: secret}
-	join, err := NewEnvelope(room, role, KindJoin, nil, secret)
+	join, err := NewEnvelope(room, role, KindJoin, joinPayload(ctx, role), secret)
 	if err != nil {
 		_ = conn.Close(websocket.StatusInternalError, "join failed")
 		return nil, err

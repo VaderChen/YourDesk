@@ -8,7 +8,7 @@ YourDesk는 macOS와 Windows를 지원하는 원격 데스크톱 앱입니다. �
 
 ## 주요 기능
 
-HTTPS 대체 연결, 실험적 Tailcat 통신과 WinPE x64 ZIP을 추가했습니다. 자동 설정은 시작으로 감지하고 적용을 눌러 반영합니다. [릴리스 노트](RELEASE-1.26.0911-build-1733.md)를 확인하세요.
+독립 터미널 창, Linux CLI x64/arm64 ZIP 및 MCP 대화형 터미널을 추가했습니다. 연결 해제 후 창 유지 여부를 설정할 수 있으며 Host 복구 대기는 회전 아이콘으로 표시합니다. [릴리스 노트](RELEASE-1.26.0911-build-2104.md).
 
 - **하드웨어 인코딩·디코딩 가속**: macOS의 H.264/HEVC와 Windows의 H.264를 지원합니다. 양쪽 기기의 기능에 따라 자동 선택하고 사용할 수 없으면 대체 방식으로 전환하며, 도구 모음에서 실제 인코딩·디코딩 상태를 확인할 수 있습니다.
 - **크로스 플랫폼 제어**: Mac과 Windows 사이에서 키보드, 마우스, 일반 단축키를 사용합니다.
@@ -38,6 +38,8 @@ IP 허용 목록은 기본으로 켜져 있고 `127.0.0.1`만 허용합니다. �
 
 [GitHub Releases](https://github.com/VaderChen/YourDesk/releases/latest)에서 macOS Apple Silicon용 DMG, Windows x64 또는 Windows ARM64 설치 프로그램을 받으세요. macOS 패키지는 서명 및 Apple 공증을 완료했습니다.
 
+| Linux x64 / arm64 | CLI Host ZIP (데스크톱 / REMOTE 미포함) |
+
 1. 두 컴퓨터에 YourDesk를 설치하고 실행합니다.
 2. 원격 ID를 입력하거나 저장한 연결을 선택합니다.
 3. 연결 암호를 입력하면 원격 제어를 시작할 수 있습니다.
@@ -64,10 +66,6 @@ FSR, QuickSRNet/SESR, RIFE 제작자에게 감사드립니다. [FSR](FSR-LICENSE
 
 **클립보드 동기화 개선: 사용자가 실제 기기에서 Mac 간 텍스트, 이미지 및 양방향 파일 복사가 가능함을 확인했습니다.**
 
-## Windows 장치 ID 변경 및 중복 Host 수정
+## 원격 터미널
 
-**Windows 장치 ID 충돌로 발생하던 중복 Host 점유 문제를 수정했습니다.** 이전 버전의 CPU ProcessorId는 서로 다른 컴퓨터에서 같을 수 있습니다. 이제 Windows MachineGuid를 사용하고 유효하지 않으면 SMBIOS UUID를 사용합니다.
-
-> **업데이트 후 Windows 장치 ID가 변경됩니다. 새 ID를 확인하고 다른 컴퓨터에 저장한 연결 정보를 수정하세요. 이전 ID는 사용하지 마세요. Mac ID는 변경되지 않습니다.**
-
-연결 추가·편집과 빠른 연결에서 ID의 영문자와 숫자만 입력하면 대문자, `YD-` 및 4자리마다 `-`가 자동 적용됩니다. 전체 ID 붙여넣기와 IP 주소 입력도 지원합니다.
+데스크톱 또는 터미널을 선택하거나 연결을 더블 클릭하여 모드를 선택하세요. 독립 창으로 여러 연결을 사용할 수 있고 미지원 구버전에는 업데이트 안내가 표시됩니다. Linux는 일반 사용자로 실행하세요. `-secret "암호"`를 지원하며 `LC_ALL → LC_MESSAGES → LANG`에 따라 번체 중국어, 영어, 일본어, 한국어를 선택합니다. 미지원 언어는 영어로 표시합니다. 사용법은 ZIP의 README를 확인하세요.

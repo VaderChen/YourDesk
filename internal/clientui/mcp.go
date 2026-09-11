@@ -42,6 +42,7 @@ func (s *server) mcpAPI(ctx context.Context, method, path string, input any) (ma
 }
 
 type mcpConnect struct {
+	Terminal    bool   `json:"terminal,omitempty" jsonschema:"true 使用互動命令列，可連線無桌面系統；不可與 diagnostics 同時啟用"`
 	ID          string `json:"id,omitempty" jsonschema:"已儲存站台 ID；與 room 擇一"`
 	Room        string `json:"room,omitempty" jsonschema:"遠端裝置 ID；與 id 擇一"`
 	Secret      string `json:"secret,omitempty" jsonschema:"遠端連線密碼，可省略以使用已記住的密碼"`
@@ -55,16 +56,18 @@ type mcpDiagnostic struct {
 	Start bool   `json:"start,omitempty"`
 }
 type mcpAction struct {
-	Session string  `json:"session"`
-	Action  string  `json:"action" jsonschema:"screenshot、move、button、key、scroll、text、display"`
-	X       float64 `json:"x,omitempty" jsonschema:"畫面相對座標 0～1"`
-	Y       float64 `json:"y,omitempty" jsonschema:"畫面相對座標 0～1"`
-	Button  int     `json:"button,omitempty" jsonschema:"0 左鍵、1 右鍵、2 中鍵"`
-	Down    bool    `json:"down,omitempty" jsonschema:"button 或 key：true 按下，false 放開；按下後必須放開"`
-	Key     string  `json:"key,omitempty" jsonschema:"按鍵名稱，例如 a、enter、control、shift"`
-	Text    string  `json:"text,omitempty" jsonschema:"UTF-8 文字，最多 16 KB；會取代本機及遠端剪貼簿"`
-	Delta   float64 `json:"delta,omitempty"`
-	Display int     `json:"display,omitempty" jsonschema:"螢幕索引，從 0 開始"`
+	expectedProcess *process
+	Params          json.RawMessage `json:"-"`
+	Session         string          `json:"session"`
+	Action          string          `json:"action" jsonschema:"screenshot、move、button、key、scroll、text、display"`
+	X               float64         `json:"x,omitempty" jsonschema:"畫面相對座標 0～1"`
+	Y               float64         `json:"y,omitempty" jsonschema:"畫面相對座標 0～1"`
+	Button          int             `json:"button,omitempty" jsonschema:"0 左鍵、1 右鍵、2 中鍵"`
+	Down            bool            `json:"down,omitempty" jsonschema:"button 或 key：true 按下，false 放開；按下後必須放開"`
+	Key             string          `json:"key,omitempty" jsonschema:"按鍵名稱，例如 a、enter、control、shift"`
+	Text            string          `json:"text,omitempty" jsonschema:"UTF-8 文字，最多 16 KB；會取代本機及遠端剪貼簿"`
+	Delta           float64         `json:"delta,omitempty"`
+	Display         int             `json:"display,omitempty" jsonschema:"螢幕索引，從 0 開始"`
 }
 
 func (s *server) mcpServer() *mcp.Server {
@@ -82,7 +85,7 @@ func (s *server) mcpServer() *mcp.Server {
 			if p.cmd.Process != nil {
 				pid = p.cmd.Process.Pid
 			}
-			children = append(children, map[string]any{"session": key, "pid": pid, "parentPID": os.Getpid(), "role": p.kind, "room": p.room, "stage": p.stage, "error": p.failureMessage, "diagnostic": p.diagnosticConnection})
+			children = append(children, map[string]any{"session": key, "pid": pid, "parentPID": os.Getpid(), "role": p.kind, "room": p.room, "stage": p.stage, "error": p.failureMessage, "diagnostic": p.diagnosticConnection, "terminal": p.terminalConnection, "instance": p.terminalInstance, "mcpOwned": p.mcpOwned})
 		}
 		return nil, map[string]any{"info": info, "pid": os.Getpid(), "processes": children, "notice": s.notice, "hostConflict": s.hostConflict}, nil
 	})
@@ -92,7 +95,7 @@ func (s *server) mcpServer() *mcp.Server {
 		sites := append([]Site{}, s.library.Sites...)
 		return nil, map[string]any{"sites": sites}, nil
 	})
-	mcp.AddTool(srv, &mcp.Tool{Name: "connect", Description: "使用正常密碼驗證建立遠端連線。回傳僅代表開始連線，請用 get_status 確認 connected。"}, func(ctx context.Context, r *mcp.CallToolRequest, in mcpConnect) (*mcp.CallToolResult, any, error) {
+	mcp.AddTool(srv, &mcp.Tool{Name: "connect", Description: "使用正常密碼驗證建立遠端連線。兩種模式都支援時，執行指令、查詢系統與透過 Shell 處理資料優先使用命令列；操作 GUI、截圖或確認畫面使用桌面。既有檔案搜尋／讀取與 run_remote_shell 工具目前需要桌面連線；命令列請使用 remote_terminal。同一站台切換模式須先斷線。terminal=true 使用命令列，預設使用桌面。回傳僅代表開始連線，請用 get_status 確認 connected 並取得 instance。"}, func(ctx context.Context, r *mcp.CallToolRequest, in mcpConnect) (*mcp.CallToolResult, any, error) {
 		if (in.ID == "") == (in.Room == "") {
 			return nil, nil, fmt.Errorf("id 與 room 必須擇一")
 		}
@@ -148,6 +151,8 @@ func (s *server) mcpServer() *mcp.Server {
 		}
 		return nil, result, nil
 	})
+	s.registerRemoteDataTools(srv)
+	s.registerTerminalTools(srv)
 	return srv
 }
 func (s *server) callRemoteAgent(ctx context.Context, in mcpAction) (agentremote.Response, error) {
@@ -158,7 +163,7 @@ func (s *server) callRemoteAgent(ctx context.Context, in mcpAction) (agentremote
 		return agentremote.Response{}, err
 	}
 	id := hex.EncodeToString(idBytes)
-	req := agentremote.Request{ID: id, Action: in.Action, X: in.X, Y: in.Y, Button: in.Button, Down: in.Down, Key: in.Key, Text: in.Text, Delta: in.Delta, Display: in.Display, Expires: time.Now().Add(8 * time.Second).UnixMilli()}
+	req := agentremote.Request{ID: id, Params: in.Params, Action: in.Action, X: in.X, Y: in.Y, Button: in.Button, Down: in.Down, Key: in.Key, Text: in.Text, Delta: in.Delta, Display: in.Display, Expires: time.Now().Add(8 * time.Second).UnixMilli()}
 	data, err := json.Marshal(map[string]any{"agent": req})
 	if err != nil {
 		return agentremote.Response{}, err
@@ -169,6 +174,10 @@ func (s *server) callRemoteAgent(ctx context.Context, in mcpAction) (agentremote
 	ch := make(chan agentremote.Response, 1)
 	s.mu.Lock()
 	p := s.children[in.Session]
+	if in.expectedProcess != nil && p != in.expectedProcess {
+		s.mu.Unlock()
+		return agentremote.Response{}, fmt.Errorf("終端機尚未連線")
+	}
 	if p == nil || (p.kind != "viewer" && p.kind != "quick") || p.diagnosticConnection || p.stage != "connected" || p.stdin == nil {
 		s.mu.Unlock()
 		return agentremote.Response{}, fmt.Errorf("遠端顯示尚未連線或不支援操作")
@@ -180,7 +189,7 @@ func (s *server) callRemoteAgent(ctx context.Context, in mcpAction) (agentremote
 		s.mu.Unlock()
 		return agentremote.Response{}, fmt.Errorf("操作佇列已滿")
 	}
-	if !p.mcpOwned {
+	if !p.mcpOwned && !p.terminalConnection {
 		p.mcpOwned = true
 		setMCPVisibility(p, s.preferences.MCPOpenDisplay)
 	}

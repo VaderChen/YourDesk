@@ -28,6 +28,7 @@ type passwordValue struct {
 }
 
 type passwordInput struct {
+	done     chan struct{}
 	agent    chan agentremote.Request
 	values   chan passwordValue
 	start    sync.Once
@@ -35,13 +36,14 @@ type passwordInput struct {
 }
 
 func newPasswordInput() *passwordInput {
-	return &passwordInput{values: make(chan passwordValue, 1), agent: make(chan agentremote.Request, 8)}
+	return &passwordInput{done: make(chan struct{}), values: make(chan passwordValue, 1), agent: make(chan agentremote.Request, 8)}
 }
 
 func (p *passwordInput) read(ctx context.Context, prompt bool) ([]byte, error) {
 	p.start.Do(func() {
 		go func() {
 			defer close(p.values)
+			defer close(p.done)
 			scanner := bufio.NewScanner(os.Stdin)
 			scanner.Buffer(make([]byte, 1024), 65536)
 			for scanner.Scan() {

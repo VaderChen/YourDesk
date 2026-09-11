@@ -8,7 +8,7 @@ YourDesk 是支援 macOS 與 Windows 的遠端桌面工具。從連線、站台�
 
 ## 特色與功能
 
-本版新增 HTTPS 備援、Tailcat 實驗性通道與 WinPE x64 實驗性 ZIP；自動配置改為先偵測、再手動套用。詳見 [發行說明](docs/RELEASE-1.26.0911-build-1733.md)。
+本版新增獨立命令列視窗、Linux CLI x64／arm64 ZIP 與 MCP 互動終端機；支援斷線視窗保留設定，等待遠端恢復時顯示轉圈提示。詳見 [發行說明](docs/RELEASE-1.26.0911-build-2104.md)。
 
 - **硬體編解碼加速**：支援 macOS H.264／HEVC 與 Windows H.264 硬體編碼、解碼；依兩端裝置能力自動選擇，無法使用時切換備援路徑，工具列可查看實際編解碼狀態。
 - **跨平台遠端操作**：在 Mac 與 Windows 之間操作桌面，支援鍵盤、滑鼠與常用快捷鍵。
@@ -46,6 +46,8 @@ IP 白名單預設開啟且只允許 `127.0.0.1`；名單內免 Token、名單�
 | Windows x64 | Windows x64 安裝程式 |
 | Windows on ARM（WOA） | Windows ARM64 安裝程式 |
 
+| Linux x64／arm64 | CLI Host ZIP（無桌面／REMOTE） |
+
 1. 在兩台電腦安裝並開啟 YourDesk。
 2. 在快速連線輸入遠端 ID，或選擇已儲存的站台。
 3. 輸入連線密碼後，即可開始操作遠端桌面。
@@ -78,10 +80,6 @@ macOS 首次使用需允許「螢幕錄製」與「輔助使用」權限。Windo
 
 **剪貼簿同步改善：Mac 對 Mac 的文字、圖片及雙向檔案複製已由使用者實機確認可用。**
 
-## Windows 裝置 ID 更新與重複 Host 修正
+## 遠端命令列
 
-**已修正 Windows 因裝置 ID 撞號而出現的重複 Host 占用問題。** 舊版使用 CPU ID（ProcessorId），不同電腦可能取得相同值；新版改用 Windows MachineGuid，無效時改用 SMBIOS UUID。
-
-> **Windows 更新後的裝置 ID（序號）會改變。請在更新後查看新 ID，並修改其他電腦已儲存的連線站台；不要繼續使用舊 ID。Mac ID 不受影響。**
-
-新增／編輯站台與快速連線可只輸入 ID 的英數字，程式自動轉大寫、補上 `YD-` 與每四碼的 `-`；也支援貼上完整 ID 及輸入 IP 位址。
+站台提供桌面與命令列兩種模式，雙擊可選擇。命令列使用獨立視窗，可同時操作不同站台；舊版不支援時會提示更新。Linux 請以一般使用者執行，CLI 支援 `-secret "密碼"`，語系依 `LC_ALL → LC_MESSAGES → LANG` 選擇繁中、英、日、韓，不支援時使用英文。Linux ZIP 的 README 提供完整使用方式。

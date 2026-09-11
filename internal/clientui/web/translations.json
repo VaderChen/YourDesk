@@ -2323,5 +2323,165 @@
     "Could not establish a connection. Check the network and remote app. The remote computer may not support Tailcat. Update its YourDesk, or turn off Tailcat and retry.",
     "接続を確立できません。ネットワークと接続先のアプリを確認してください。 接続先が Tailcat に未対応の可能性があります。YourDesk を更新するか、Tailcat をオフにして再試行してください。",
     "연결을 설정하지 못했습니다. 네트워크와 상대 앱을 확인하세요. 상대 컴퓨터가 Tailcat을 지원하지 않을 수 있습니다. YourDesk를 업데이트하거나 Tailcat을 끄고 다시 시도하세요."
+  ],
+  "選擇連線方式": [
+    "Choose connection type",
+    "接続方法を選択",
+    "연결 방식 선택"
+  ],
+  "命令列": [
+    "Terminal",
+    "ターミナル",
+    "터미널"
+  ],
+  "桌面": [
+    "Desktop",
+    "デスクトップ",
+    "데스크톱"
+  ],
+  "開啟命令列": [
+    "Open terminal",
+    "ターミナルを開く",
+    "터미널 열기"
+  ],
+  "開啟桌面": [
+    "Open desktop",
+    "デスクトップを開く",
+    "데스크톱 열기"
+  ],
+  "請先關閉目前連線。": [
+    "Close the current connection first.",
+    "現在の接続を先に閉じてください。",
+    "현재 연결을 먼저 종료하세요."
+  ],
+  "正在開啟終端機…": [
+    "Opening terminal…",
+    "ターミナルを起動中…",
+    "터미널 여는 중…"
+  ],
+  "已連線；關閉視窗會結束命令列。": [
+    "Connected. Closing this window ends the shell.",
+    "接続済み。このウィンドウを閉じるとシェルが終了します。",
+    "연결됨. 창을 닫으면 셸이 종료됩니다."
+  ],
+  "命令列已結束。": [
+    "Shell session ended.",
+    "シェルが終了しました。",
+    "셸이 종료되었습니다."
+  ],
+  "輸入過多，請重新連線。": [
+    "Too much input. Please reconnect.",
+    "入力が多すぎます。再接続してください。",
+    "입력이 너무 많습니다. 다시 연결하세요."
+  ],
+  "終端機輸入已中斷。": [
+    "Terminal input was interrupted.",
+    "ターミナル入力が中断されました。",
+    "터미널 입력이 중단되었습니다."
+  ],
+  "輸入過快，請重新連線。": [
+    "Input is too fast. Please reconnect.",
+    "入力が速すぎます。再接続してください。",
+    "입력이 너무 빠릅니다. 다시 연결하세요."
+  ],
+  "終端機尚未連線": [
+    "Terminal is not connected",
+    "ターミナルは未接続です",
+    "터미널이 연결되지 않았습니다"
+  ],
+  "不支援的終端機操作": [
+    "Unsupported terminal operation",
+    "未対応のターミナル操作です",
+    "지원하지 않는 터미널 작업입니다"
+  ],
+  "終端機參數無效": [
+    "Invalid terminal parameters",
+    "ターミナルの設定値が無効です",
+    "터미널 매개변수가 올바르지 않습니다"
+  ],
+  "終端機大小無效": [
+    "Invalid terminal size",
+    "ターミナルのサイズが無効です",
+    "터미널 크기가 올바르지 않습니다"
+  ],
+  "請先開啟終端機": [
+    "Open a terminal first",
+    "先にターミナルを開いてください",
+    "먼저 터미널을 여세요"
+  ],
+  "終端機輸入序號無效": [
+    "Terminal input is out of order. Please reconnect.",
+    "ターミナル入力の順序が不正です。再接続してください。",
+    "터미널 입력 순서가 올바르지 않습니다. 다시 연결하세요."
+  ],
+  "終端機輸出序號無效": [
+    "Terminal output is out of order. Please reconnect.",
+    "ターミナル出力の順序が不正です。再接続してください。",
+    "터미널 출력 순서가 올바르지 않습니다. 다시 연결하세요."
+  ],
+  "Shell 已結束": [
+    "Shell session ended",
+    "シェルが終了しました",
+    "셸이 종료되었습니다"
+  ],
+  "命令列不支援畫面偵測": [
+    "Display detection is unavailable in terminal mode",
+    "ターミナルでは画面の検出を利用できません",
+    "터미널 모드에서는 화면 감지를 사용할 수 없습니다"
+  ],
+  "正在準備命令列…": [
+    "Preparing terminal…",
+    "ターミナルを準備中…",
+    "터미널 준비 중…"
+  ],
+  "對方尚未支援命令列，請更新對方的 YourDesk 後再試。": [
+    "The remote computer does not support terminals. Update its YourDesk and retry.",
+    "接続先はターミナルに対応していません。接続先の YourDesk を更新して再試行してください。",
+    "상대 컴퓨터가 터미널을 지원하지 않습니다. 상대 컴퓨터의 YourDesk를 업데이트한 후 다시 시도하세요."
+  ],
+  "對方尚未支援命令列，請更新對方的 YourDesk 後再試。 對方可能尚未支援 Tailcat，請更新對方的 YourDesk，或關閉 Tailcat 後重試。": [
+    "The remote computer does not support terminals. Update its YourDesk and retry. The remote computer may not support Tailcat. Update its YourDesk or turn off Tailcat and retry.",
+    "接続先はターミナルに対応していません。接続先の YourDesk を更新して再試行してください。 接続先が Tailcat 未対応の可能性があります。YourDesk を更新するか、Tailcat を無効にして再試行してください。",
+    "상대 컴퓨터가 터미널을 지원하지 않습니다. 상대 컴퓨터의 YourDesk를 업데이트한 후 다시 시도하세요. 상대 컴퓨터가 Tailcat을 지원하지 않을 수 있습니다. YourDesk를 업데이트하거나 Tailcat을 끄고 다시 시도하세요."
+  ],
+  "此裝置沒有桌面環境，請改用命令列連線。": [
+    "This device has no desktop environment. Use a terminal connection.",
+    "このデバイスにはデスクトップ環境がありません。ターミナルで接続してください。",
+    "이 장치에는 데스크톱 환경이 없습니다. 터미널로 연결하세요."
+  ],
+  "等待遠端命令列輸出…": [
+    "Waiting for remote shell output…",
+    "リモートシェルの出力を待機中…",
+    "원격 셸 출력을 기다리는 중…"
+  ],
+  "尚未收到命令列輸出，請確認遠端 Shell 狀態。": [
+    "No shell output yet. Check the remote shell.",
+    "シェル出力がまだありません。接続先のシェルを確認してください。",
+    "아직 셸 출력이 없습니다. 원격 셸 상태를 확인하세요."
+  ],
+  "命令列無法繼續執行，請確認遠端 Shell 狀態。": [
+    "The shell could not continue. Check the remote shell.",
+    "シェルを続行できません。接続先のシェルを確認してください。",
+    "셸을 계속 실행할 수 없습니다. 원격 셸 상태를 확인하세요."
+  ],
+  "此站台的終端機視窗已開啟": [
+    "The terminal window for this site is already open",
+    "この接続先のターミナルは既に開いています",
+    "이 사이트의 터미널 창이 이미 열려 있습니다"
+  ],
+  "斷線後自動關閉視窗": [
+    "Close windows on disconnect",
+    "切断後にウィンドウを自動で閉じる",
+    "연결 종료 시 창 자동 닫기"
+  ],
+  "斷線後自動關閉桌面或命令列視窗；關閉時保留畫面與輸出。": [
+    "Close desktop or terminal windows on disconnect. When off, keep the screen and output.",
+    "切断後にデスクトップやターミナルを閉じます。オフの場合は画面や出力を残します。",
+    "연결 종료 후 데스크톱 또는 터미널 창을 닫습니다. 끄면 화면과 출력이 유지됩니다."
+  ],
+  "等待遠端恢復連線…": [
+    "Waiting for the remote Host to reconnect…",
+    "リモート Host の再接続を待っています…",
+    "원격 Host의 재연결을 기다리는 중…"
   ]
 }

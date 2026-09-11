@@ -100,6 +100,7 @@ dialog::backdrop { background: #18302566; backdrop-filter: blur(2px); }
 .modal-heading .eyebrow { font-size: 10px; }
 dialog label { margin-top: 11px; font-size: 13px; }
 dialog label input, dialog select, dialog textarea { display: block; width: 100%; border: 1px solid #dce4de; border-radius: 5px; background: #fafcfb; padding: 8px 10px; color: #344b3d; font-size: 14px; margin-top: 5px; }
+dialog select { height: 36px; }
 dialog textarea { resize: vertical; }
 dialog input:focus, dialog select:focus, dialog textarea:focus { outline: 2px solid #a8cdb5; outline-offset: 1px; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 7px; margin-top: 16px; border-top: 1px solid #edf1ee; padding-top: 12px; }
@@ -187,7 +188,7 @@ dialog input:focus, dialog select:focus, dialog textarea:focus { outline: 2px so
 /* 空白狀態提示不占據列距；有進度訊息時正常顯示。 */
 #settings-dialog .form-note:empty { display: none; }
 .preference-row :is(input[type="number"], select) { width: 100%; min-width: 0; height: 32px; margin: 0; padding: 4px 10px; border: 1px solid var(--line); border-radius: 8px; background-color: #fafcfb; color: #344b3d; font: inherit; font-size: 14px; }
-.preference-row select { appearance: none; -webkit-appearance: none; padding-right: 28px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='m3 4.5 3 3 3-3' fill='none' stroke='%237c8982' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 9px center; }
+dialog select, .preference-row select { appearance: none; -webkit-appearance: none; padding-right: 28px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='m3 4.5 3 3 3-3' fill='none' stroke='%237c8982' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 9px center; }
 .settings-content { scrollbar-gutter: stable; }
 @media (max-width: 700px) { :root { --sidebar-width: 130px; } .preference-row { grid-template-columns: 1fr 150px; } }
 :root[data-theme="dark"] { color-scheme: dark; background: #19211d; color: #e0eae4; --line: #3a4a40; --muted: #a0b3a6; --green: #287f59; --pale: #2d4637; }
@@ -351,3 +352,17 @@ dialog .remember-row input { display: inline-block; width: 16px; height: 16px; m
 [data-theme="dark"] .stop-incoming { color: #ff8585; }
 [data-theme="dark"] .stop-incoming:hover { background: #492626; }
 .stop-incoming[hidden] { display: none; }
+
+/* 能力不支援與處理中不同：固定停用使用禁止游標。 */
+.site-action[data-connect-mode]:disabled, #connection-choice button:disabled { cursor: not-allowed; }
+
+/* 只有在線且明確支援的連線模式亮起；未知能力保留中性色。 */
+.site-action.mode-available { color: #176d52; background: transparent; box-shadow: none; }
+.site-action.mode-available:hover { color: #10533e; background: transparent; }
+[data-theme="dark"] .site-action.mode-available { color: #8fe2b4; background: transparent; box-shadow: none; }
+[data-theme="dark"] .site-action.mode-available:hover { color: #b2f4ce; background: transparent; }
+
+.site-action.mode-recovering { position: relative; color: var(--green); cursor: wait; }
+.site-action.mode-recovering svg { visibility: hidden; }
+.site-action.mode-recovering::after { content: ""; position: absolute; width: 15px; height: 15px; left: 50%; top: 50%; margin: -7.5px; border: 2px solid var(--line); border-top-color: currentColor; border-radius: 50%; animation: connection-spin .85s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .site-action.mode-recovering::after { animation: none; } }

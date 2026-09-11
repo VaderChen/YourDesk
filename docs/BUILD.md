@@ -1,6 +1,6 @@
 # 跨平台建置與打包
 
-buildMac.command／buildWin.command 與 pack.command 統一版本格式為 `1.YY.MMDD build HHmm`（台北時間）。
+buildMac.command／buildWin.command／buildLinux.command 與 pack.command 統一版本格式為 `1.YY.MMDD build HHmm`（台北時間）。
 
 ## 使用方式
 
@@ -8,6 +8,7 @@ buildMac.command／buildWin.command 與 pack.command 統一版本格式為 `1.YY
 ./buildMac.command       # 僅 Mac arm64，含簽章及公證
 # 或
 ./buildWin.command       # Windows x64、WOA ARM64 與 WinPE x64 實驗版
+./buildLinux.command     # Linux x64、arm64 命令列 Host（另擇一次建置）
 ./pack.command --no-build
 # 或一次建置與打包
 ./pack.command
@@ -26,7 +27,7 @@ pack.command 預設目標：
 | Windows arm64（WOA） | 原生 ARM64 Client UI、遠端顯示 | ARM64 Installer EXE |
 | WinPE amd64（實驗性） | 原生 Win32 救援 Host | 便攜 ZIP |
 
-Linux 暫不提供桌面套件。Windows arm64（WOA）列入預設目標，需要 LLVM-MinGW 的 aarch64 編譯器及 windres。
+Linux 提供 x64／arm64 命令列 Host ZIP；圖形處理與 REMOTE 尚未提供。Windows arm64（WOA）列入預設目標，需要 LLVM-MinGW 的 aarch64 編譯器及 windres。
 
 一般桌面版的原生 Client／遠端顯示 強制使用 CGO；缺少工具鏈會明確停止，不產生無法開啟介面的替代執行檔。
 
@@ -51,11 +52,11 @@ YOURDESK_VERSION='1.26.0908 build 1800' ./pack.command --no-build
 
 ## 輸出與啟動
 
-`dist/` 直接保存 `macos-arm64/`、`windows-amd64/`、`windows-arm64/`、`winpe-amd64/` 平台目錄，以及 release.json 與 SHA256SUMS，不再建立版本號子目錄。版本仍記錄於 release.json、應用程式及安裝包檔名。buildMac.command／buildWin.command 與預設 pack.command 會先清空專案的 dist，再於暫存目錄建置，成功後才發布產物。pack.command --no-build 依 dist/release.json 封裝現有產物，不清空 dist；若另指定 YOURDESK_VERSION，必須與現有版本一致。舊版版本子目錄需重新建置一次。清理會拒絕符號連結或非預期的 dist 路徑。對應本機平台的執行檔同步放入 bin。
+`dist/` 直接保存 `macos-arm64/`、`windows-amd64/`、`windows-arm64/`、`winpe-amd64/` 平台目錄，以及 release.json 與 SHA256SUMS，不再建立版本號子目錄。版本仍記錄於 release.json、應用程式及安裝包檔名。buildMac.command／buildWin.command／buildLinux.command 與預設 pack.command 會先清空專案的 dist，再於暫存目錄建置，成功後才發布產物。pack.command --no-build 依 dist/release.json 封裝現有產物，不清空 dist；若另指定 YOURDESK_VERSION，必須與現有版本一致。舊版版本子目錄需重新建置一次。清理會拒絕符號連結或非預期的 dist 路徑。對應本機平台的執行檔同步放入 bin。
 
 macOS 開啟 YourDesk.app；Windows 開啟 YourDesk.exe（需 WebView2 Runtime）。入口會啟動同目錄的 yourdesk-client，Client 再管理 遠端顯示；關閉視窗仍常駐 Tray，從 Tray 選單結束程式。
 
-Windows 套件包含繁體中文、英文、日文、韓文的 README.txt／使用說明.txt，使用 YourDesk.exe 啟動。
+Windows 套件包含繁體中文、英文、日文、韓文的 README.txt，使用 YourDesk.exe 啟動。
 
 本專案僅提供 Client／遠端顯示，不含中央 Server 原始碼或執行檔。封裝使用明確檔案清單，不包含本機設定、連線密碼或 TLS 私鑰。Client 的 IP 直連 TLS 身分於本機首次使用時產生。雜湊清單只用於檔案完整性核對，不代表簽章或公證。
 
@@ -63,7 +64,7 @@ macOS 遠端顯示 使用內嵌 WebView 標題列。全螢幕以無邊框視窗�
 
 本機 runUITest.command、localRun.command、remoteRun.command、remoteClientOnly.command 皆在編譯後呼叫 scripts/sign-local.sh，使用相同 Developer ID 並驗證簽章後才執行。buildMac.command 產生的 macOS 原始執行檔與 App 也使用同一身分；直接手動 go build 不會自動執行簽章，執行前應呼叫此腳本。
 
-Apple 平台目錄僅輸出 YourDesk.app（build）與 DMG（pack）；獨立執行檔、說明與雜湊清單不放入 Apple 平台目錄。共用 release.json 與 SHA256SUMS 保留在 dist 根目錄；本機 bin 由 App 內的執行檔同步。
+Apple 平台目錄僅輸出 YourDesk.app（build）與 DMG（pack）；獨立執行檔與雜湊清單不放入 Apple 平台目錄，README.txt 隨附於平台目錄與 DMG。共用 release.json 與 SHA256SUMS 保留在 dist 根目錄；本機 bin 由 App 內的執行檔同步。
 
 路徑以腳本所在的專案目錄為基準，移動專案後仍可建置。編譯使用 `-trimpath` 並移除除錯符號；公證設定由環境變數提供。DMG 的 `/Applications` 是 macOS 安裝捷徑，並非開發者本機目錄。
 
@@ -126,3 +127,5 @@ RIFE 4.25 Lite 的轉換模型內嵌於 `internal/frameinterp`，來源、SHA256
 從 `clientUI.app` 啟動時，會啟用 `YOURDESK_TEST_UPDATE=1`：只有手動按下「檢查更新」時放行版本比較。按「下載並自動更新」後，會下載正式套件、結束 APP、安裝並啟動正式版；這是真正的安裝，不是模擬。開發啟動器本身不被覆蓋。測試狀態不改寫正式更新紀錄。
 
 若程式仍在執行，請先完整結束後再開啟 `clientUI.app`。一般安裝版與直接執行 `runUITest.command` 維持正常版本判斷；後者也可用 `YOURDESK_TEST_UPDATE=1 ./runUITest.command` 啟用相同測試。
+
+Linux CLI 目標為 `linux/amd64`、`linux/arm64`，兩者均包含於預設全平台建置，輸出 `YourDesk-版本-linux-架構-cli.zip`。套件只有 Host，不包含圖形 Viewer。各平台 README 提供繁中、英、日、韓使用方式；不附重複的使用說明.txt。

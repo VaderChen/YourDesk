@@ -5,7 +5,7 @@
 ## 已完成
 
 - `cmd/winpe`：獨立原生 Win32 視窗，標題與功能標示 Experimental / 實驗性。每次程式啟動產生隨機臨時 ID 與 16 字元密碼，密碼預設遮蔽，只在視窗顯示，不讀取映像 MachineGuid、PowerShell 或 CIM。
-- `internal/hostsession`：由一般 Client 抽出的共用 Host 核心，保留既有驗證、WebRTC、畫面封包、鍵鼠與中斷流程；一般 Client 也改呼叫此核心。救援入口不啟用剪貼簿，限制單一螢幕。
+- `internal/hostsession`：由一般 Client 抽出的共用 Host 核心，保留既有驗證、WebRTC、畫面封包、鍵鼠與中斷流程；一般 Client 也改呼叫此核心。救援入口關閉剪貼簿與遠端資料／Shell 註冊，限制單一螢幕。
 - Windows 無 CGO 建置：使用現有 GDI 擷取、Go JPEG 與 SendInput；排除 DXGI / Media Foundation 的 cgo 實作。救援入口拒絕未加 winpe 標籤的建置，亦不提供 CGO 入口。
 - Tailcat：winpe build tag 使用空的虛擬後端清單，不編入 Tailcat / Tailscale。原生視窗以灰色、未勾選的控制項呈現，旁邊 `(?)` 泡泡解釋原因。CLI、能力宣告與單端自動協商均使用同一後端清單，因此無法繞過。
 - 連線控制：Start 開放接收；Stop 同時取消配對等待與現有連線，等待前一輪回收後才可重新啟動。視窗關閉會停止 Host；命名 mutex 防止同一登入工作階段重複啟動。

@@ -36,6 +36,7 @@
             <div class="preference-row"><label for="ui-hints">泡泡提示</label><input id="ui-hints" class="preference-switch" type="checkbox" role="switch" checked></div>
             <div class="preference-row"><label for="ui-key-mapping">MacOS/Windows 按鍵映射</label><input id="ui-key-mapping" class="preference-switch" type="checkbox" role="switch" checked></div>
             <div class="preference-row" data-tooltip="調整視窗大小，完整顯示遠端畫面；全螢幕不受影響。"><label for="ui-fit-window">調整畫面滿版</label><input id="ui-fit-window" class="preference-switch" type="checkbox" role="switch"></div>
+            <div class="preference-row" data-tooltip="斷線後自動關閉桌面或命令列視窗；關閉時保留畫面與輸出。"><label for="ui-close-on-disconnect">斷線後自動關閉視窗</label><input id="ui-close-on-disconnect" class="preference-switch" type="checkbox" role="switch"></div>
             <p class="help-description">跟隨系統的語言與外觀，變更會自動儲存。</p>
             <dl class="settings-details"><div><dt>主機名稱</dt><dd id="settings-hostname">—</dd></div><div><dt>站台設定檔</dt><dd class="settings-config"><span id="settings-path">—</span><span class="config-actions"><button id="import-config" type="button" class="button" data-tooltip="匯入站台設定檔">匯入</button><button id="export-config" type="button" class="button" data-tooltip="匯出站台設定檔">匯出</button></span><input id="import-config-file" type="file" accept=".json,application/json" hidden></dd></div></dl>
           </section>
@@ -140,9 +141,13 @@
     <div id="stream-auto-result" class="settings-details" aria-live="polite"></div>
     <div class="modal-actions"><button id="stream-auto-cancel" type="button" class="button">取消</button><button id="stream-auto-apply" type="button" class="button primary" hidden>套用</button><button id="stream-auto-start" type="button" autofocus class="button primary">開始</button></div>
   </dialog>
+  <dialog id="connection-choice" aria-labelledby="connection-choice-title"><div class="modal-heading"><h2 id="connection-choice-title">選擇連線方式</h2><button id="connection-choice-close" type="button" class="icon-button" aria-label="關閉">×</button></div><p id="connection-choice-name"></p><div class="modal-actions"><button id="connection-choice-terminal" class="button" type="button">命令列</button><button id="connection-choice-desktop" class="button primary" type="button" autofocus>桌面</button></div></dialog>
   <script src="i18n.js"></script>
   <script src="tooltips.js"></script>
   <script src="app.js"></script>
   <script src="diagnostics.js"></script>
+
+
+  <script src="terminal.js"></script>
 </body>
 </html>

@@ -90,6 +90,10 @@ func runBackgroundDiagnostic(url, room, codec string, mode peertransport.Mode) e
 	})
 	defer worker.Close()
 	peer, err := p2p.NewViewerWithTransport(ctx, sig, mode, func(f p2p.Frame) { stats.received.Add(1); stats.wire.Store(uint32(f.Codec)); worker.Submit(f) }, func(c p2p.Control) {
+		if c.Type == "desktop-unavailable" {
+			fatal(fmt.Errorf("此裝置沒有桌面環境，請改用命令列連線。"))
+			return
+		}
 		if c.Type == "keyboard-capabilities" {
 			remoteVersion.Store(c.AppVersion)
 		}

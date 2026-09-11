@@ -71,6 +71,7 @@ let confirmAction = null;
 let groupDrag = null;
 let siteDrag = null;
 let sitePresence = {};
+const siteRecovery = new Map();
 let passwordReminderDismissed = false;
 let checkingPresence = false;
 let connectionWait = null;
@@ -143,7 +144,23 @@ function groupName(id) {
   return state.library.groups.find(group => group.id === id)?.name || i18n.t('未分組');
 }
 // 本機與遠端站台皆依 Server 實際註冊結果顯示在線狀態。
-function siteOnline(site) { return sitePresence[site?.id]; }
+function siteOnline(site) { const value=sitePresence[site?.id]; return value && typeof value==='object'?value.online:value; }
+function siteCapability(site,name) { return sitePresence[site?.id]?.capabilities?.[name]; }
+function applySiteCapabilities(card,site) {
+ const recovering=siteRecovery.has(site?.id);
+
+ for(const [name,label] of [['desktop','此裝置沒有桌面環境，請改用命令列連線。'],['terminal','對方尚未支援命令列，請更新對方的 YourDesk 後再試。']]){
+  const btn=card.querySelector(`[data-connect-mode="${name}"]`);if(!btn)continue;
+  const capability=siteCapability(site,name);
+  btn.disabled=capability===false||recovering;
+  btn.classList.toggle('mode-recovering',recovering&&capability!==false);
+  btn.setAttribute('aria-busy',String(recovering&&capability!==false));
+  const available=!recovering && capability===true && siteOnline(site)===true && !Object.hasOwn(state.running,`viewer:${site.id}`);
+  btn.classList.toggle('mode-available',available);
+  btn.dataset.tooltip=i18n.t(recovering?'等待遠端恢復連線…':btn.disabled?label:name==='desktop'?'開啟桌面':'開啟命令列');
+ }
+ const diagnostic=card.querySelector('[data-connect-mode="diagnostics"]');if(diagnostic)diagnostic.disabled=recovering||siteCapability(site,'desktop')===false;
+}
 function renderDevice() {
  $('#stop-incoming').hidden=!state.incomingConnected;
   const { info, running } = state;
@@ -193,10 +210,12 @@ function siteIconButton(icon, label, onClick, active = false) {
     speed: 'M4 18a9 9 0 1 1 16 0M12 13l5-5M5 13h2M12 5v2M17 13h2M10 18h4',
     delete: 'M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7',
     edit: 'M14 5l5 5M4 20l5-1L21 7l-5-5L4 14z',
-    connect: 'M13 4h7v7M20 4l-9 9M10 5H4v15h15v-6',
+    connect: 'M3 3h18v14H3zM12 17v4M8 21h8',
+    terminal: 'M3 4h18v16H3zM6 8l4 4-4 4M13 16h5',
     stop: 'M6 6h12v12H6z'
   }[icon]);
   svg.append(path); control.append(svg);
+  if (["connect","terminal","speed"].includes(icon)) control.dataset.connectMode=icon==="connect"?"desktop":icon==="speed"?"diagnostics":"terminal";
   return control;
 }
 function renderSites() {
@@ -219,9 +238,9 @@ function renderSites() {
     card.addEventListener('pointerdown', event => { card.draggable = !event.target.closest('button, input, a'); });
     card.addEventListener('dblclick', event => {
       if (event.target.closest('button, input, select, textarea, a') || siteDrag || busy || document.querySelector('dialog[open]')) return;
-      if (Object.hasOwn(state.running, `viewer:${site.id}`)) return;
+      if (siteRecovery.has(site.id)||Object.hasOwn(state.running, `viewer:${site.id}`)) return;
       event.preventDefault();
-      connect(site);
+      chooseConnection(site);
     });
     const header = text('div', '', 'card-header');
     const title = text('div', '', 'card-title');
@@ -241,12 +260,14 @@ function renderSites() {
     footer.append(
       siteIconButton('delete', i18n.t(`刪除 ${site.name}`), () => deleteSite(site)),
       siteIconButton('edit', i18n.t(`編輯 ${site.name}`), () => editSite(site)),
-      siteIconButton(active ? 'stop' : 'connect', active ? i18n.t('關閉 遠端顯示') : i18n.t('連線 ↗'), () => active ? stop(`viewer:${site.id}`) : connect(site), active)
+      siteIconButton('terminal', i18n.t('開啟命令列'), () => active ? toast(i18n.t('請先關閉目前連線。'),true) : connect(site,true)),
+      siteIconButton(active ? 'stop' : 'connect', active ? i18n.t('關閉連線') : i18n.t('開啟桌面'), () => active ? stop(`viewer:${site.id}`) : connect(site), active)
     );
     const note = text('p', site.note || '', 'card-note'); note.dataset.tooltip = site.note;
     const identity = text('div', '', 'card-id');
     identity.append(siteIconButton('speed', i18n.t('連線測速與分析'), () => openDiagnostics(site)), text('code', site.room));
     card.append(header, identity, note, footer);
+    applySiteCapabilities(card,site);
     $('#site-list').append(card);
   }
 }
@@ -312,6 +333,7 @@ async function startConnection(key, name, request) {
  catch(error) { failConnection(error.message); }
 }
 function failConnection(message) {
+ pendingTerminalSite=null;
  pendingDiagnosticSite=null;
  if(!connectionWait)return;
  connectionWait.failed=true;
@@ -325,13 +347,14 @@ function renderConnectionWait() {
  const {key}=connectionWait, session=state.sessions?.[key];
  const dialog=$('#connection-progress-dialog');
  if(state.passwordPrompt?.key===key){if(dialog.open)dialog.close();return;}
- if(session?.stage==='connected'){dialog.close();connectionWait=null;if(pendingDiagnosticSite && key===`viewer:${pendingDiagnosticSite.id}`){const site=pendingDiagnosticSite;pendingDiagnosticSite=null;openDiagnostics(site);}return;}
+ if(session?.stage==='connected'){dialog.close();connectionWait=null;if(pendingTerminalSite && key===`viewer:${pendingTerminalSite.id}`){const site=pendingTerminalSite;pendingTerminalSite=null;openTerminal(site);return;}if(pendingDiagnosticSite && key===`viewer:${pendingDiagnosticSite.id}`){const site=pendingDiagnosticSite;pendingDiagnosticSite=null;openDiagnostics(site);}return;}
  if(session?.error){failConnection(session.error);return;}
  if(!Object.hasOwn(state.running,key)){failConnection(state.notice||'遠端連線已結束，請確認網路與遠端裝置後重試。');return;}
- const labels={waiting:'等待遠端回應…',authenticating:'正在驗證密碼…',connecting:'正在啟動 遠端顯示，等待遠端畫面…'};
+ const labels={waiting:'等待遠端回應…',authenticating:'正在驗證密碼…',connecting:pendingTerminalSite?'正在準備命令列…':'正在啟動 遠端顯示，等待遠端畫面…'};
  $('#connection-progress-status').textContent=i18n.t(labels[session?.stage]||'正在建立安全連線…');
 }
 function cancelConnectionWait(){
+ pendingTerminalSite=null;
  pendingDiagnosticSite=null;
  if(!connectionWait)return;
  if(connectionWait.failed){$('#connection-progress-dialog').close();connectionWait=null;return;}
@@ -341,10 +364,14 @@ $('#connection-progress-dialog form').addEventListener('submit',event=>event.pre
 $('#connection-progress-cancel').addEventListener('click',cancelConnectionWait);
 $('#connection-progress-dialog').addEventListener('cancel',event=>{event.preventDefault();if(!busy)cancelConnectionWait();});
 
-function connect(site) {
+function connect(site,terminal=false) {
+ if(siteRecovery.has(site.id)){toast(i18n.t('等待遠端恢復連線…'));return;}
+ if(siteCapability(site,terminal?'terminal':'desktop')===false){toast(i18n.t(terminal?'對方尚未支援命令列，請更新對方的 YourDesk 後再試。':'此裝置沒有桌面環境，請改用命令列連線。'),true);return;}
   action(async () => {
+    pendingTerminalSite=terminal?site:null;
+    if(terminal)pendingDiagnosticSite=null;
     const saved = await api('remembered', 'POST', { id: site.id });
-    if (saved.remembered) { await startConnection(`viewer:${site.id}`,site.name,()=>api('viewer/start','POST',{id:site.id,diagnostics:pendingDiagnosticSite?.id===site.id})); return; }
+    if (saved.remembered) { await startConnection(`viewer:${site.id}`,site.name,()=>api('viewer/start','POST',{id:site.id,terminal,diagnostics:pendingDiagnosticSite?.id===site.id})); return; }
     $('#connect-form').reset();
     $('#connect-form').elements.id.value = site.id;
     $('#connect-name').textContent = site.name;
@@ -355,6 +382,18 @@ function connect(site) {
 
 async function updateRunning() {
   const latest = await api('state');
+  const now=Date.now();
+  for(const site of state.library.sites){
+   const key=`viewer:${site.id}`;
+   if(state.sessions?.[key]?.stage==='connected' && latest.sessions?.[key]?.stage!=='connected'){
+    siteRecovery.set(site.id,{readyAfter:now+3000,expires:now+15000});
+    setTimeout(refreshPresence,3100);
+   }
+  }
+  for(const [id,recovery] of siteRecovery){
+   if(now>=recovery.expires)siteRecovery.delete(id);
+  }
+
   const changed = JSON.stringify(state.running) !== JSON.stringify(latest.running);
   const codecsChanged = JSON.stringify(state.videoCapabilities) !== JSON.stringify(latest.videoCapabilities) || state.hardwareJPEG !== latest.hardwareJPEG;
   const srChanged=JSON.stringify(state.superResolutionCapabilities)!==JSON.stringify(latest.superResolutionCapabilities);
@@ -383,6 +422,7 @@ async function updateRunning() {
   lastNotice = latest.notice;
   renderDevice();
   if (changed) renderSites();
+  document.querySelectorAll('.site-card').forEach(card=>applySiteCapabilities(card,state.library.sites.find(site=>site.id===card.dataset.siteId)));
   renderQuick();
 }
 function stop(key) {
@@ -476,6 +516,7 @@ $('#connect-form').addEventListener('submit', event => {
   action(async () => {
     const form = event.target;
     const payload={id:form.elements.id.value,secret:form.elements.secret.value,remember:form.elements.remember.checked};
+    payload.terminal=pendingTerminalSite?.id===payload.id;
     payload.diagnostics=pendingDiagnosticSite?.id===payload.id;
     await startConnection(`viewer:${payload.id}`,$('#connect-name').textContent,()=>api('viewer/start','POST',payload));
   });
@@ -567,6 +608,7 @@ function applyPreferences(preferences) {
   $('#ui-hints').checked = !values.disableHints;
  $('#ui-key-mapping').checked=!values.disableKeyMapping;
  $('#ui-fit-window').checked=!!values.fitWindow;
+ $('#ui-close-on-disconnect').checked=!!values.closeWindowOnDisconnect;
  $('#ui-enhancement').checked=!!values.imageEnhancement;
  $('#ui-interpolation').checked=!!values.interpolation;
  $('#ui-interpolation-method').value=values.interpolationMethod||'';
@@ -620,7 +662,7 @@ async function savePreferences() {
  for(const id of ['#ui-source-fps','#ui-bitrate-limit','#ui-gop']){if(!$(id).checkValidity()){$(id).reportValidity();return}}
   const previous = state.preferences;
  if(!$('#ui-enhancement-budget').checkValidity()){$('#ui-enhancement-budget').reportValidity();return}
-	const preferences = { tailcatEnabled:$('#tailcat-mode').checked, mcpOpenDisplay:$('#ui-mcp-open-display').checked, mcpWhitelistEnabled:$('#ui-mcp-whitelist-enabled').checked, mcpWhitelist:[...new Set($('#ui-mcp-whitelist').value.split(/\r?\n/).map(v=>v.trim()).filter(Boolean))], mcpEnabled:$('#ui-mcp-enabled').checked, fitWindow:$('#ui-fit-window').checked, sourceFPSLimit:Number($('#ui-source-fps').value), bitrateLimitMbps:Number($('#ui-bitrate-limit').value), keyframeInterval:Number($('#ui-gop').value), interpolation: $('#ui-interpolation').checked, interpolationMethod: $('#ui-interpolation-method').value, coreMLModel: $('#ui-coreml-model').value || 'quicksrnet-small', enhancementStrategy: $('#ui-enhancement-strategy').value, enhancementBitrateMbps: Number($('#ui-enhancement-budget').value), superResolution: $('#ui-super-resolution').value, imageEnhancement: $('#ui-enhancement').checked, language: $('#ui-language').value, theme: $('#ui-theme').value, codec: $('#stream-codec').value, disableHints: !$('#ui-hints').checked, disableKeyMapping:!$('#ui-key-mapping').checked, directListen: $('#direct-listen').checked };
+	const preferences = { tailcatEnabled:$('#tailcat-mode').checked, mcpOpenDisplay:$('#ui-mcp-open-display').checked, mcpWhitelistEnabled:$('#ui-mcp-whitelist-enabled').checked, mcpWhitelist:[...new Set($('#ui-mcp-whitelist').value.split(/\r?\n/).map(v=>v.trim()).filter(Boolean))], mcpEnabled:$('#ui-mcp-enabled').checked, fitWindow:$('#ui-fit-window').checked, closeWindowOnDisconnect:$('#ui-close-on-disconnect').checked, sourceFPSLimit:Number($('#ui-source-fps').value), bitrateLimitMbps:Number($('#ui-bitrate-limit').value), keyframeInterval:Number($('#ui-gop').value), interpolation: $('#ui-interpolation').checked, interpolationMethod: $('#ui-interpolation-method').value, coreMLModel: $('#ui-coreml-model').value || 'quicksrnet-small', enhancementStrategy: $('#ui-enhancement-strategy').value, enhancementBitrateMbps: Number($('#ui-enhancement-budget').value), superResolution: $('#ui-super-resolution').value, imageEnhancement: $('#ui-enhancement').checked, language: $('#ui-language').value, theme: $('#ui-theme').value, codec: $('#stream-codec').value, disableHints: !$('#ui-hints').checked, disableKeyMapping:!$('#ui-key-mapping').checked, directListen: $('#direct-listen').checked };
   $('#ui-mcp-whitelist-enabled').disabled=true;$('#ui-mcp-whitelist').disabled=true;
  $('#ui-mcp-enabled').disabled=true;
  $('#ui-language').disabled = true;
@@ -660,6 +702,7 @@ $('#ui-theme').addEventListener('change', savePreferences);
 $('#ui-hints').addEventListener('change', savePreferences);
 $('#ui-key-mapping').addEventListener('change',savePreferences);
 $('#ui-fit-window').addEventListener('change',savePreferences);
+$('#ui-close-on-disconnect').addEventListener('change',savePreferences);
  $('#ui-enhancement').addEventListener('change',savePreferences);
  $('#ui-interpolation').addEventListener('change',savePreferences);
  $('#ui-interpolation-method').addEventListener('change',savePreferences);
@@ -783,11 +826,18 @@ siteList.addEventListener('dragend', () => { clearSiteDrag(); if (state) renderS
 async function refreshPresence() {
   if (!state || checkingPresence || document.hidden) return;
   checkingPresence = true;
+  const requestedAt=Date.now();
   try { sitePresence = await api('presence'); }
   catch { sitePresence = {}; }
   finally { checkingPresence = false; }
+  for(const [id,recovery] of siteRecovery){
+   const site=state.library.sites.find(site=>site.id===id);
+   if(Date.now()>=recovery.expires || (requestedAt>=recovery.readyAfter && siteOnline(site)===true))siteRecovery.delete(id);
+  }
   // 僅更新圖示，避免干擾拖拉或鍵盤焦點。
   document.querySelectorAll('.site-card').forEach(card => {
+    const site=state.library.sites.find(site=>site.id===card.dataset.siteId);
+    applySiteCapabilities(card,site);
     const icon = card.querySelector('.mini-device');
     const online = siteOnline(state.library.sites.find(site => site.id === card.dataset.siteId));
     icon.classList.toggle('online', online === true);

@@ -20,9 +20,11 @@ import (
 	"yourdesk/internal/p2p"
 	"yourdesk/internal/peertransport"
 	"yourdesk/internal/rawkey"
+	"yourdesk/internal/remotedata"
 	"yourdesk/internal/signaling"
 	"yourdesk/internal/streamconfig"
 	"yourdesk/internal/streampipeline"
+	"yourdesk/internal/terminal"
 	"yourdesk/internal/video"
 )
 
@@ -31,8 +33,10 @@ var incomingPeer atomic.Pointer[p2p.Peer]
 var activeSession atomic.Bool
 
 type Options struct {
+	Headless              bool
 	Version               string
 	DisableClipboard      bool
+	DisableRemoteData     bool
 	PrimaryDisplayOnly    bool
 	OnState               func(string)
 	Transport             peertransport.Mode
@@ -41,6 +45,9 @@ type Options struct {
 }
 
 func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
+	if options.Headless {
+		return commandSession(ctx, sig, options)
+	}
 	switch video.Codec(options.Codec) {
 	case video.CodecAuto, video.CodecHardwareH264, video.CodecHardwareHEVC, video.CodecSoftwareH264, video.CodecHardwareJPEG, video.CodecSoftwareJPEG:
 	default:
@@ -121,7 +128,9 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 		clipboardSync = clipboard.New()
 	}
 	var recovery atomic.Uint64
+	var lastKeyframeRequest atomic.Int64
 	var fullFrameRequested atomic.Bool
+	var terminalActive atomic.Bool
 	var authorized atomic.Bool
 	peer, err := p2p.NewHostWithTransport(ctx, sig, options.Transport, func(c p2p.Control) {
 		if c.Type == "video-capabilities" {
@@ -303,6 +312,38 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 	}()
 	configPeer.Store(peer)
 	authorized.Store(true)
+	if !options.DisableRemoteData {
+		remotedata.Register(peer, authorized.Load)
+		terminal.Register(peer, authorized.Load, terminalActive.Store)
+	}
+	_ = peer.RegisterCommand("input.reset", func(commandCtx context.Context) (any, error) {
+		displayMu.Lock()
+		defer displayMu.Unlock()
+		if err := commandCtx.Err(); err != nil {
+			return nil, err
+		}
+		if !authorized.Load() {
+			return nil, fmt.Errorf("工作階段已結束")
+		}
+		releaseInput()
+		return map[string]bool{"released": true}, nil
+	})
+	_ = peer.RegisterCommand("video.keyframe", func(commandCtx context.Context) (any, error) {
+		if err := commandCtx.Err(); err != nil {
+			return nil, err
+		}
+		if !authorized.Load() {
+			return nil, fmt.Errorf("工作階段已結束")
+		}
+		now := time.Now().UnixMilli()
+		previous := lastKeyframeRequest.Load()
+		if now-previous < 1000 || !lastKeyframeRequest.CompareAndSwap(previous, now) {
+			return map[string]bool{"accepted": true, "coalesced": true}, nil
+		}
+		fullFrameRequested.Store(true)
+		recovery.Add(1)
+		return map[string]bool{"accepted": true}, nil
+	})
 	if !options.DisableClipboard {
 		go clipboardSync.Run(ctx, peer)
 	}
@@ -381,6 +422,16 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 	var captureEpoch atomic.Uint64
 	var encodedEpoch, encodedRecovery uint64
 	captureStage := func(stageCtx context.Context) (capturedFrame, error) {
+		if terminalActive.Load() {
+			select {
+			case <-peer.Done():
+				return capturedFrame{}, io.EOF
+			case <-stageCtx.Done():
+				return capturedFrame{}, stageCtx.Err()
+			case <-time.After(100 * time.Millisecond):
+				return capturedFrame{}, streampipeline.Skip
+			}
+		}
 		select {
 		case <-stageCtx.Done():
 			return capturedFrame{}, stageCtx.Err()

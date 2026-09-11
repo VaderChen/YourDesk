@@ -3,6 +3,7 @@ module yourdesk
 go 1.27.1
 
 require (
+	github.com/creack/pty v1.1.24
 	github.com/coder/websocket v1.8.14
 	github.com/hajimehoshi/ebiten/v2 v2.9.3
 	github.com/kbinani/screenshot v0.0.0-20250624051815-089614a94018
@@ -21,7 +22,6 @@ require (
 	github.com/akutz/memconn v0.1.0 // indirect
 	github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be // indirect
 	github.com/creachadair/msync v0.8.1 // indirect
-	github.com/creack/pty v1.1.24 // indirect
 	github.com/dblohm7/wingoes v0.0.0-20240119213807-a09d6be7affa // indirect
 	github.com/ebitengine/gomobile v0.0.0-20250923094054-ea854a63cce1 // indirect
 	github.com/ebitengine/hideconsole v1.0.0 // indirect

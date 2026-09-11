@@ -39,7 +39,7 @@ func dialHTTPS(ctx context.Context, address, room string, role Role, secret []by
 	}
 	// 不將工作階段權杖或簽署封包跟隨重新導向傳往其他站台。
 	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	join, err := NewEnvelope(room, role, KindJoin, nil, secret)
+	join, err := NewEnvelope(room, role, KindJoin, joinPayload(ctx, role), secret)
 	if err != nil {
 		return nil, err
 	}

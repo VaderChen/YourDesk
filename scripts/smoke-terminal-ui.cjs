@@ -1,0 +1,25 @@
+const {chromium}=require(process.env.YOURDESK_PLAYWRIGHT_MODULE || 'playwright');
+const fs=require('fs');
+(async()=>{
+ const browser=await chromium.launch({executablePath:process.env.YOURDESK_SMOKE_BROWSER,headless:true});
+ const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ const root=require('path').resolve(__dirname,'../internal/clientui/web');
+ await page.setContent('<dialog id="connection-choice"><h2 id="connection-choice-name"></h2><button id="connection-choice-close">close</button><button id="connection-choice-desktop">desktop</button><button id="connection-choice-terminal">terminal</button></dialog><dialog id="terminal-dialog"><h2 id="terminal-title"></h2><button id="terminal-close">close</button><p id="terminal-status"></p><div id="terminal-screen" style="width:750px;height:400px"></div></dialog>');
+ await page.addStyleTag({path:root+'/vendor/xterm.css'});
+ await page.addScriptTag({path:root+'/vendor/xterm.js'});await page.addScriptTag({path:root+'/vendor/addon-fit.js'});
+ await page.evaluate(()=>{window.$=s=>document.querySelector(s);window.i18n={t:s=>s};window.openDialog=s=>$(s).showModal();window.siteCapability=(site,key)=>site.capabilities?.[key];window.choices=[];window.connect=(s,t)=>choices.push(t);window.calls=[];window.api=async(path,method,body)=>{calls.push({path,...body});if(body.action==='read'){await new Promise(r=>setTimeout(r,10));return body.params.ack?{sequence:1,data:null}:{sequence:1,data:btoa(unescape(encodeURIComponent('\x1b[32mSMOKE 繁體中文 ✓\x1b[0m\r\n')))}}return {ok:true}}});
+ await page.addScriptTag({path:root+'/terminal.js'});
+ await page.evaluate(()=>chooseConnection({id:'s',name:'本機測試'}));await page.click('#connection-choice-terminal');
+ if(!(await page.evaluate(()=>choices[0]===true)))throw Error('選擇命令列未連線');
+ await page.evaluate(()=>chooseConnection({id:'s',name:'本機測試'}));await page.click('#connection-choice-desktop');
+ if(!(await page.evaluate(()=>choices[1]===false)))throw Error('選擇桌面未連線');
+ await page.evaluate(()=>chooseConnection({id:'h',name:'Linux Server',capabilities:{desktop:false,terminal:true}}));
+ if(!(await page.locator('#connection-choice-desktop').isDisabled()))throw Error('無桌面按鈕未停用');
+ if(await page.locator('#connection-choice-terminal').isDisabled())throw Error('命令列誤停用');
+ await page.click('#connection-choice-close');
+ await page.evaluate(()=>openTerminal({id:'s',name:'本機測試'}));
+ if(!(await page.evaluate(()=>calls.some(c=>c.path==='terminal/window'&&c.session==='viewer:s'))))throw Error('未請求獨立視窗');
+ if(errors.length)throw Error(errors.join('\n'));
+ console.log('PASS: 連線方式選擇、無桌面能力停用、獨立終端機視窗請求。');
+ await browser.close();
+})().catch(e=>{console.error(e);process.exit(1)});

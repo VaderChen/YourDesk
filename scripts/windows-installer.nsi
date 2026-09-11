@@ -84,7 +84,7 @@ Section "YourDesk"
  File "${PAYLOAD_DIR}/yourdesk-remote.exe"
  File /r "${PAYLOAD_DIR}/ThirdPartyLicenses"
  File "${PAYLOAD_DIR}/README.txt"
- File "${PAYLOAD_DIR}/使用說明.txt"
+ Delete "$INSTDIR\使用說明.txt"
  ${If} ${Errors}
   SetErrorLevel 3
   Abort

@@ -14,10 +14,14 @@ func (s *server) servePresence(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	sites := append([]Site(nil), s.library.Sites...)
 	s.mu.Unlock()
-	states := make(map[string]*bool, len(sites))
+	type presence struct {
+		Online       *bool                       `json:"online"`
+		Capabilities *signaling.HostCapabilities `json:"capabilities,omitempty"`
+	}
+	states := make(map[string]presence, len(sites))
 	groups := make(map[string][]Site)
 	for _, site := range sites {
-		states[site.ID] = nil
+		states[site.ID] = presence{}
 		if _, direct := signaling.DirectAddress(site.Room); direct {
 			continue
 		}
@@ -49,12 +53,17 @@ func (s *server) servePresence(w http.ResponseWriter, r *http.Request) {
 				for _, site := range batch {
 					rooms = append(rooms, site.Room)
 				}
-				body, _ := json.Marshal(map[string]any{"rooms": rooms})
+				body, _ := json.Marshal(map[string]any{"rooms": rooms, "details": true})
 				response, err := security.SignalHTTPRequest(r.Context(), client, signal, "POST", "/presence", body)
 				if err != nil {
-					return
+					// 舊 Server 可能拒絕 details；共用 HTTP 層已關閉失敗回應。
+					body, _ = json.Marshal(map[string]any{"rooms": rooms})
+					response, err = security.SignalHTTPRequest(r.Context(), client, signal, "POST", "/presence", body)
+					if err != nil {
+						return
+					}
 				}
-				var result map[string]bool
+				var result map[string]json.RawMessage
 				if response.StatusCode == 200 {
 					err = json.NewDecoder(io.LimitReader(response.Body, 1024*1024)).Decode(&result)
 				}
@@ -65,8 +74,18 @@ func (s *server) servePresence(w http.ResponseWriter, r *http.Request) {
 				mu.Lock()
 				for _, site := range batch {
 					if value, ok := result[site.Room]; ok {
-						online := value
-						states[site.ID] = &online
+						var item presence
+						if json.Unmarshal(value, &item) != nil {
+							var online bool
+							if json.Unmarshal(value, &online) != nil {
+								continue
+							}
+							item.Online = &online
+						}
+						if item.Capabilities != nil && item.Capabilities.Schema != 1 {
+							item.Capabilities = nil
+						}
+						states[site.ID] = item
 					}
 				}
 				mu.Unlock()
