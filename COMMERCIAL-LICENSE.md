@@ -13,7 +13,7 @@ YourDesk 現行版本採用[原始碼公開・禁止商業販售授權](LICENSE.
 
 ## English
 
-YourDesk uses the [source-available, no-commercial-sales license](LICENSE.en.md). Non-sale use, modification and free sharing, including internal business use, are allowed. Software sales, paid hosting/SaaS, paid remote services, paid product integration, and charges for installation, customization, support or maintenance are prohibited. 
+YourDesk uses the [source-available, no-commercial-sales license](LICENSE.en.md). Non-sale use, modification and free sharing, including internal business use, are allowed. Software sales, paid hosting/SaaS, paid remote services, paid product integration, and charges for installation, customization, support or maintenance are prohibited.
 
 If you intend to sell or integrate the Software, contact the copyright holder to discuss the scope and terms of a separate license.
 
@@ -37,7 +37,7 @@ YourDesk は[ソース公開・商業販売禁止ライセンス](LICENSE.ja.md)
 
 ## 한국어
 
-YourDesk는 [소스 공개·상업적 판매 금지 라이선스](LICENSE.ko.md)를 적용합니다. 기업 내부 사용을 포함한 비판매 사용, 수정 및 무료 공유를 허용합니다. 소프트웨어 판매, 유료 호스팅/SaaS, 유료 원격 서비스, 유료 제품 통합 및 설치, 맞춤 개발, 지원, 유지보수에 대한 요금 부과는 금지합니다. 
+YourDesk는 [소스 공개·상업적 판매 금지 라이선스](LICENSE.ko.md)를 적용합니다. 기업 내부 사용을 포함한 비판매 사용, 수정 및 무료 공유를 허용합니다. 소프트웨어 판매, 유료 호스팅/SaaS, 유료 원격 서비스, 유료 제품 통합 및 설치, 맞춤 개발, 지원, 유지보수에 대한 요금 부과는 금지합니다.
 
 소프트웨어의 판매 또는 통합을 희망하는 경우 저작권자와 별도 라이선스의 범위 및 조건을 논의하세요.
 
