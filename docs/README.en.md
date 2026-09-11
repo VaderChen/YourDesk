@@ -88,4 +88,4 @@ If YourDesk is useful to you, consider buying me a coffee to support continued d
 
 Copyright (C) 2026 VaderChen.
 
-This project is dual-licensed: open-source use is governed by [GNU GPL v3.0 only](../LICENSE) (`GPL-3.0-only`); alternative terms are available through a separate [commercial license](../COMMERCIAL-LICENSE.md). Third-party components retain their respective licenses.
+This project uses a custom [source-available, no-commercial-sales license](../LICENSE). Non-sale use, modification and free sharing, including internal business use, are permitted. Selling, paid hosting/SaaS, paid services and integration into paid products are prohibited; no separate commercial sales license is offered. Third-party components retain their respective licenses. This is not an OSI open-source license. The Traditional Chinese LICENSE is authoritative.
