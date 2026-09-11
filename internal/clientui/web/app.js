@@ -579,6 +579,8 @@ function applyPreferences(preferences) {
  $('#ui-enhancement-budget').value=values.enhancementBitrateMbps||12;
  renderEnhancementStrategy();
 	$('#direct-listen').checked = !!values.directListen;
+ $('#tailcat-mode').checked = !!values.tailcatEnabled;
+ $('#transport-summary').textContent=i18n.t(values.tailcatEnabled?'WebRTC / Tailcat 虛擬傳輸':'WebRTC / 自動協商');
  renderPrelogin();
   hints.setEnabled(!values.disableHints);
   refreshCodecOptions(values.codec);
@@ -618,7 +620,7 @@ async function savePreferences() {
  for(const id of ['#ui-source-fps','#ui-bitrate-limit','#ui-gop']){if(!$(id).checkValidity()){$(id).reportValidity();return}}
   const previous = state.preferences;
  if(!$('#ui-enhancement-budget').checkValidity()){$('#ui-enhancement-budget').reportValidity();return}
-	const preferences = { mcpOpenDisplay:$('#ui-mcp-open-display').checked, mcpWhitelistEnabled:$('#ui-mcp-whitelist-enabled').checked, mcpWhitelist:[...new Set($('#ui-mcp-whitelist').value.split(/\r?\n/).map(v=>v.trim()).filter(Boolean))], mcpEnabled:$('#ui-mcp-enabled').checked, fitWindow:$('#ui-fit-window').checked, sourceFPSLimit:Number($('#ui-source-fps').value), bitrateLimitMbps:Number($('#ui-bitrate-limit').value), keyframeInterval:Number($('#ui-gop').value), interpolation: $('#ui-interpolation').checked, interpolationMethod: $('#ui-interpolation-method').value, coreMLModel: $('#ui-coreml-model').value || 'quicksrnet-small', enhancementStrategy: $('#ui-enhancement-strategy').value, enhancementBitrateMbps: Number($('#ui-enhancement-budget').value), superResolution: $('#ui-super-resolution').value, imageEnhancement: $('#ui-enhancement').checked, language: $('#ui-language').value, theme: $('#ui-theme').value, codec: $('#stream-codec').value, disableHints: !$('#ui-hints').checked, disableKeyMapping:!$('#ui-key-mapping').checked, directListen: $('#direct-listen').checked };
+	const preferences = { tailcatEnabled:$('#tailcat-mode').checked, mcpOpenDisplay:$('#ui-mcp-open-display').checked, mcpWhitelistEnabled:$('#ui-mcp-whitelist-enabled').checked, mcpWhitelist:[...new Set($('#ui-mcp-whitelist').value.split(/\r?\n/).map(v=>v.trim()).filter(Boolean))], mcpEnabled:$('#ui-mcp-enabled').checked, fitWindow:$('#ui-fit-window').checked, sourceFPSLimit:Number($('#ui-source-fps').value), bitrateLimitMbps:Number($('#ui-bitrate-limit').value), keyframeInterval:Number($('#ui-gop').value), interpolation: $('#ui-interpolation').checked, interpolationMethod: $('#ui-interpolation-method').value, coreMLModel: $('#ui-coreml-model').value || 'quicksrnet-small', enhancementStrategy: $('#ui-enhancement-strategy').value, enhancementBitrateMbps: Number($('#ui-enhancement-budget').value), superResolution: $('#ui-super-resolution').value, imageEnhancement: $('#ui-enhancement').checked, language: $('#ui-language').value, theme: $('#ui-theme').value, codec: $('#stream-codec').value, disableHints: !$('#ui-hints').checked, disableKeyMapping:!$('#ui-key-mapping').checked, directListen: $('#direct-listen').checked };
   $('#ui-mcp-whitelist-enabled').disabled=true;$('#ui-mcp-whitelist').disabled=true;
  $('#ui-mcp-enabled').disabled=true;
  $('#ui-language').disabled = true;
@@ -629,6 +631,7 @@ async function savePreferences() {
  $('#ui-source-fps').disabled=true;$('#ui-bitrate-limit').disabled=true;$('#ui-gop').disabled=true;$('#ui-interpolation').disabled=true;$('#ui-interpolation-method').disabled=true;$('#ui-enhancement').disabled=true;$('#ui-super-resolution').disabled=true;$('#ui-coreml-model').disabled=true;$('#ui-enhancement-strategy').disabled=true;$('#ui-enhancement-budget').disabled=true;
   $('#stream-codec').disabled = true;
 	$('#direct-listen').disabled = true;
+ $('#tailcat-mode').disabled = true;
   await action(async () => {
     try {
       await api('preferences', 'PUT', preferences);
@@ -646,6 +649,7 @@ async function savePreferences() {
  $('#ui-source-fps').disabled=false;$('#ui-bitrate-limit').disabled=false;$('#ui-gop').disabled=false;$('#ui-interpolation').disabled=false;renderInterpolationSupport();$('#ui-enhancement').disabled=false;$('#ui-super-resolution').disabled=false;$('#ui-coreml-model').disabled=false;$('#ui-enhancement-strategy').disabled=false;$('#ui-enhancement-budget').disabled=false;
   $('#stream-codec').disabled = false;
 	$('#direct-listen').disabled = false;
+ $('#tailcat-mode').disabled = false;
 }
 $('#ui-mcp-whitelist-enabled').addEventListener('change',savePreferences);
 $('#ui-mcp-whitelist').addEventListener('change',savePreferences);
@@ -1032,6 +1036,7 @@ function renderInterpolationSupport(){
 
 let streamAutoRun = null;
 function setStreamAutoStep(index, progress, message) {
+ $('#stream-auto-hint').hidden = index >= 2;
  $('#stream-auto-progress').value = progress;
  $('#stream-auto-message').textContent = message;
  [...$('#stream-auto-steps').children].forEach((step,i)=>{
@@ -1041,13 +1046,25 @@ function setStreamAutoStep(index, progress, message) {
 }
 function closeStreamAuto() {
  if(streamAutoRun?.applying) return;
- if(streamAutoRun) streamAutoRun.cancelled=true;
+ if(streamAutoRun) { streamAutoRun.cancelled=true; streamAutoRun.resolveStart?.(false); streamAutoRun.resolveApply?.(false); }
  $('#stream-auto-dialog').close();
 }
 $('#stream-auto-close').addEventListener('click',closeStreamAuto);
 $('#stream-auto-cancel').addEventListener('click',closeStreamAuto);
 $('#stream-auto-dialog').addEventListener('cancel',event=>{event.preventDefault();closeStreamAuto();});
-$('#stream-auto-dialog').addEventListener('close',()=>{if(streamAutoRun&&!streamAutoRun.applying)streamAutoRun.cancelled=true;});
+$('#stream-auto-dialog').addEventListener('close',()=>{if(streamAutoRun&&!streamAutoRun.applying){streamAutoRun.cancelled=true;streamAutoRun.resolveStart?.(false); streamAutoRun.resolveApply?.(false);}});
+$('#stream-auto-start').addEventListener('click',()=>{
+ const run=streamAutoRun;
+ if(!run?.resolveStart||run.cancelled)return;
+ $('#stream-auto-start').hidden=true;
+ run.resolveStart(true);run.resolveStart=null;
+});
+$('#stream-auto-apply').addEventListener('click',()=>{
+ const run=streamAutoRun;
+ if(!run?.resolveApply||run.cancelled)return;
+ $('#stream-auto-apply').hidden=true;
+ run.resolveApply(true);run.resolveApply=null;
+});
 async function autoConfigureStream(mode) {
  if (busy || streamAutoRun) return;
  const run={cancelled:false,applying:false};streamAutoRun=run;
@@ -1057,12 +1074,25 @@ async function autoConfigureStream(mode) {
  $('#stream-auto-message').dataset.error='false';
  $('#stream-auto-result').replaceChildren();
  $('#stream-auto-cancel').textContent=i18n.t('取消');
- setStreamAutoStep(0,0,i18n.t('確認遠端連線'));
+ $('#stream-auto-start').hidden=false;
+ $('#stream-auto-apply').hidden=true;
+ setStreamAutoStep(-1,0,i18n.t('準備好後，請按「開始」。'));
+ const ready=new Promise(resolve=>{run.resolveStart=resolve;});
  openDialog('#stream-auto-dialog');
+ $('#stream-auto-start').focus({preventScroll:true});
+ const started=await ready;
+ run.resolveStart=null;
+ if(!started||run.cancelled){
+  streamAutoRun=null;
+  buttons.forEach(button=>button.disabled=false);
+  return;
+ }
+ setStreamAutoStep(0,0,i18n.t('確認遠端連線'));
  await action(async()=>{
   try {
    const id=typeof diagnosticSite!=='undefined' && diagnosticSite && Object.hasOwn(state.running,`viewer:${diagnosticSite.id}`) ? diagnosticSite.id : '';
    let result=await api('stream-auto','POST',{mode,id});
+   run.probe={mode,id:result.id,startedAt:result.startedAt};
    const deadline=performance.now()+24000;
    while(result.pending) {
     if(run.cancelled)return;
@@ -1083,6 +1113,13 @@ async function autoConfigureStream(mode) {
    add('GOP（關鍵影格間隔）',String(result.preferences.keyframeInterval));
    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
    if(run.cancelled)return;
+   setStreamAutoStep(3,85,i18n.t('偵測完成，按「套用」才會變更設定。'));
+   const lastStep=$('#stream-auto-steps').lastElementChild;
+   lastStep.dataset.state='waiting';lastStep.removeAttribute('aria-current');
+   $('#stream-auto-apply').hidden=false;
+   const confirmed=await new Promise(resolve=>{run.resolveApply=resolve;});
+   run.resolveApply=null;
+   if(!confirmed||run.cancelled)return;
    run.applying=true;
    $('#stream-auto-close').disabled=true;$('#stream-auto-cancel').disabled=true;
    setStreamAutoStep(3,90,i18n.t('套用並儲存設定'));
@@ -1098,6 +1135,8 @@ async function autoConfigureStream(mode) {
   } catch(error) {
    if(!run.cancelled){$('#stream-auto-message').dataset.error='true';$('#stream-auto-message').textContent=i18n.t(error.message);}
   } finally {
+   $('#stream-auto-apply').hidden=true;
+   if(run.probe) { try { await api('stream-auto','POST',{...run.probe,cancel:true}); } catch {} }
    run.applying=false;
    $('#stream-auto-close').disabled=false;$('#stream-auto-cancel').disabled=false;
    $('#stream-auto-cancel').textContent=i18n.t('關閉');
@@ -1132,7 +1171,7 @@ function renderPrelogin() {
  toggle.disabled=!service?.supported||!!service?.busy;
  const row=toggle.closest('.preference-row');
  row.classList.toggle('experimental-unavailable',toggle.disabled);
- row.dataset.tooltip=i18n.t(service?.message||'此平台尚未提供未登入連線服務。');
+ row.dataset.tooltip=i18n.t(service?.message||'這台電腦目前不支援登入前連線。');
  $('#prelogin-access-reason').textContent=row.dataset.tooltip;
  $('#prelogin-progress').textContent=service?.busy ? i18n.t(service.message) : '';
  if (!service?.busy && preloginWasBusy && service?.message) toast(i18n.t(service.message),false,{warning:true,duration:15000});
@@ -1151,3 +1190,5 @@ $('#stop-incoming').addEventListener('click',()=>action(async()=>{
  try {await api('incoming/disconnect','POST',{});await updateRunning();}
  finally {button.disabled=false;}
 }));
+
+$('#tailcat-mode').addEventListener('change',savePreferences);

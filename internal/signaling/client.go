@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/coder/websocket"
@@ -18,7 +19,7 @@ var ErrHostOccupied = errors.New("此裝置已有另一個 Host 連線")
 
 type Client struct {
 	binding string
-	conn    *websocket.Conn
+	conn    clientConnection
 	room    string
 	role    Role
 	secret  []byte
@@ -26,10 +27,19 @@ type Client struct {
 	ResolveSecret func(context.Context) ([]byte, error)
 }
 
+type clientConnection interface {
+	Read(context.Context) (websocket.MessageType, []byte, error)
+	Write(context.Context, websocket.MessageType, []byte) error
+	Close(websocket.StatusCode, string) error
+}
+
 func Dial(ctx context.Context, url, room string, role Role, secret []byte) (*Client, error) {
 	secureURL, err := security.SecureSignalURL(url)
 	if err != nil {
 		return nil, err
+	}
+	if strings.HasPrefix(secureURL, "https://") {
+		return dialHTTPS(ctx, secureURL, room, role, secret)
 	}
 	client, err := security.TLSHTTPClient(0)
 	if err != nil {
@@ -38,14 +48,28 @@ func Dial(ctx context.Context, url, room string, role Role, secret []byte) (*Cli
 	transport := client.Transport.(*http.Transport)
 	transport.ForceAttemptHTTP2 = false
 	transport.TLSNextProto = map[string]func(string, *tls.Conn) http.RoundTripper{}
-	conn, resp, err := websocket.Dial(ctx, secureURL, &websocket.DialOptions{HTTPClient: client, HTTPHeader: http.Header{"Origin": []string{"https://yourdesk.local"}}})
+	dialCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	conn, resp, err := websocket.Dial(dialCtx, secureURL, &websocket.DialOptions{HTTPClient: client, HTTPHeader: http.Header{"Origin": []string{"https://yourdesk.local"}}})
+	cancel()
 	if err != nil {
+		client.CloseIdleConnections()
+		if ctx.Err() == nil {
+			fallback, fallbackErr := security.SignalHTTPSURL(secureURL)
+			if fallbackErr == nil {
+				var result *Client
+				result, fallbackErr = dialHTTPS(ctx, fallback, room, role, secret)
+				if fallbackErr == nil {
+					return result, nil
+				}
+			}
+			return nil, fmt.Errorf("WSS 連線失敗：%v；HTTPS 備援失敗：%w", err, fallbackErr)
+		}
 		if resp != nil {
 			return nil, fmt.Errorf("連接 signaling (%s): %w", resp.Status, err)
 		}
 		return nil, fmt.Errorf("連接 signaling: %w", err)
 	}
-	authlog.Event("signaling-connected", map[string]any{"role": role})
+	authlog.Event("signaling-connected", map[string]any{"role": role, "transport": "wss"})
 	c := &Client{conn: conn, room: room, role: role, secret: secret}
 	join, err := NewEnvelope(room, role, KindJoin, nil, secret)
 	if err != nil {

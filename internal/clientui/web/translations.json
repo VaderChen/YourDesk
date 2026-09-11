@@ -5,9 +5,9 @@
     "IP 직접 연결 허용"
   ],
   "預設關閉。啟用後才會在 TCP 47823 接受通過密碼驗證的直連。": [
-    "Off by default. When enabled, TCP 47823 accepts only password-authenticated direct connections.",
-    "標準では無効です。有効にすると、TCP 47823 でパスワード認証済みの直接接続のみ受け付けます。",
-    "기본값은 꺼짐입니다. 활성화하면 TCP 47823에서 비밀번호 인증을 통과한 직접 연결만 허용합니다."
+    "Allow connections to this computer using its IP address and password.",
+    "IP アドレスと接続パスワードで、このパソコンに接続できます。",
+    "IP 주소와 연결 비밀번호로 이 컴퓨터에 연결할 수 있습니다."
   ],
   "貼上遠端 ID 或 IP": [
     "Paste remote ID or IP",
@@ -125,9 +125,9 @@
     "어둡게"
   ],
   "AUTO 跟隨系統語言；預設風格跟隨系統明暗模式。設定會自動儲存。": [
-    "AUTO uses the system language. Default appearance follows the system theme. Changes are saved automatically.",
-    "AUTO はシステム言語、デフォルトの外観はシステムの明暗設定に従います。変更は自動保存されます。",
-    "AUTO는 시스템 언어를, 기본 스타일은 시스템 테마를 따릅니다. 변경 사항은 자동 저장됩니다."
+    "Follow your system language and appearance. Changes save automatically.",
+    "言語と外観をシステムに合わせ、自動保存します。",
+    "시스템 언어와 테마를 따르며 자동 저장됩니다."
   ],
   "本機資訊": [
     "Device information",
@@ -435,9 +435,9 @@
     "호스트 비밀번호 입력"
   ],
   "將開啟原生 遠端顯示 視窗。被控端必須已啟動 Client。": [
-    "Opens the native Remote Display. Client must be running on the remote device.",
-    "ネイティブ リモート画面 を開きます。接続先で Client を起動してください。",
-    "기본 원격 화면 창을 엽니다. 원격 기기에서 Client가 실행 중이어야 합니다."
+    "Open YourDesk on the remote computer first.",
+    "先に接続先で YourDesk を起動してください。",
+    "먼저 원격 컴퓨터에서 YourDesk를 실행하세요."
   ],
   "連到遠端 ↗": [
     "Connect to remote ↗",
@@ -835,9 +835,9 @@
     "H.264 (소프트웨어)"
   ],
   "變更後會重新啟動本機 Client，現有遠端連線將中斷。不支援的方式無法選取。": [
-    "Changing this restarts the local Client and disconnects active remote sessions. Unsupported modes cannot be selected.",
-    "変更するとローカル Client が再起動し、接続中のセッションが切断されます。非対応の方式は選択できません。",
-    "변경하면 로컬 Client가 다시 시작되고 현재 연결이 끊깁니다. 지원하지 않는 방식은 선택할 수 없습니다."
+    "Changes disconnect current sessions. Unavailable options are disabled.",
+    "変更すると現在の接続が切れます。非対応の項目は選べません。",
+    "변경하면 현재 연결이 끊어집니다. 지원되지 않는 항목은 선택할 수 없습니다."
   ],
   "自動（優先硬體壓縮）": [
     "Auto (prefer hardware compression)",
@@ -950,9 +950,9 @@
     "연결 비밀번호가 변경되었습니다."
   ],
   "修改後會重新啟動本機 Client，現有連線將中斷。": [
-    "Changing the password restarts the local Client and disconnects active sessions.",
-    "変更後にローカル Client が再起動し、接続が切断されます。",
-    "변경하면 로컬 Client가 다시 시작되고 연결이 끊깁니다."
+    "Changing the password restarts the connection service and disconnects current sessions.",
+    "パスワード変更で接続サービスが再起動し、現在の接続が切れます。",
+    "비밀번호를 변경하면 연결 서비스가 다시 시작되고 현재 연결이 끊어집니다."
   ],
   "正在建立連線": [
     "Establishing connection",
@@ -1179,10 +1179,10 @@
     "画像強化",
     "영상 향상"
   ],
-  "啟用畫面增強（實驗性）": [
-    "Enable image enhancement (experimental)",
-    "画像強化を有効にする（試験的）",
-    "영상 향상 사용 (실험적)"
+  "啟用畫面增強": [
+    "Enable image enhancement",
+    "画像強化を有効にする",
+    "영상 향상 사용"
   ],
   "超解析度": [
     "Super resolution",
@@ -1394,10 +1394,10 @@
     "なし",
     "없음"
   ],
-  "2× 補幀（實驗性）": [
-    "2× frame interpolation (experimental)",
-    "2× フレーム補間（実験的）",
-    "2× 프레임 보간 (실험적)"
+  "2× 補幀": [
+    "2× frame interpolation",
+    "2× フレーム補間",
+    "2× 프레임 보간"
   ],
   "每兩張真實影格補一張；可能增加操作延遲，處理逾時自動回退。": [
     "Inserts one frame between two real frames; may add input latency. Falls back on timeout.",
@@ -1465,9 +1465,9 @@
     "GOP (키 프레임 간격)"
   ],
   "每隔指定張數要求關鍵影格；1 為每張。僅適用 H.264／HEVC。": [
-    "Request a keyframe every specified number of frames; 1 means every frame. H.264/HEVC only.",
-    "指定フレーム数ごとにキーフレームを要求します。1 は毎フレーム。H.264／HEVC のみ。",
-    "지정한 프레임 수마다 키 프레임을 요청합니다. 1은 매 프레임입니다. H.264/HEVC에만 적용됩니다."
+    "Lower values help the picture recover faster but use more data. H.264/HEVC only.",
+    "値を小さくすると画面の復旧が早くなりますが、通信量も増えます。H.264／HEVC のみ。",
+    "값이 작으면 화면 복구가 빠르지만 데이터를 더 사용합니다. H.264/HEVC 전용입니다."
   ],
   "GOP 必須為 1 至 300 張": [
     "GOP must be between 1 and 300 frames.",
@@ -1495,9 +1495,9 @@
     "비트레이트 상한은 1~64 Mbps이어야 합니다."
   ],
   "FPS 範圍 5～60，碼率範圍 1～64 Mbps。碼率限制 H.264／HEVC 的目標值，瞬間流量可能超過。": [
-    "FPS range: 5–60; bitrate range: 1–64 Mbps. The bitrate limit sets the H.264/HEVC target and may be exceeded briefly.",
-    "FPSは5～60、ビットレートは1～64 Mbpsです。H.264／HEVCの目標値を制限し、瞬間的に超える場合があります。",
-    "FPS 범위는 5~60, 비트레이트는 1~64 Mbps입니다. H.264/HEVC 목표값을 제한하며 순간적으로 초과할 수 있습니다."
+    "Higher FPS is smoother. Higher bitrate usually improves clarity and uses more data.",
+    "FPS を上げると滑らかに、ビットレートを上げると通常は鮮明になりますが、通信量も増えます。",
+    "FPS가 높으면 부드럽고, 비트레이트가 높으면 보통 선명하지만 데이터 사용량도 늘어납니다."
   ],
   "補幀方式": [
     "Interpolation method",
@@ -1695,9 +1695,9 @@
     "원격 화면에 창 맞추기"
   ],
   "自動調整 遠端顯示 視窗比例，完整顯示遠端畫面。全螢幕不調整。": [
-    "Adjust the Remote Display window proportions to show the entire remote display. Fullscreen is unchanged.",
-    "リモート画面全体が表示されるように リモート画面 の縦横比を調整します。全画面では調整しません。",
-    "전체 원격 화면이 표시되도록 원격 화면 창 비율을 조정합니다. 전체 화면에서는 조정하지 않습니다."
+    "Fit the window to the remote screen. Full screen is unchanged.",
+    "遠隔画面全体が見えるよう調整します。全画面表示には影響しません。",
+    "원격 화면 전체가 보이도록 창을 조절합니다. 전체 화면에는 적용되지 않습니다."
   ],
   "自動配置/延遲優先": [
     "Auto / Low latency",
@@ -1710,14 +1710,14 @@
     "자동 설정 / 트래픽 우선"
   ],
   "依遠端實測調整 FPS 與 GOP，優先減少等待；保留畫質、解析度、碼率與影像傳輸設定。設定會套用到所有 遠端顯示。": [
-    "Adjust FPS and GOP using remote measurements to reduce waiting. Keep quality, resolution, bitrate and codec settings. Applies to all Viewers.",
-    "実測に基づき FPS と GOP を調整し、待ち時間を抑えます。画質・解像度・ビットレート・映像方式は維持します。すべての リモート画面 に適用します。",
-    "원격 측정값에 따라 FPS와 GOP를 조정합니다. 화질, 해상도, 비트레이트, 코덱은 유지합니다. 모든 Viewer에 적용됩니다."
+    "Adjust automatically for faster response. Applies to all remote displays.",
+    "操作の応答を優先して自動調整します。すべての遠隔画面に適用します。",
+    "빠른 반응을 우선하여 자동 조절합니다. 모든 원격 화면에 적용됩니다."
   ],
   "降低每秒傳送張數，減少完整畫面傳送；保留畫質、解析度、碼率與影像傳輸設定。動作會較不流暢，流量依內容而定。設定會套用到所有 遠端顯示。": [
-    "Send fewer frames and full-frame updates. Keep quality, resolution, bitrate and codec settings. Motion is less smooth; traffic depends on content. Applies to all Viewers.",
-    "送信フレーム数と全画面更新を減らします。画質・解像度・ビットレート・映像方式は維持します。動きの滑らかさは下がり、通信量は内容によります。すべての リモート画面 に適用します。",
-    "초당 프레임과 전체 화면 전송을 줄입니다. 화질, 해상도, 비트레이트, 코덱은 유지합니다. 동작이 덜 부드러울 수 있으며 트래픽은 화면 내용에 따라 달라집니다. 모든 Viewer에 적용됩니다."
+    "Reduce data use automatically. Motion may be less smooth. Applies to all remote displays.",
+    "通信量を自動で抑えます。動きが滑らかでなくなる場合があります。すべての遠隔画面に適用します。",
+    "데이터 사용량을 줄여 화면이 덜 부드러울 수 있습니다. 모든 원격 화면에 적용됩니다."
   ],
   "取樣中，請持續拖動遠端視窗或捲動約 10 秒…": [
     "Measuring. Keep moving a remote window or scrolling for about 10 seconds…",
@@ -1805,9 +1805,9 @@
     "디코딩이 느립니다. 원본 FPS를 낮춰 비교하세요."
   ],
   "自動取樣目前連線，無需操作遠端。結果不代表網路最高速度。": [
-    "The connection is sampled automatically; no remote interaction is needed. Results do not represent maximum network speed.",
-    "接続を自動測定するため、遠隔操作は不要です。結果は回線の最大速度ではありません。",
-    "연결을 자동으로 측정하므로 원격 조작이 필요 없습니다. 결과는 네트워크 최대 속도가 아닙니다."
+    "Check the current connection automatically, without operating the remote computer.",
+    "遠隔パソコンを操作せず、現在の接続を自動確認します。",
+    "원격 컴퓨터를 조작하지 않고 현재 연결을 자동 확인합니다."
   ],
   "本次取樣資料不足，請稍後重新分析。": [
     "Not enough data was collected. Please try again later.",
@@ -1885,19 +1885,19 @@
     "MCP 활성화"
   ],
   "允許 Agent 查詢狀態及操作已授權的遠端連線。預設關閉，切換後立即生效。": [
-    "Allow agents to check status and control authorized remote sessions. Off by default; changes apply immediately.",
-    "Agent に状態の確認と認証済みリモート接続の操作を許可します。初期状態はオフで、変更はすぐ反映されます。",
-    "Agent가 상태를 확인하고 인증된 원격 연결을 조작하도록 허용합니다. 기본값은 꺼짐이며 변경 즉시 적용됩니다."
+    "Let an AI assistant check status and control authorized remote computers.",
+    "AI アシスタントが状態を確認し、許可された遠隔パソコンを操作できます。",
+    "AI 도우미가 상태를 확인하고 허용된 원격 컴퓨터를 조작할 수 있습니다."
   ],
   "服務位址": [
     "Service address",
     "サービスアドレス",
     "서비스 주소"
   ],
-  "連線需要獨立 Token；關閉後，Agent 將無法透過 MCP 操作。": [
-    "A separate token is required. Turning this off stops agent access through MCP.",
-    "接続には専用 Token が必要です。オフにすると Agent は MCP で操作できません。",
-    "별도의 Token이 필요합니다. 끄면 Agent가 MCP를 통해 조작할 수 없습니다."
+  "關閉 MCP 後，Agent 將無法透過 MCP 操作。": [
+    "Turning this off stops AI control through MCP.",
+    "オフにすると MCP 経由の AI 操作ができなくなります。",
+    "끄면 MCP를 통한 AI 조작을 사용할 수 없습니다."
   ],
   "啟用 IP 白名單": [
     "Enable IP whitelist",
@@ -1910,9 +1910,9 @@
     "허용된 IP 주소"
   ],
   "每行一個 IP。白名單啟用時，名單內免 Token、名單外禁止連線；關閉時所有來源皆需 Token。": [
-    "One IP per line. With the whitelist on, listed IPs need no token and other IPs are blocked. With it off, all sources require a token.",
-    "1 行に 1 つの IP。有効時はリスト内の IP は Token 不要、リスト外は接続不可です。無効時はすべての接続に Token が必要です。",
-    "한 줄에 IP 하나를 입력하세요. 목록이 켜져 있으면 목록 내 IP는 Token 없이 연결되며 나머지는 차단됩니다. 끄면 모든 연결에 Token이 필요합니다."
+    "One IP per line. When enabled, only listed IPs can connect, without a token. When off, all connections need a token.",
+    "IP は1行に1つ。オンでは一覧内のみ接続でき、トークンは不要です。オフでは全接続にトークンが必要です。",
+    "IP를 한 줄에 하나씩 입력하세요. 켜면 목록 내 IP만 토큰 없이 연결할 수 있습니다. 끄면 모두 토큰이 필요합니다."
   ],
   "複製 MCP 位址": [
     "Copy MCP address",
@@ -1950,9 +1950,9 @@
     "강제 업데이트"
   ],
   "忽略版本高低，下載最新正式 Release。": [
-    "Download the latest stable release regardless of the installed version.",
-    "現在のバージョンに関係なく、最新の正式リリースをダウンロードします。",
-    "설치된 버전에 관계없이 최신 정식 릴리스를 다운로드합니다."
+    "Download the latest release even if your installed version is the same or newer.",
+    "現在のバージョンが同じ、または新しくても最新の公開版をダウンロードします。",
+    "현재 버전이 같거나 더 최신이어도 최근 배포 버전을 다운로드합니다."
   ],
   "立即更新": [
     "Update now",
@@ -1975,9 +1975,9 @@
     "MCP 제어 시작 시 원격 화면 표시"
   ],
   "開啟後，MCP 接管時自動顯示遠端畫面；關閉時在背景操作，可從 Tray 開啟或隱藏。": [
-    "Show the remote display when MCP takes control. When off, operate in the background; use the tray to show or hide it.",
-    "オンの場合、MCP 操作開始時にリモート画面を表示します。オフの場合はバックグラウンドで操作し、トレイから表示・非表示を切り替えられます。",
-    "켜면 MCP 제어 시작 시 원격 화면을 표시합니다. 끄면 백그라운드로 동작하며 트레이에서 표시하거나 숨길 수 있습니다."
+    "Show the remote screen during AI control. You can also open it from the tray menu.",
+    "AI 操作中に遠隔画面を表示します。オフでもトレイメニューから開けます。",
+    "AI 조작 중 원격 화면을 표시합니다. 꺼도 트레이 메뉴에서 열 수 있습니다."
   ],
   "自動配置偵測": [
     "Automatic configuration",
@@ -2005,9 +2005,9 @@
     "설정 적용 및 저장"
   ],
   "依目前連線的動態樣本計算，不代表網路最高速度；資料不足時不變更設定。": [
-    "Uses motion samples from this connection, not maximum network speed; settings remain unchanged if data is insufficient.",
-    "現在の接続の動的サンプルを使用し、ネットワークの最高速度は測定しません。データ不足の場合は設定を変更しません。",
-    "현재 연결의 동적 샘플을 사용하며 네트워크 최고 속도를 측정하지 않습니다. 데이터가 부족하면 설정을 변경하지 않습니다."
+    "Adjust for the current connection. Keep existing settings if there is not enough data.",
+    "現在の接続に合わせて調整します。データ不足の場合は設定を変えません。",
+    "현재 연결에 맞춰 조절합니다. 정보가 부족하면 기존 설정을 유지합니다."
   ],
   "有效樣本不足，設定未變更；請確認遠端畫面有變化，或改用有畫面的遠端連線後重試。": [
     "Insufficient valid samples; settings were not changed. Ensure the remote screen is changing, or retry with a visible remote session.",
@@ -2045,19 +2045,19 @@
     "실험적 기능"
   ],
   "開機後尚未登入 OS 時允許遠端連線。目前版本尚未提供系統服務，暫不支援。": [
-    "Allow remote connections after boot, before OS login. This version does not yet provide the required system service.",
-    "OS 起動後、ログイン前のリモート接続を許可します。このバージョンでは必要なシステムサービスが未実装のため利用できません。",
-    "OS 부팅 후 로그인 전 원격 접속을 허용합니다. 현재 버전에는 필요한 시스템 서비스가 아직 제공되지 않습니다."
+    "Allow remote access before sign-in. Currently unavailable.",
+    "ログイン前でも遠隔接続できます。現在は利用できません。",
+    "로그인 전에도 원격 연결을 허용합니다. 현재 지원되지 않습니다."
   ],
   "透過網路喚醒本機，需硬體、電源設定及可用的喚醒節點支援。目前版本尚未提供此功能。": [
-    "Wake this computer over the network. Requires compatible hardware, power settings and an available wake node. Not yet implemented in this version.",
-    "ネットワーク経由でこのコンピュータを起動します。対応ハードウェア、電源設定、利用可能な起動用ノードが必要です。このバージョンでは未実装です。",
-    "네트워크로 이 컴퓨터를 깨웁니다. 지원 하드웨어, 전원 설정 및 사용 가능한 깨우기 노드가 필요합니다. 현재 버전에는 아직 구현되지 않았습니다."
+    "Wake this computer over the network. Currently unavailable.",
+    "ネットワーク経由で起動します。現在は利用できません。",
+    "네트워크로 이 컴퓨터를 깨웁니다. 현재 지원되지 않습니다."
   ],
   "此平台尚未提供未登入連線服務。": [
-    "Pre-login remote access is not yet available on this platform.",
-    "このプラットフォームではログイン前のリモート接続はまだ利用できません。",
-    "이 플랫폼에서는 로그인 전 원격 접속이 아직 제공되지 않습니다."
+    "This computer does not currently support access before sign-in.",
+    "このパソコンは現在ログイン前の接続に対応していません。",
+    "이 컴퓨터는 현재 로그인 전 연결을 지원하지 않습니다."
   ],
   "未登入連線需要 macOS 14.4 以上。": [
     "Pre-login remote access requires macOS 14.4 or later.",
@@ -2070,9 +2070,9 @@
     "서명된 YourDesk.app에서 로그인 전 접속을 활성화하세요."
   ],
   "實驗性功能：需管理員授權及螢幕錄製、輔助使用權限；不支援 FileVault 開機前畫面。": [
-    "Experimental: requires administrator approval, Screen Recording and Accessibility permissions. FileVault preboot screens are not supported.",
-    "実験的機能：管理者の承認、画面収録とアクセシビリティの権限が必要です。FileVault の起動前画面には対応していません。",
-    "실험적 기능: 관리자 승인, 화면 기록 및 손쉬운 사용 권한이 필요합니다. FileVault 부팅 전 화면은 지원하지 않습니다."
+    "Requires admin approval, Screen Recording and Accessibility permissions. FileVault startup unlock is not supported.",
+    "管理者の承認と画面収録・アクセシビリティの許可が必要です。FileVault の起動時ロック解除には非対応です。",
+    "관리자 승인과 화면 기록 및 손쉬운 사용 권한이 필요합니다. FileVault 부팅 잠금 해제 화면은 지원하지 않습니다."
   ],
   "正在變更系統服務，請完成管理員授權。": [
     "Changing the system service. Please complete administrator authorization.",
@@ -2118,5 +2118,210 @@
     "Disconnect incoming connection",
     "受信中のリモート接続を切断",
     "수신 원격 연결 끊기"
+  ],
+  "Tailcat 模式": [
+    "Tailcat mode",
+    "Tailcat モード",
+    "Tailcat 모드"
+  ],
+  "WebRTC / Tailcat 虛擬傳輸": [
+    "WebRTC / Tailcat virtual transport",
+    "WebRTC / Tailcat 仮想通信",
+    "WebRTC / Tailcat 가상 전송"
+  ],
+  "兩端傳輸模式不同或版本不支援，請確認兩端的 Tailcat 模式設定": [
+    "Transport modes differ or the version is unsupported. Check the Tailcat mode setting on both ends.",
+    "通信モードが異なるか、バージョンが対応していません。両端の Tailcat モード設定を確認してください。",
+    "전송 모드가 다르거나 버전이 지원되지 않습니다. 양쪽의 Tailcat 모드 설정을 확인하세요."
+  ],
+  "請先停用未登入開機，再修改 Host 的影像傳輸、IP 直連或 Tailcat 模式。": [
+    "Disable pre-login access before changing Host video transport, direct IP access or Tailcat mode.",
+    "Host の映像通信、IP 直接接続、Tailcat モードを変更する前に、未ログイン接続を無効にしてください。",
+    "Host 영상 전송, IP 직접 연결 또는 Tailcat 모드를 변경하기 전에 로그인 전 접속을 비활성화하세요."
+  ],
+  "預設關閉。任一端開啟即可使用 Tailcat 通道，另一端通過密碼驗證後自動配合；兩端皆關閉時使用原生 P2P。兩端需支援此功能。切換會重啟本機 Host 並中斷被控連線，對外連線需重新連線；中繼速度依網路而異。": [
+    "Try this if you cannot connect. Enable it on either end; both must support it. Switching disconnects incoming sessions; reconnect other sessions.",
+    "接続できない場合にお試しください。両端が対応していれば片側の有効化で使えます。切り替えると受信接続が切れます。他の接続も再接続してください。",
+    "연결이 안 될 때 사용해 보세요. 양쪽이 지원하면 한쪽만 켜도 됩니다. 전환 시 수신 연결이 끊어지며 다른 연결도 다시 연결해야 합니다."
+  ],
+  "WebRTC / 自動協商": [
+    "WebRTC / Automatic negotiation",
+    "WebRTC / 自動ネゴシエーション",
+    "WebRTC / 자동 협상"
+  ],
+  "對端不支援單端傳輸協商，請更新遠端程式": [
+    "The remote does not support single-end transport negotiation. Update the remote app.",
+    "相手側は片側からの通信方式の切り替えに対応していません。リモートアプリを更新してください。",
+    "상대방이 단일 측 전송 협상을 지원하지 않습니다. 원격 앱을 업데이트하세요."
+  ],
+  "對端不支援所需的傳輸模式，請更新兩端程式": [
+    "The requested transport mode is unsupported. Update both apps.",
+    "要求された通信方式に対応していません。両端のアプリを更新してください。",
+    "요청한 전송 모드가 지원되지 않습니다. 양쪽 앱을 업데이트하세요."
+  ],
+  "跟隨系統的語言與外觀，變更會自動儲存。": [
+    "Follow your system language and appearance. Changes save automatically.",
+    "言語と外観をシステムに合わせ、自動保存します。",
+    "시스템 언어와 테마를 따르며 자동 저장됩니다."
+  ],
+  "調整視窗大小，完整顯示遠端畫面；全螢幕不受影響。": [
+    "Fit the window to the remote screen. Full screen is unchanged.",
+    "遠隔画面全体が見えるよう調整します。全画面表示には影響しません。",
+    "원격 화면 전체가 보이도록 창을 조절합니다. 전체 화면에는 적용되지 않습니다."
+  ],
+  "開啟後，可用 IP 位址和連線密碼連到這台電腦。": [
+    "Allow connections to this computer using its IP address and password.",
+    "IP アドレスと接続パスワードで、このパソコンに接続できます。",
+    "IP 주소와 연결 비밀번호로 이 컴퓨터에 연결할 수 있습니다."
+  ],
+  "連不上時可試用；任一端開啟即可，兩端皆須支援。切換會中斷被控連線，其他連線請重新連接。": [
+    "Try this if you cannot connect. Enable it on either end; both must support it. Switching disconnects incoming sessions; reconnect other sessions.",
+    "接続できない場合にお試しください。両端が対応していれば片側の有効化で使えます。切り替えると受信接続が切れます。他の接続も再接続してください。",
+    "연결이 안 될 때 사용해 보세요. 양쪽이 지원하면 한쪽만 켜도 됩니다. 전환 시 수신 연결이 끊어지며 다른 연결도 다시 연결해야 합니다."
+  ],
+  "登入系統前也能接受遠端連線；目前不支援。": [
+    "Allow remote access before sign-in. Currently unavailable.",
+    "ログイン前でも遠隔接続できます。現在は利用できません。",
+    "로그인 전에도 원격 연결을 허용합니다. 현재 지원되지 않습니다."
+  ],
+  "透過網路喚醒這台電腦；目前不支援。": [
+    "Wake this computer over the network. Currently unavailable.",
+    "ネットワーク経由で起動します。現在は利用できません。",
+    "네트워크로 이 컴퓨터를 깨웁니다. 현재 지원되지 않습니다."
+  ],
+  "修改密碼會重新啟動連線服務，並中斷目前連線。": [
+    "Changing the password restarts the connection service and disconnects current sessions.",
+    "パスワード変更で接続サービスが再起動し、現在の接続が切れます。",
+    "비밀번호를 변경하면 연결 서비스가 다시 시작되고 현재 연결이 끊어집니다."
+  ],
+  "FPS 越高越流暢；碼率越高通常越清晰，也更耗流量。": [
+    "Higher FPS is smoother. Higher bitrate usually improves clarity and uses more data.",
+    "FPS を上げると滑らかに、ビットレートを上げると通常は鮮明になりますが、通信量も増えます。",
+    "FPS가 높으면 부드럽고, 비트레이트가 높으면 보통 선명하지만 데이터 사용량도 늘어납니다."
+  ],
+  "數值越小，畫面越快恢復，也更耗流量；僅適用 H.264／HEVC。": [
+    "Lower values help the picture recover faster but use more data. H.264/HEVC only.",
+    "値を小さくすると画面の復旧が早くなりますが、通信量も増えます。H.264／HEVC のみ。",
+    "값이 작으면 화면 복구가 빠르지만 데이터를 더 사용합니다. H.264/HEVC 전용입니다."
+  ],
+  "變更會中斷目前連線；無法使用的選項會停用。": [
+    "Changes disconnect current sessions. Unavailable options are disabled.",
+    "変更すると現在の接続が切れます。非対応の項目は選べません。",
+    "변경하면 현재 연결이 끊어집니다. 지원되지 않는 항목은 선택할 수 없습니다."
+  ],
+  "自動調整，優先讓操作更即時；套用到所有遠端畫面。": [
+    "Adjust automatically for faster response. Applies to all remote displays.",
+    "操作の応答を優先して自動調整します。すべての遠隔画面に適用します。",
+    "빠른 반응을 우선하여 자동 조절합니다. 모든 원격 화면에 적용됩니다."
+  ],
+  "自動減少流量，畫面可能較不流暢；套用到所有遠端畫面。": [
+    "Reduce data use automatically. Motion may be less smooth. Applies to all remote displays.",
+    "通信量を自動で抑えます。動きが滑らかでなくなる場合があります。すべての遠隔画面に適用します。",
+    "데이터 사용량을 줄여 화면이 덜 부드러울 수 있습니다. 모든 원격 화면에 적용됩니다."
+  ],
+  "讓 AI 助理查看狀態並操作已授權的遠端電腦。": [
+    "Let an AI assistant check status and control authorized remote computers.",
+    "AI アシスタントが状態を確認し、許可された遠隔パソコンを操作できます。",
+    "AI 도우미가 상태를 확인하고 허용된 원격 컴퓨터를 조작할 수 있습니다."
+  ],
+  "AI 操作時顯示遠端畫面；關閉後仍可從系統圖示選單開啟。": [
+    "Show the remote screen during AI control. You can also open it from the tray menu.",
+    "AI 操作中に遠隔画面を表示します。オフでもトレイメニューから開けます。",
+    "AI 조작 중 원격 화면을 표시합니다. 꺼도 트레이 메뉴에서 열 수 있습니다."
+  ],
+  "每行填一個 IP。開啟時只允許名單內連線，免驗證金鑰；關閉時皆需金鑰（Token）。": [
+    "One IP per line. When enabled, only listed IPs can connect, without a token. When off, all connections need a token.",
+    "IP は1行に1つ。オンでは一覧内のみ接続でき、トークンは不要です。オフでは全接続にトークンが必要です。",
+    "IP를 한 줄에 하나씩 입력하세요. 켜면 목록 내 IP만 토큰 없이 연결할 수 있습니다. 끄면 모두 토큰이 필요합니다."
+  ],
+  "關閉後，AI 助理將無法透過 MCP 操作。": [
+    "Turning this off stops AI control through MCP.",
+    "オフにすると MCP 経由の AI 操作ができなくなります。",
+    "끄면 MCP를 통한 AI 조작을 사용할 수 없습니다."
+  ],
+  "即使版本相同或較新，也可下載最新發布的版本。": [
+    "Download the latest release even if your installed version is the same or newer.",
+    "現在のバージョンが同じ、または新しくても最新の公開版をダウンロードします。",
+    "현재 버전이 같거나 더 최신이어도 최근 배포 버전을 다운로드합니다."
+  ],
+  "請先在遠端電腦開啟 YourDesk。": [
+    "Open YourDesk on the remote computer first.",
+    "先に接続先で YourDesk を起動してください。",
+    "먼저 원격 컴퓨터에서 YourDesk를 실행하세요."
+  ],
+  "自動檢查目前連線，不需操作遠端電腦。": [
+    "Check the current connection automatically, without operating the remote computer.",
+    "遠隔パソコンを操作せず、現在の接続を自動確認します。",
+    "원격 컴퓨터를 조작하지 않고 현재 연결을 자동 확인합니다."
+  ],
+  "依目前連線調整；資料不足時保留原設定。": [
+    "Adjust for the current connection. Keep existing settings if there is not enough data.",
+    "現在の接続に合わせて調整します。データ不足の場合は設定を変えません。",
+    "현재 연결에 맞춰 조절합니다. 정보가 부족하면 기존 설정을 유지합니다."
+  ],
+  "需管理員允許，並開啟螢幕錄製與輔助使用權限；無法操作 FileVault 開機解鎖畫面。": [
+    "Requires admin approval, Screen Recording and Accessibility permissions. FileVault startup unlock is not supported.",
+    "管理者の承認と画面収録・アクセシビリティの許可が必要です。FileVault の起動時ロック解除には非対応です。",
+    "관리자 승인과 화면 기록 및 손쉬운 사용 권한이 필요합니다. FileVault 부팅 잠금 해제 화면은 지원하지 않습니다."
+  ],
+  "這台電腦目前不支援登入前連線。": [
+    "This computer does not currently support access before sign-in.",
+    "このパソコンは現在ログイン前の接続に対応していません。",
+    "이 컴퓨터는 현재 로그인 전 연결을 지원하지 않습니다."
+  ],
+  "請在遠端畫面拖動視窗或捲動頁面，以便偵測。": [
+    "Move a window or scroll a page on the remote screen during detection.",
+    "検出中は遠隔画面でウィンドウを動かすか、ページをスクロールしてください。",
+    "감지 중에는 원격 화면에서 창을 움직이거나 페이지를 스크롤해 주세요."
+  ],
+  "開始": [
+    "Start",
+    "開始",
+    "시작"
+  ],
+  "準備好後，請按「開始」。": [
+    "When ready, click Start.",
+    "準備ができたら「開始」を押してください。",
+    "준비되면 시작을 누르세요."
+  ],
+  "將評估 5～30 FPS。請在遠端畫面拖動視窗或捲動頁面。": [
+    "Evaluate 5–30 FPS. Move a window or scroll a page on the remote screen.",
+    "5～30 FPS を評価します。遠隔画面でウィンドウを動かすか、ページをスクロールしてください。",
+    "5~30 FPS를 평가합니다. 원격 화면에서 창을 움직이거나 페이지를 스크롤하세요."
+  ],
+  "套用": [
+    "Apply",
+    "適用",
+    "적용"
+  ],
+  "偵測完成，按「套用」才會變更設定。": [
+    "Detection complete. Click Apply to change settings.",
+    "検出が完了しました。「適用」で設定を変更します。",
+    "감지가 완료되었습니다. 적용을 눌러야 설정이 변경됩니다."
+  ],
+  "請重新偵測後再套用。": [
+    "Run detection again before applying.",
+    "再度検出してから適用してください。",
+    "다시 감지한 후 적용하세요."
+  ],
+  "遠端連線失敗，請確認遠端 Client 與網路狀態後再試。 對方可能尚未支援 Tailcat，請更新對方的 YourDesk，或關閉 Tailcat 後重試。": [
+    "Connection failed. Check the remote app and network. The remote computer may not support Tailcat. Update its YourDesk, or turn off Tailcat and retry.",
+    "接続できません。接続先のアプリとネットワークを確認してください。 接続先が Tailcat に未対応の可能性があります。YourDesk を更新するか、Tailcat をオフにして再試行してください。",
+    "연결하지 못했습니다. 상대 앱과 네트워크를 확인하세요. 상대 컴퓨터가 Tailcat을 지원하지 않을 수 있습니다. YourDesk를 업데이트하거나 Tailcat을 끄고 다시 시도하세요."
+  ],
+  "遠端握手資料已過期，請重新啟動遠端 Client，並確認雙方系統時間正確。 對方可能尚未支援 Tailcat，請更新對方的 YourDesk，或關閉 Tailcat 後重試。": [
+    "Connection data expired. Restart the remote app and check both computers’ clocks. The remote computer may not support Tailcat. Update its YourDesk, or turn off Tailcat and retry.",
+    "接続情報の期限が切れました。接続先のアプリを再起動し、両方の時計を確認してください。 接続先が Tailcat に未対応の可能性があります。YourDesk を更新するか、Tailcat をオフにして再試行してください。",
+    "연결 정보가 만료되었습니다. 상대 앱을 재시작하고 양쪽 시간을 확인하세요. 상대 컴퓨터가 Tailcat을 지원하지 않을 수 있습니다. YourDesk를 업데이트하거나 Tailcat을 끄고 다시 시도하세요."
+  ],
+  "等待遠端握手逾時；Client 已註冊，但尚未完成連線。請更新或重新啟動遠端 Client 後再試。 對方可能尚未支援 Tailcat，請更新對方的 YourDesk，或關閉 Tailcat 後重試。": [
+    "Connection timed out. Update or restart the remote app and retry. The remote computer may not support Tailcat. Update its YourDesk, or turn off Tailcat and retry.",
+    "接続がタイムアウトしました。接続先のアプリを更新または再起動してください。 接続先が Tailcat に未対応の可能性があります。YourDesk を更新するか、Tailcat をオフにして再試行してください。",
+    "연결 시간이 초과되었습니다. 상대 앱을 업데이트하거나 다시 시작하세요. 상대 컴퓨터가 Tailcat을 지원하지 않을 수 있습니다. YourDesk를 업데이트하거나 Tailcat을 끄고 다시 시도하세요."
+  ],
+  "無法完成連線服務握手，請檢查網路與遠端 Client 狀態。 對方可能尚未支援 Tailcat，請更新對方的 YourDesk，或關閉 Tailcat 後重試。": [
+    "Could not establish a connection. Check the network and remote app. The remote computer may not support Tailcat. Update its YourDesk, or turn off Tailcat and retry.",
+    "接続を確立できません。ネットワークと接続先のアプリを確認してください。 接続先が Tailcat に未対応の可能性があります。YourDesk を更新するか、Tailcat をオフにして再試行してください。",
+    "연결을 설정하지 못했습니다. 네트워크와 상대 앱을 확인하세요. 상대 컴퓨터가 Tailcat을 지원하지 않을 수 있습니다. YourDesk를 업데이트하거나 Tailcat을 끄고 다시 시도하세요."
   ]
 }

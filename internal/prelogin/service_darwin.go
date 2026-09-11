@@ -115,7 +115,7 @@ func Status() State {
 		}
 	}
 	s.Supported = true
-	s.Message = "實驗性功能：需管理員授權及螢幕錄製、輔助使用權限；不支援 FileVault 開機前畫面。"
+	s.Message = "需管理員允許，並開啟螢幕錄製與輔助使用權限；無法操作 FileVault 開機解鎖畫面。"
 	return s
 }
 func Configure(ctx context.Context, enabled bool, c Config) error {
@@ -545,6 +545,9 @@ func runAgent(ctx context.Context) error {
 		return err
 	}
 	args := []string{"-signal", c.Signal, "-room", c.Room, "-codec", c.Codec, "-secret-stdin", "-parent-stdin", "-prelogin-host"}
+	if c.Tailcat {
+		args = append(args, "-transport", "tailcat")
+	}
 	if c.Direct {
 		args = append(args, "-direct-listen", ":47823")
 	}

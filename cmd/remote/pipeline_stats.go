@@ -50,7 +50,7 @@ func (p *pipelineSample) report(s *viewerPipelineStats, g *game, peer *p2p.Peer)
 		if p.bytes > 0 && next.bytes >= p.bytes {
 			rate = float64(next.bytes-p.bytes) * 8 / elapsed / 1e6
 		}
-		sample := diagnostics.Sample{StartedAt: p.at.UnixMilli(), Seconds: elapsed, RTTMS: peer.RoundTripMS(), ReceiveMbps: rate, SourceFPS: float64(next.presented-p.presented) / elapsed, RenderFPS: float64(next.rendered-p.rendered) / elapsed, ReceivedPerSec: float64(next.received-p.received) / elapsed, CallbackMS: averageMS, FPSLimit: limit, Codec: codec, Gaps: next.gaps - p.gaps, Errors: next.failed - p.failed, Received: next.received - p.received}
+		sample := diagnostics.Sample{Transport: peer.TransportMode(), StartedAt: p.at.UnixMilli(), Seconds: elapsed, RTTMS: peer.RoundTripMS(), ReceiveMbps: rate, SourceFPS: float64(next.presented-p.presented) / elapsed, RenderFPS: float64(next.rendered-p.rendered) / elapsed, ReceivedPerSec: float64(next.received-p.received) / elapsed, CallbackMS: averageMS, FPSLimit: limit, Codec: codec, Gaps: next.gaps - p.gaps, Errors: next.failed - p.failed, Received: next.received - p.received}
 		if version, ok := g.remoteVersion.Load().(string); ok {
 			sample.RemoteVersion = version
 		}

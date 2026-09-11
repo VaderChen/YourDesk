@@ -2,6 +2,7 @@
 package diagnostics
 
 type Sample struct {
+	Transport      string   `json:"transport,omitempty"`
 	RemoteVersion  string   `json:"remoteVersion,omitempty"`
 	Background     bool     `json:"background,omitempty"`
 	DecodedPerSec  float64  `json:"decodedPerSec,omitempty"`

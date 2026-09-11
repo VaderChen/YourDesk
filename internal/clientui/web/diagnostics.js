@@ -97,6 +97,7 @@ function showDiagnosticReport(samples) {
     element.append(text('span', i18n.t(label)), text('strong', value)); report.append(element);
   };
   const measurement = (value, unit) => Number.isFinite(value) ? `${value.toFixed(1)} ${unit}` : '-';
+  row('連線方式',samples.at(-1).transport==='tailcat'?i18n.t('WebRTC / Tailcat 虛擬傳輸'):samples.at(-1).transport==='native'?i18n.t('WebRTC P2P 直連'):i18n.t('未提供'));
   row('遠端版本', samples.map(sample=>sample.remoteVersion).filter(Boolean).at(-1)||i18n.t('未提供'));
   row('網路回應', `${i18n.t(network)}${rtt === null ? '' : ` · ${Math.round(rtt)} ms`}`);
   row('目前下載流量', measurement(average('receiveMbps'), 'Mbps'));

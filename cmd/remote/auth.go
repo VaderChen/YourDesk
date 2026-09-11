@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 
 	"yourdesk/internal/agentremote"
 	"yourdesk/internal/security"
@@ -45,7 +46,16 @@ func (p *passwordInput) read(ctx context.Context, prompt bool) ([]byte, error) {
 			scanner.Buffer(make([]byte, 1024), 65536)
 			for scanner.Scan() {
 				var envelope struct {
-					Agent *agentremote.Request `json:"agent"`
+					Agent    *agentremote.Request `json:"agent"`
+					ProbeFPS *int                 `json:"probeFPS"`
+				}
+				if json.Unmarshal(scanner.Bytes(), &envelope) == nil && envelope.ProbeFPS != nil {
+					if *envelope.ProbeFPS == 30 {
+						fpsProbeUntil.Store(time.Now().Add(30 * time.Second).UnixMilli())
+					} else if *envelope.ProbeFPS == 0 {
+						fpsProbeUntil.Store(0)
+					}
+					continue
 				}
 				if json.Unmarshal(scanner.Bytes(), &envelope) == nil && envelope.Agent != nil {
 					select {

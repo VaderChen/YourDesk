@@ -104,6 +104,7 @@ type Preferences struct {
 	ImageEnhancement       bool     `json:"imageEnhancement"`
 	DisableKeyMapping      bool     `json:"disableKeyMapping"`
 	DisableHints           bool     `json:"disableHints"`
+	TailcatEnabled         bool     `json:"tailcatEnabled"`
 	DirectListen           bool     `json:"directListen"`
 	Codec                  string   `json:"codec"`
 	Language               string   `json:"language"`
@@ -439,8 +440,8 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 			fail(w, err)
 			return
 		}
-		if (s.preloginBusy || prelogin.Status().Enabled) && (preferences.Codec != s.preferences.Codec || preferences.DirectListen != s.preferences.DirectListen) {
-			fail(w, errors.New("請先停用未登入開機，再修改 Host 的影像傳輸或 IP 直連設定。"))
+		if (s.preloginBusy || prelogin.Status().Enabled) && (preferences.Codec != s.preferences.Codec || preferences.DirectListen != s.preferences.DirectListen || preferences.TailcatEnabled != s.preferences.TailcatEnabled) {
+			fail(w, errors.New("請先停用未登入開機，再修改 Host 的影像傳輸、IP 直連或 Tailcat 模式。"))
 			return
 		}
 		startedMCP := false
@@ -465,7 +466,7 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 			s.mcpStop()
 			s.mcpStop = nil
 		}
-		hostChanged := s.preferences.Codec != preferences.Codec || s.preferences.DirectListen != preferences.DirectListen
+		hostChanged := s.preferences.Codec != preferences.Codec || s.preferences.DirectListen != preferences.DirectListen || s.preferences.TailcatEnabled != preferences.TailcatEnabled
 		s.preferences = preferences
 		if hostChanged {
 			if host := s.children["host"]; host != nil {
@@ -569,6 +570,9 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		args := []string{"-signal", s.options.Signal, "-room", room, "-name", name, "-secret-stdin", "-interactive-auth"}
+		if s.preferences.TailcatEnabled {
+			args = append(args, "-transport", "tailcat")
+		}
 		if r.Context().Value(mcpConnectContextKey{}) == true {
 			args = append(args, "-mcp-managed")
 			if !s.preferences.MCPOpenDisplay {
@@ -658,6 +662,9 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 		}
 		binary := s.viewerBinary()
 		args := []string{"-signal", selected.Signal, "-room", selected.Room, "-name", selected.Name, "-secret-stdin", "-interactive-auth"}
+		if s.preferences.TailcatEnabled {
+			args = append(args, "-transport", "tailcat")
+		}
 		if r.Context().Value(mcpConnectContextKey{}) == true && !request.Diagnostics {
 			args = append(args, "-mcp-managed")
 			if !s.preferences.MCPOpenDisplay {
@@ -709,7 +716,7 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 }
 func validSignal(value string) bool {
 	u, err := url.Parse(value)
-	return err == nil && (u.Scheme == "ws" || u.Scheme == "wss") && u.Hostname() != "" && u.User == nil && u.Fragment == ""
+	return err == nil && (u.Scheme == "ws" || u.Scheme == "wss" || u.Scheme == "https") && u.Hostname() != "" && u.User == nil && u.Fragment == ""
 }
 func validate(l Library) error {
 	if len(l.Groups) > 200 || len(l.Sites) > 2000 {
@@ -880,12 +887,7 @@ func (s *server) start(kind, siteID, binary string, args []string) error {
 							if err := s.remember(p); err != nil {
 								s.notice = "無法保存連線密碼"
 							}
-							if !p.mcpOwned && !p.diagnosticConnection {
-								select {
-								case s.connected <- struct{}{}:
-								default:
-								}
-							}
+
 							p.authRequired = false
 							p.stage = "connecting"
 						case "password-required":
@@ -893,6 +895,13 @@ func (s *server) start(kind, siteID, binary string, args []string) error {
 							p.authMessage = event.Message
 							p.stage = "password"
 						case "frame":
+							// 首張畫面準備好才隱藏主介面，密碼驗證成功不代表視窗已開啟。
+							if p.stage != "connected" && !p.mcpOwned && !p.diagnosticConnection {
+								select {
+								case s.connected <- struct{}{}:
+								default:
+								}
+							}
 							p.authRequired = false
 							p.stage = "connected"
 						}
@@ -977,6 +986,9 @@ func (s *server) keepHostRunning(ctx context.Context) {
 			continue
 		}
 		args := append(append([]string{}, s.options.HostArgs...), "-codec", s.preferences.Codec, "-secret-stdin", "-parent-stdin")
+		if s.preferences.TailcatEnabled {
+			args = append(args, "-transport", "tailcat")
+		}
 		if s.preferences.DirectListen {
 			address := s.options.DirectListen
 			if address == "" {

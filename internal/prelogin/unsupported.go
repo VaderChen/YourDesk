@@ -7,7 +7,7 @@ import (
 	"errors"
 )
 
-func Status() State                                 { return State{Message: "此平台尚未提供未登入連線服務。"} }
+func Status() State                                 { return State{Message: "這台電腦目前不支援登入前連線。"} }
 func Configure(context.Context, bool, Config) error { return errors.New(Status().Message) }
 func runDaemon(context.Context) error               { return errors.New(Status().Message) }
 func runAgent(context.Context) error                { return errors.New(Status().Message) }

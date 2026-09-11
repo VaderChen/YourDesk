@@ -2,6 +2,7 @@ package main
 
 import (
 	"slices"
+	"sync/atomic"
 	"time"
 	"yourdesk/internal/p2p"
 	"yourdesk/internal/streamconfig"
@@ -11,6 +12,9 @@ import (
 var sourceFPSLimit = 20
 var sourceFPSOverride bool
 
+// 偵測上限僅作用於此遠端視窗，逾時自動恢復，避免取消或主程式退出後殘留。
+var fpsProbeUntil atomic.Int64
+
 func applySourceFPSLimit(r *streamconfig.Request, c *streamconfig.Capabilities) {
 	limits := streamingLimits{FPS: 20, BitrateMbps: 12}
 	if p := viewerStreamingLimits.Load(); p != nil {
@@ -18,6 +22,9 @@ func applySourceFPSLimit(r *streamconfig.Request, c *streamconfig.Capabilities) 
 	}
 	if sourceFPSOverride {
 		limits.FPS = sourceFPSLimit
+	}
+	if time.Now().UnixMilli() < fpsProbeUntil.Load() {
+		limits.FPS = 30
 	}
 	if c == nil {
 		return

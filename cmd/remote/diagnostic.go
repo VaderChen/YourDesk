@@ -12,6 +12,7 @@ import (
 	"time"
 	"yourdesk/internal/diagnostics"
 	"yourdesk/internal/p2p"
+	"yourdesk/internal/peertransport"
 	"yourdesk/internal/signaling"
 	"yourdesk/internal/streamconfig"
 	"yourdesk/internal/streampipeline"
@@ -19,7 +20,7 @@ import (
 )
 
 // 背景診斷只驗證串流及解碼，不建立 遠端顯示、不注入輸入、不同步剪貼簿。
-func runBackgroundDiagnostic(url, room, codec string) error {
+func runBackgroundDiagnostic(url, room, codec string, mode peertransport.Mode) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
@@ -88,7 +89,7 @@ func runBackgroundDiagnostic(url, room, codec string) error {
 		}
 	})
 	defer worker.Close()
-	peer, err := p2p.NewViewer(ctx, sig, func(f p2p.Frame) { stats.received.Add(1); stats.wire.Store(uint32(f.Codec)); worker.Submit(f) }, func(c p2p.Control) {
+	peer, err := p2p.NewViewerWithTransport(ctx, sig, mode, func(f p2p.Frame) { stats.received.Add(1); stats.wire.Store(uint32(f.Codec)); worker.Submit(f) }, func(c p2p.Control) {
 		if c.Type == "keyboard-capabilities" {
 			remoteVersion.Store(c.AppVersion)
 		}
@@ -154,7 +155,7 @@ func runBackgroundDiagnostic(url, room, codec string) error {
 			}
 			_, receivedBytes := peer.TrafficBytes()
 			received, decoded, failures, gaps, nanos, attempts := stats.received.Load(), stats.decoded.Load(), stats.failed.Load(), stats.gaps.Load(), stats.decodeNanos.Load(), stats.attempts.Load()
-			sample := diagnostics.Sample{Background: true, StartedAt: at.UnixMilli(), Seconds: elapsed, RTTMS: peer.RoundTripMS(), ReceiveMbps: float64(receivedBytes-lastBytes) * 8 / elapsed / 1e6, DecodedPerSec: float64(decoded-lastDecoded) / elapsed, ReceivedPerSec: float64(received-lastReceived) / elapsed, Received: received - lastReceived, Errors: failures - lastErrors, Gaps: gaps - lastGaps, Codec: map[uint32]string{0: "JPEG（可能為區塊）", 1: "H.264", 2: "HEVC"}[stats.wire.Load()]}
+			sample := diagnostics.Sample{Transport: peer.TransportMode(), Background: true, StartedAt: at.UnixMilli(), Seconds: elapsed, RTTMS: peer.RoundTripMS(), ReceiveMbps: float64(receivedBytes-lastBytes) * 8 / elapsed / 1e6, DecodedPerSec: float64(decoded-lastDecoded) / elapsed, ReceivedPerSec: float64(received-lastReceived) / elapsed, Received: received - lastReceived, Errors: failures - lastErrors, Gaps: gaps - lastGaps, Codec: map[uint32]string{0: "JPEG（可能為區塊）", 1: "H.264", 2: "HEVC"}[stats.wire.Load()]}
 			if version, ok := remoteVersion.Load().(string); ok {
 				sample.RemoteVersion = version
 			}

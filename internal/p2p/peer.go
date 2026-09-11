@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/pion/webrtc/v4"
+	"yourdesk/internal/peertransport"
 	"yourdesk/internal/rawkey"
 	"yourdesk/internal/signaling"
 	"yourdesk/internal/streamconfig"
@@ -78,6 +79,7 @@ type Control struct {
 }
 
 type Peer struct {
+	transportMode  peertransport.Mode
 	pc             *webrtc.PeerConnection
 	screen         *webrtc.DataChannel
 	control        *webrtc.DataChannel
@@ -101,11 +103,15 @@ func config() webrtc.Configuration {
 }
 
 func NewHost(ctx context.Context, signal *signaling.Client, onControl func(Control)) (*Peer, error) {
-	pc, err := webrtc.NewPeerConnection(connectionConfig(signal))
+	return NewHostWithTransport(ctx, signal, peertransport.Native, onControl)
+}
+func NewHostWithTransport(ctx context.Context, signal *signaling.Client, mode peertransport.Mode, onControl func(Control)) (*Peer, error) {
+	pc, link, err := newTransportPC(ctx, signal, mode, true, "")
 	if err != nil {
 		return nil, err
 	}
 	p := &Peer{pc: pc, done: make(chan struct{}), clipboardInbox: make(chan []byte, 128), clipboardDone: make(chan struct{})}
+	p.bindTransport(link, mode)
 	pc.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
 		if state == webrtc.PeerConnectionStateClosed || state == webrtc.PeerConnectionStateFailed {
 			p.markClosed()
@@ -183,17 +189,37 @@ func NewHost(ctx context.Context, signal *signaling.Client, onControl func(Contr
 		_ = pc.Close()
 		return nil, err
 	}
-	e, err := signal.OfferAndReceive(ctx, pc.LocalDescription())
+	description := transportDescription{SessionDescription: *pc.LocalDescription(), NegotiationVersion: 1, Capabilities: peertransport.Modes()}
+	if link != nil {
+		sealed, sealErr := signal.SealTransport(description.SDP, link.Offer())
+		if sealErr != nil {
+			_ = pc.Close()
+			return nil, sealErr
+		}
+		description.Transport = &transportOffer{Version: 1, Mode: mode, Secret: sealed}
+	}
+	e, err := signal.OfferAndReceive(ctx, description)
 	if err != nil {
 		_ = pc.Close()
 		return nil, err
+	}
+	if selected, ok := requestedTransport(e, description); ok {
+		// 先關閉尚未連上的原生 Peer，保持單一通道；最多升級一次。
+		_ = p.Close()
+		negotiation, cancel := context.WithTimeout(ctx, 75*time.Second)
+		defer cancel()
+		return NewHostWithTransport(negotiation, signal, selected, onControl)
 	}
 	if e.Kind != signaling.KindAnswer {
 		_ = pc.Close()
 		return nil, fmt.Errorf("預期 answer，收到 %s", e.Kind)
 	}
-	var answer webrtc.SessionDescription
+	var answer transportDescription
 	if err := e.DecodePayload(&answer); err != nil {
+		_ = pc.Close()
+		return nil, err
+	}
+	if err := validateTransport(answer, mode); err != nil {
 		_ = pc.Close()
 		return nil, err
 	}
@@ -201,7 +227,7 @@ func NewHost(ctx context.Context, signal *signaling.Client, onControl func(Contr
 		_ = pc.Close()
 		return nil, err
 	}
-	if err := pc.SetRemoteDescription(answer); err != nil {
+	if err := pc.SetRemoteDescription(answer.SessionDescription); err != nil {
 		_ = pc.Close()
 		return nil, err
 	}
@@ -209,11 +235,27 @@ func NewHost(ctx context.Context, signal *signaling.Client, onControl func(Contr
 }
 
 func NewViewer(ctx context.Context, signal *signaling.Client, onFrame func(Frame), onControl ...func(Control)) (*Peer, error) {
-	pc, err := webrtc.NewPeerConnection(connectionConfig(signal))
+	return NewViewerWithTransport(ctx, signal, peertransport.Native, onFrame, onControl...)
+}
+func NewViewerWithTransport(ctx context.Context, signal *signaling.Client, mode peertransport.Mode, onFrame func(Frame), onControl ...func(Control)) (*Peer, error) {
+	description, selected, err := receiveTransportDescription(ctx, signal, mode)
+	if err != nil {
+		return nil, err
+	}
+	mode = selected
+	transportAddress := ""
+	if description.Transport != nil {
+		transportAddress, err = signal.OpenTransport(description.SDP, description.Transport.Secret)
+		if err != nil {
+			return nil, err
+		}
+	}
+	pc, link, err := newTransportPC(ctx, signal, mode, false, transportAddress)
 	if err != nil {
 		return nil, err
 	}
 	p := &Peer{pc: pc, done: make(chan struct{}), clipboardInbox: make(chan []byte, 128), clipboardDone: make(chan struct{})}
+	p.bindTransport(link, mode)
 	pc.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
 		if state == webrtc.PeerConnectionStateClosed || state == webrtc.PeerConnectionStateFailed {
 			p.markClosed()
@@ -255,20 +297,7 @@ func NewViewer(ctx context.Context, signal *signaling.Client, onFrame func(Frame
 			})
 		}
 	})
-	e, err := signal.Receive(ctx)
-	if err != nil {
-		_ = pc.Close()
-		return nil, err
-	}
-	if e.Kind != signaling.KindOffer {
-		_ = pc.Close()
-		return nil, fmt.Errorf("預期 offer，收到 %s", e.Kind)
-	}
-	var offerRemote webrtc.SessionDescription
-	if err := e.DecodePayload(&offerRemote); err != nil {
-		_ = pc.Close()
-		return nil, err
-	}
+	offerRemote := description.SessionDescription
 	if err := rejectRelay(offerRemote.SDP); err != nil {
 		_ = pc.Close()
 		return nil, err
@@ -294,7 +323,11 @@ func NewViewer(ctx context.Context, signal *signaling.Client, onFrame func(Frame
 		_ = pc.Close()
 		return nil, err
 	}
-	if err := signal.Send(ctx, signaling.KindAnswer, pc.LocalDescription()); err != nil {
+	answerDescription := transportDescription{SessionDescription: *pc.LocalDescription()}
+	if mode != peertransport.Native {
+		answerDescription.Transport = &transportOffer{Version: 1, Mode: mode}
+	}
+	if err := signal.Send(ctx, signaling.KindAnswer, answerDescription); err != nil {
 		_ = pc.Close()
 		return nil, err
 	}
@@ -465,4 +498,5 @@ func (p *Peer) RoundTripMS() *float64 {
 	return nil
 }
 
+// Connected 回報已建立的 P2P 連線，不把僅完成認證視為已連線。
 func (p *Peer) Connected() bool { return p.pc.ConnectionState() == webrtc.PeerConnectionStateConnected }

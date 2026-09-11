@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""YourDesk 跨平台建置、macOS DMG／Windows Installer 封裝。"""
+"""YourDesk 跨平台建置、macOS DMG／Windows Installer／WinPE 實驗性 ZIP 封裝。"""
 import argparse
 import hashlib
 import json
@@ -19,16 +19,16 @@ from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parent.parent
 DIST = ROOT / 'dist'
-DEFAULT_TARGETS = 'darwin/arm64,windows/amd64,windows/arm64'
-SUPPORTED_TARGETS = {'darwin/arm64', 'windows/amd64', 'windows/arm64'}
+DEFAULT_TARGETS = 'darwin/arm64,windows/amd64,windows/arm64,winpe/amd64'
+SUPPORTED_TARGETS = {'darwin/arm64', 'windows/amd64', 'windows/arm64', 'winpe/amd64'}
 
 
 def run(args, env=None, cwd=ROOT):
     subprocess.run([str(a) for a in args], cwd=cwd, env=env, check=True)
 
 
-def capture(args):
-    return subprocess.check_output(args, cwd=ROOT, text=True).strip()
+def capture(args, env=None):
+    return subprocess.check_output(args, cwd=ROOT, env=env, text=True).strip()
 
 
 def manifest(folder):
@@ -219,8 +219,72 @@ def copy_model_licenses(folder):
         shutil.copy2(source, licenses / ('RIFE-' + name))
 
 
+def compile_winpe(folder, version):
+    env = environment('windows/amd64', False)
+    common = ['-mod=readonly', '-tags', 'winpe']
+    dependencies = capture(['go', 'list', *common, '-deps', './cmd/winpe'], env=env)
+    if re.search(r'^(github.com/(tailscale/tailcat|webview/)|tailscale.com/|yourdesk/internal/(winmedia|clientui)$)', dependencies, re.MULTILINE):
+        raise ValueError('WinPE 建置含有不允許的桌面或 Tailcat 相依')
+    flags = f"-s -w -H=windowsgui -X 'main.rescueVersion=YourDesk {version} WinPE Experimental'"
+    run(['go', 'build', *common, '-trimpath', '-ldflags', flags,
+         '-o', folder / 'yourdesk-winpe.exe', './cmd/winpe'], env=env)
+    for name in ('start-yourdesk.cmd', 'README.md'):
+        shutil.copy2(ROOT / 'packaging/winpe' / name, folder / name)
+    licenses = folder / 'ThirdPartyLicenses'
+    licenses.mkdir(exist_ok=True)
+    shutil.copy2(Path(capture(['go', 'env', 'GOROOT'])) / 'LICENSE', licenses / 'Go-LICENSE')
+    modules = capture(['go', 'list', *common, '-deps', '-f',
+                       '{{if .Module}}{{if not .Module.Main}}{{.Module.Path}}@{{.Module.Version}}|{{.Module.Dir}}{{end}}{{end}}',
+                       './cmd/winpe'], env=env)
+    for module in sorted(set(modules.splitlines())):
+        if not module.strip():
+            continue
+        name, directory = module.split('|', 1)
+        for pattern in ('LICENSE', 'LICENSE.*', 'COPYING', 'NOTICE'):
+            for source in Path(directory).glob(pattern):
+                if source.is_file():
+                    shutil.copy2(source, licenses / (name.replace('/', '__') + '-' + source.name))
+    manifest(folder)
+
+
+def winpe_zip(folder, stem):
+    # 僅封裝已知 payload，重複打包不會把上一份 ZIP 放入新 ZIP。
+    payload = [folder / name for name in ('yourdesk-winpe.exe', 'start-yourdesk.cmd', 'README.md', 'ThirdPartyLicenses')]
+    if any(not item.exists() for item in payload):
+        raise ValueError('WinPE 產物不完整，請重新建置')
+    with tempfile.TemporaryDirectory(prefix='.winpe-pack-', dir=folder.parent) as temporary:
+        stage = Path(temporary)
+        package = stage / stem
+        package.mkdir()
+        for source in payload:
+            if source.is_dir():
+                shutil.copytree(source, package / source.name)
+            else:
+                shutil.copy2(source, package / source.name)
+        manifest(package)
+        archive = stage / (stem + '.zip')
+        with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as output:
+            for item in sorted(package.rglob('*')):
+                if item.is_file():
+                    output.write(item, item.relative_to(stage))
+        os.replace(archive, folder / archive.name)
+    return folder / (stem + '.zip')
+
+
+def build_winpe_standalone(version):
+    version_name(version)
+    output = ROOT / '.local-run/winpe-dist'
+    output.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix='.winpe-build-', dir=output) as temporary:
+        folder = Path(temporary)
+        compile_winpe(folder, version)
+        archive = winpe_zip(folder, 'YourDesk-WinPE-x64-experimental')
+        os.replace(archive, output / archive.name)
+    print(output / 'YourDesk-WinPE-x64-experimental.zip')
+
+
 def write_instructions(folder, system, version):
-    if system == 'darwin':
+    if system in ('darwin', 'winpe'):
         return
     copy_model_licenses(folder)
     instructions = ROOT / 'docs' / 'README-Windows.txt'
@@ -250,10 +314,13 @@ def build(version, targets):
     release = DIST
     selected = list(dict.fromkeys(targets.split(',')))
     if not selected or any(t not in SUPPORTED_TARGETS for t in selected):
-        raise ValueError('不支援的建置目標；macOS 僅支援 arm64，Windows 支援 amd64、arm64；Linux 暫不提供桌面套件')
+        raise ValueError('不支援的建置目標；macOS 僅支援 arm64，Windows 支援 amd64、arm64，WinPE 實驗版支援 amd64；Linux 暫不提供桌面套件')
     # 預先確認原生 UI 工具鏈，禁止用 CGO=0 產生缺少介面的桌面版。
     for target in selected:
-        environment(target, True)
+        if target == 'winpe/amd64':
+            environment('windows/amd64', False)
+        else:
+            environment(target, True)
     if 'darwin/arm64' in selected:
         signing_identity()
         capture(['xcrun', 'notarytool', 'history', '--keychain-profile', notary_profile(), '--output-format', 'json'])
@@ -273,6 +340,8 @@ def build(version, targets):
                         compile_program(name, binaries, target, version)
                     mac_bundle(binaries, version)
                     shutil.move(str(binaries / 'YourDesk.app'), folder / 'YourDesk.app')
+            elif system == 'winpe':
+                compile_winpe(folder, version)
             else:
                 programs = ('client', 'remote', 'desktop')
                 for name in programs:
@@ -359,6 +428,8 @@ def pack(release, targets=None):
                 run(['spctl', '--assess', '--type', 'open', '--context', 'context:primary-signature', '--verbose=2', output])
         elif system == 'windows':
             windows_installer(folder, stem, version, arch)
+        elif system == 'winpe':
+            winpe_zip(folder, stem + '-experimental')
         if system == 'darwin':
             clean_apple_output(folder)
         else:
@@ -369,12 +440,17 @@ def pack(release, targets=None):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('mode', choices=('build', 'pack'))
+    parser.add_argument('mode', choices=('build', 'pack', 'winpe'))
     parser.add_argument('--no-build', action='store_true', help='使用 dist 中已完成的建置產物打包')
     args = parser.parse_args()
     if DIST.is_symlink():
         raise ValueError('dist 不可為符號連結')
     version = os.environ.get('YOURDESK_VERSION')
+    if args.mode == 'winpe':
+        if args.no_build:
+            raise ValueError('winpe 獨立建置不接受 --no-build')
+        build_winpe_standalone(version or datetime.now(ZoneInfo('Asia/Taipei')).strftime('1.%y.%m%d build %H%M'))
+        return
     if args.mode == 'pack' and args.no_build:
         release = DIST
         metadata_path = release / 'release.json'

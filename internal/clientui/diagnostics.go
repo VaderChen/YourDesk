@@ -9,6 +9,7 @@ import (
 
 // 呼叫時已持有 server.mu。取樣綁定子程序，重新連線不沿用舊報告。
 type diagnosticRun struct {
+	Proposal  *streamAutoProposal  `json:"-"`
 	StartedAt int64                `json:"startedAt"`
 	Samples   []diagnostics.Sample `json:"samples"`
 }

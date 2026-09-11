@@ -1,11 +1,9 @@
 package clientui
 
 import (
-	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
-	"net/url"
 	"sync"
 	"time"
 	"yourdesk/internal/security"
@@ -45,22 +43,6 @@ func (s *server) servePresence(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			defer func() { <-slots }()
-			address, err := url.Parse(signal)
-			if err != nil {
-				return
-			}
-			switch address.Scheme {
-			case "ws":
-				address.Scheme = "https"
-			case "wss":
-				address.Scheme = "https"
-			default:
-				return
-			}
-			address.Path = "/presence"
-			address.RawPath = ""
-			address.RawQuery = ""
-			address.Fragment = ""
 			for start := 0; start < len(group); start += 256 {
 				batch := group[start:min(start+256, len(group))]
 				rooms := make([]string, 0, len(batch))
@@ -68,12 +50,7 @@ func (s *server) servePresence(w http.ResponseWriter, r *http.Request) {
 					rooms = append(rooms, site.Room)
 				}
 				body, _ := json.Marshal(map[string]any{"rooms": rooms})
-				request, err := http.NewRequestWithContext(r.Context(), "POST", address.String(), bytes.NewReader(body))
-				if err != nil {
-					return
-				}
-				request.Header.Set("Content-Type", "application/json")
-				response, err := client.Do(request)
+				response, err := security.SignalHTTPRequest(r.Context(), client, signal, "POST", "/presence", body)
 				if err != nil {
 					return
 				}

@@ -10,11 +10,12 @@ import (
 )
 
 type Config struct {
-	Room   string `json:"room"`
-	Signal string `json:"signal"`
-	Secret string `json:"secret"`
-	Codec  string `json:"codec"`
-	Direct bool   `json:"direct"`
+	Tailcat bool   `json:"tailcat,omitempty"`
+	Room    string `json:"room"`
+	Signal  string `json:"signal"`
+	Secret  string `json:"secret"`
+	Codec   string `json:"codec"`
+	Direct  bool   `json:"direct"`
 }
 
 func (c Config) validate() error {

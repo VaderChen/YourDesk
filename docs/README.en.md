@@ -8,7 +8,7 @@ YourDesk is a remote desktop app for macOS and Windows. Connect to another compu
 
 ## Features
 
-This release adds a tray action and red button to disconnect incoming sessions, and allows listed MCP IPs to connect without a token. macOS pre-login access is experimental, off by default and not yet verified on hardware; see the [release notes](RELEASE-1.26.0911-build-1012.md) for limitations and changes.
+This release adds HTTPS fallback, an experimental Tailcat transport and a WinPE x64 experimental ZIP. Automatic configuration now requires Start, then Apply. See the [release notes](RELEASE-1.26.0911-build-1733.md).
 
 - **Hardware-accelerated encoding and decoding:** supports H.264/HEVC on macOS and H.264 on Windows, selected automatically according to both devices' capabilities. Falls back when unavailable; the toolbar shows the actual encoding and decoding status.
 - **Cross-platform control:** use your keyboard, mouse and common shortcuts between Mac and Windows.

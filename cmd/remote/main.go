@@ -23,6 +23,7 @@ import (
 	"yourdesk/internal/branding"
 	"yourdesk/internal/clipboard"
 	"yourdesk/internal/p2p"
+	"yourdesk/internal/peertransport"
 	"yourdesk/internal/rawkey"
 	"yourdesk/internal/signaling"
 	"yourdesk/internal/streamconfig"
@@ -435,6 +436,7 @@ func main() {
 	flag.Bool("mcp-managed", false, "由 MCP 管理的遠端連線")
 	mcpHidden := flag.Bool("mcp-hidden", false, "MCP 背景操作，直到使用者開啟遠端畫面")
 	backgroundDiagnostic := flag.Bool("diagnostic", false, "背景串流診斷，不開啟 遠端顯示")
+	transport := flag.String("transport", "", "虛擬傳輸模式：空白為原生 UDP，tailcat 為實驗性 Tailcat")
 	flag.Parse()
 	flag.Visit(func(f *flag.Flag) {
 		if f.Name == "source-fps" {
@@ -452,7 +454,7 @@ func main() {
 		fatal(fmt.Errorf("必須透過標準輸入提供連線密碼"))
 	}
 	if *backgroundDiagnostic {
-		if err := runBackgroundDiagnostic(*signalURL, *room, *codec); err != nil {
+		if err := runBackgroundDiagnostic(*signalURL, *room, *codec, peertransport.Mode(*transport)); err != nil {
 			fatal(err)
 		}
 		return
@@ -595,7 +597,7 @@ func main() {
 		g.mu.Unlock()
 	})
 	defer decodeFrames.Close()
-	peer, err := p2p.NewViewer(handshakeCtx, sig, func(f p2p.Frame) {
+	peer, err := p2p.NewViewerWithTransport(handshakeCtx, sig, peertransport.Mode(*transport), func(f p2p.Frame) {
 		stats.received.Add(1)
 		stats.wire.Store(uint32(f.Codec))
 		// 封包已重組為獨立記憶體，交給解碼 worker 後即可接收下一幀。
@@ -694,7 +696,9 @@ func main() {
 		}
 	}()
 	emitUIEvent("authenticated", "")
+	g.mu.Lock()
 	g.peer = peer
+	g.mu.Unlock()
 	go g.clipboard.Run(ctx, peer)
 	defer func() {
 		// 先解除收件回呼的反壓並等待解碼，再關閉網路及原生資源。
@@ -737,6 +741,10 @@ func fatal(err error) {
 		message = "等待遠端握手逾時；Client 已註冊，但尚未完成連線。請更新或重新啟動遠端 Client 後再試。"
 	} else if strings.Contains(err.Error(), "signaling") || strings.Contains(err.Error(), "IP 直連") {
 		message = "無法完成連線服務握手，請檢查網路與遠端 Client 狀態。"
+	}
+	// 只在本次連線選用 Tailcat 時提供相容性提醒，不直接判定失敗原因。
+	if mode := flag.Lookup("transport"); mode != nil && mode.Value.String() == string(peertransport.Tailcat) {
+		message += " 對方可能尚未支援 Tailcat，請更新對方的 YourDesk，或關閉 Tailcat 後重試。"
 	}
 	emitUIEvent("error", message)
 	fmt.Fprintln(os.Stderr, "yourdesk-remote:", err)

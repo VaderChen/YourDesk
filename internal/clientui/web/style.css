@@ -180,7 +180,12 @@ dialog input:focus, dialog select:focus, dialog textarea:focus { outline: 2px so
 .quick-status { margin-left: calc(var(--sidebar-width) + 1px); }
 .preference-row { display: grid; grid-template-columns: 1fr 190px; gap: 14px; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--line); }
 .preference-row label, .preference-row select { margin: 0; }
-.preference-row label { font-size: 14px; }
+.preference-row label { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; font-size: 14px; line-height: 1.4; }
+/* 設定名稱沿用 label 字體，不套用一般欄位的 span 副標樣式。 */
+.preference-row label > span:not(.experimental-badge) { font: inherit; color: inherit; margin-left: 0; }
+.preference-row label > .experimental-badge { margin-left: 0; white-space: nowrap; line-height: 1.4; }
+/* 空白狀態提示不占據列距；有進度訊息時正常顯示。 */
+#settings-dialog .form-note:empty { display: none; }
 .preference-row :is(input[type="number"], select) { width: 100%; min-width: 0; height: 32px; margin: 0; padding: 4px 10px; border: 1px solid var(--line); border-radius: 8px; background-color: #fafcfb; color: #344b3d; font: inherit; font-size: 14px; }
 .preference-row select { appearance: none; -webkit-appearance: none; padding-right: 28px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='m3 4.5 3 3 3-3' fill='none' stroke='%237c8982' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 9px center; }
 .settings-content { scrollbar-gutter: stable; }
@@ -311,10 +316,12 @@ dialog .remember-row input { display: inline-block; width: 16px; height: 16px; m
 #diagnostic-progress { width:100%; accent-color:var(--green); }
 #stream-auto-dialog { width:min(520px,calc(100% - 28px)); }
 #stream-auto-progress { width:100%; accent-color:var(--green); }
-#stream-auto-steps { padding-left:24px; line-height:2; color:var(--muted); }
+#stream-auto-steps { padding-left:0; list-style:none; counter-reset:detection-step; line-height:2; color:var(--muted); }
+#stream-auto-steps li { counter-increment:detection-step; position:relative; padding-left:24px; }
+#stream-auto-steps li::before { content:counter(detection-step) "."; position:absolute; left:0; width:20px; text-align:center; }
 #stream-auto-steps li[data-state="active"] { color:var(--green); font-weight:700; }
 #stream-auto-steps li[data-state="done"] { color:var(--green); }
-#stream-auto-steps li[data-state="done"]::marker { content:'✓  '; }
+#stream-auto-steps li[data-state="done"]::before { content:"✓"; font-weight:700; }
 #stream-auto-message[data-error="true"] { color:#b42318; }
 .diagnostic-row { display:flex; justify-content:space-between; gap:16px; border-bottom:1px solid var(--line); padding:10px 0; font-size:14px; }
 .diagnostic-row strong { text-align:right; }
@@ -337,7 +344,7 @@ dialog .remember-row input { display: inline-block; width: 16px; height: 16px; m
 .experimental-badge { display: inline-block; padding: 2px 6px; border: 1px solid var(--line); border-radius: 5px; font-size: 11px; font-weight: 600; }
 .preference-row.experimental-unavailable input.preference-switch:disabled { background: #a4aaa7; opacity: .55; cursor: not-allowed; }
 .experimental-unavailable:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
-.experimental-reason { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.help-description { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 .stop-incoming { color: #c13737; }
 .stop-incoming:hover { color: #a51e1e; background: #fbe7e7; }

@@ -1,13 +1,16 @@
 package security
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	_ "embed"
 	"errors"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -20,10 +23,34 @@ func SecureSignalURL(value string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if address.Hostname() == "" || (address.Scheme != "ws" && address.Scheme != "wss") {
-		return "", errors.New("配對服務必須使用有效的 WSS 網址")
+	if address.Hostname() == "" || address.User != nil || (address.Scheme != "ws" && address.Scheme != "wss" && address.Scheme != "https") {
+		return "", errors.New("配對服務必須使用有效的 WSS 或 HTTPS 網址")
 	}
-	address.Scheme = "wss" // 舊設定只升級，不允許降級到明文。
+	if address.Scheme == "ws" {
+		address.Scheme = "wss"
+	} // 舊設定只升級，不允許降級到明文。
+	return address.String(), nil
+}
+
+// 自訂 HTTPS 埠可透過環境變數設定，或直接將站台 signal 設為 HTTPS 網址。
+func SignalHTTPSURL(value string) (string, error) {
+	secure, err := SecureSignalURL(value)
+	if err != nil {
+		return "", err
+	}
+	address, _ := url.Parse(secure)
+	if address.Scheme != "https" {
+		port := os.Getenv("YOURDESK_SIGNAL_HTTPS_PORT")
+		if port == "" {
+			port = "8081"
+		}
+		number, err := strconv.Atoi(port)
+		if err != nil || number < 1 || number > 65535 {
+			return "", errors.New("HTTPS 備援埠須為 1～65535")
+		}
+		address.Host = net.JoinHostPort(address.Hostname(), port)
+	}
+	address.Scheme, address.Path, address.RawPath, address.RawQuery, address.Fragment = "https", "", "", "", ""
 	return address.String(), nil
 }
 func TLSHTTPClient(timeout time.Duration) (*http.Client, error) {
@@ -58,25 +85,12 @@ func TLSHTTPClient(timeout time.Duration) (*http.Client, error) {
 
 // 啟動腳本使用 Go TLS，避免系統 curl 不支援 TLS 1.3。
 func CheckSignalServer(value string) error {
-	secure, err := SecureSignalURL(value)
-	if err != nil {
-		return err
-	}
-	address, err := url.Parse(secure)
-	if err != nil {
-		return err
-	}
-	address.Scheme = "https"
-	address.Path = "/healthz"
-	address.RawPath = ""
-	address.RawQuery = ""
-	address.Fragment = ""
 	client, err := TLSHTTPClient(8 * time.Second)
 	if err != nil {
 		return err
 	}
 	defer client.CloseIdleConnections()
-	response, err := client.Get(address.String())
+	response, err := SignalHTTPRequest(context.Background(), client, value, "GET", "/healthz", nil)
 	if err != nil {
 		return err
 	}
