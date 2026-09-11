@@ -10,6 +10,8 @@ YourDesk は macOS と Windows に対応するリモートデスクトップア�
 
 独立ターミナル、Linux CLI x64／arm64 ZIP、MCP 対話ターミナルを追加しました。切断後のウィンドウ保持を設定でき、Host 復帰待ちは回転アイコンで表示します。[リリースノート](RELEASE-1.26.0911-build-2104.md)。
 
+- **GUI・コマンドラインの両モード**：作業に応じてリモートデスクトップと対話ターミナルを選択できます。ターミナルは独立ウィンドウで表示し、Linux CLI Host にも接続できます。
+- **MCP AI Agent による遠隔操作**：AI Agent が MCP 経由で接続し、デスクトップやターミナルの操作、接続先の機能確認、作業後の切断を行えます。
 - **ハードウェアエンコード・デコード**：macOS の H.264／HEVC、Windows の H.264 に対応。両端の機器の能力に応じて自動選択し、利用できない場合は代替方式に切り替えます。実際の処理状態はツールバーで確認できます。
 - **クロスプラットフォーム操作**：Mac と Windows 間でキーボード、マウス、一般的なショートカットを使用。
 - **簡単な接続管理**：リモート ID で接続し、接続先の保存、グループ分け、並べ替え、インポート／エクスポートが可能。
@@ -38,6 +40,11 @@ IP 許可リストは初期状態で有効、許可先は `127.0.0.1` のみで�
 
 [GitHub Releases](https://github.com/VaderChen/YourDesk/releases/latest) から、macOS Apple Silicon 用 DMG、Windows x64 または Windows ARM64 用インストーラーをダウンロードしてください。macOS 版は署名・Apple 公証済みです。
 
+| プラットフォーム | ダウンロードパッケージ |
+| --- | --- |
+| macOS Apple Silicon | 署名・Apple 公証済み DMG |
+| Windows x64 | x64 インストーラー |
+| Windows on ARM（WOA） | ARM64 インストーラー |
 | Linux x64／arm64 | CLI Host ZIP（デスクトップ／REMOTE なし） |
 
 1. 両方のパソコンに YourDesk をインストールして起動します。

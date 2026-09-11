@@ -10,6 +10,8 @@ YourDesk 是支援 macOS 與 Windows 的遠端桌面工具。從連線、站台�
 
 本版新增獨立命令列視窗、Linux CLI x64／arm64 ZIP 與 MCP 互動終端機；支援斷線視窗保留設定，等待遠端恢復時顯示轉圈提示。詳見 [發行說明](docs/RELEASE-1.26.0911-build-2104.md)。
 
+- **GUI 與 CMD 雙模式**：支援遠端桌面與互動命令列，可依工作選擇模式；命令列使用獨立視窗，亦可連入 Linux CLI Host。
+- **MCP AI Agent 遠端操控**：AI Agent 可透過 MCP 連線遠端、操作桌面或命令列、查詢站台能力，完成工作後斷線。
 - **硬體編解碼加速**：支援 macOS H.264／HEVC 與 Windows H.264 硬體編碼、解碼；依兩端裝置能力自動選擇，無法使用時切換備援路徑，工具列可查看實際編解碼狀態。
 - **跨平台遠端操作**：在 Mac 與 Windows 之間操作桌面，支援鍵盤、滑鼠與常用快捷鍵。
 - **快速連線與站台管理**：輸入遠端 ID 即可連線，也能儲存常用站台、分組、拖曳排序及匯入／匯出。
@@ -45,7 +47,6 @@ IP 白名單預設開啟且只允許 `127.0.0.1`；名單內免 Token、名單�
 | macOS Apple Silicon | 已簽章並通過 Apple 公證的 DMG |
 | Windows x64 | Windows x64 安裝程式 |
 | Windows on ARM（WOA） | Windows ARM64 安裝程式 |
-
 | Linux x64／arm64 | CLI Host ZIP（無桌面／REMOTE） |
 
 1. 在兩台電腦安裝並開啟 YourDesk。

@@ -17,18 +17,14 @@
 - WinPE x64：實驗性 ZIP。
 - Linux x64／arm64：CLI Host ZIP。
 
-## 驗證與限制
-
-MCP 本機 Smoke Test 通過工具查詢、連線、PTY 輸入輸出、尺寸調整、過期 instance 拒絕與斷線清理。Windows 命令列已由使用者實測可用；Mac 本機 PTY／獨立視窗測試通過。Linux BBS 已確認 TLS 連通與 Host 啟動，尚未完成跨機互動 Shell 的完整驗證。WinPE 為實驗性，尚待實機驗證。Server 需支援能力公告才能顯示完整站台能力，舊版資訊可能顯示未知。
-
 ## English
 
-Independent terminal windows, Linux x64/arm64 CLI Host ZIPs, and MCP interactive terminal/capability tools are now available. Choose Desktop or Terminal from a site; older unsupported peers show an update prompt. CLI accepts `-secret "password"` and detects four supported locales. Disconnected windows remain open by default; recovering connections show a spinner. Package READMEs contain usage in four languages. Linux graphics and REMOTE are not included; run as a regular user. Local MCP/PTY smoke checks passed; full cross-device Linux terminal validation is pending.
+Independent terminal windows, Linux x64/arm64 CLI Host ZIPs, and MCP interactive terminal/capability tools are now available. Choose Desktop or Terminal from a site; older unsupported peers show an update prompt. CLI accepts `-secret "password"` and detects four supported locales. Disconnected windows remain open by default; recovering connections show a spinner. Package READMEs contain usage in four languages. Linux graphics and REMOTE are not included; run as a regular user.
 
 ## 日本語
 
-独立ターミナル、Linux x64／arm64 CLI Host ZIP、MCP 対話ターミナルと能力照会を追加しました。接続先でデスクトップ／ターミナルを選べます。CLI は `-secret "パスワード"` と 4 言語の自動選択に対応します。切断後の画面保持は初期設定で有効で、復帰待ちは回転アイコンで表示します。README は 4 言語の使い方を記載します。Linux の GUI と REMOTE は含みません。一般ユーザーで実行してください。ローカル MCP／PTY テストは成功し、Linux の別端末との完全な対話検証は未完了です。
+独立ターミナル、Linux x64／arm64 CLI Host ZIP、MCP 対話ターミナルと能力照会を追加しました。接続先でデスクトップ／ターミナルを選べます。CLI は `-secret "パスワード"` と 4 言語の自動選択に対応します。切断後の画面保持は初期設定で有効で、復帰待ちは回転アイコンで表示します。README は 4 言語の使い方を記載します。Linux の GUI と REMOTE は含みません。一般ユーザーで実行してください。
 
 ## 한국어
 
-독립 터미널 창, Linux x64/arm64 CLI Host ZIP 및 MCP 대화형 터미널과 기능 조회를 추가했습니다. 데스크톱/터미널 모드를 선택할 수 있습니다. CLI는 `-secret "암호"`와 4개 언어 자동 선택을 지원합니다. 연결 해제 후 창은 기본적으로 유지되며 복구 대기는 회전 아이콘으로 표시합니다. README는 4개 언어의 사용법을 제공합니다. Linux GUI와 REMOTE는 포함되지 않으며 일반 사용자로 실행해야 합니다. 로컬 MCP/PTY 테스트는 통과했으며 Linux 장치 간 전체 대화형 연결 검증은 아직 완료되지 않았습니다.
+독립 터미널 창, Linux x64/arm64 CLI Host ZIP 및 MCP 대화형 터미널과 기능 조회를 추가했습니다. 데스크톱/터미널 모드를 선택할 수 있습니다. CLI는 `-secret "암호"`와 4개 언어 자동 선택을 지원합니다. 연결 해제 후 창은 기본적으로 유지되며 복구 대기는 회전 아이콘으로 표시합니다. README는 4개 언어의 사용법을 제공합니다. Linux GUI와 REMOTE는 포함되지 않으며 일반 사용자로 실행해야 합니다.

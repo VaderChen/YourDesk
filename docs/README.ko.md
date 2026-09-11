@@ -10,6 +10,8 @@ YourDesk는 macOS와 Windows를 지원하는 원격 데스크톱 앱입니다. �
 
 독립 터미널 창, Linux CLI x64/arm64 ZIP 및 MCP 대화형 터미널을 추가했습니다. 연결 해제 후 창 유지 여부를 설정할 수 있으며 Host 복구 대기는 회전 아이콘으로 표시합니다. [릴리스 노트](RELEASE-1.26.0911-build-2104.md).
 
+- **GUI 및 명령줄 모드**: 작업에 따라 원격 데스크톱이나 대화형 터미널을 선택하세요. 터미널은 독립 창으로 열리며 Linux CLI Host에도 연결할 수 있습니다.
+- **MCP AI Agent 원격 제어**: AI Agent가 MCP로 연결하여 데스크톱이나 터미널을 조작하고, 연결 대상의 기능을 조회한 뒤 작업을 마치면 연결을 해제할 수 있습니다.
 - **하드웨어 인코딩·디코딩 가속**: macOS의 H.264/HEVC와 Windows의 H.264를 지원합니다. 양쪽 기기의 기능에 따라 자동 선택하고 사용할 수 없으면 대체 방식으로 전환하며, 도구 모음에서 실제 인코딩·디코딩 상태를 확인할 수 있습니다.
 - **크로스 플랫폼 제어**: Mac과 Windows 사이에서 키보드, 마우스, 일반 단축키를 사용합니다.
 - **빠른 연결과 관리**: 원격 ID로 연결하거나 저장된 연결을 선택합니다. 그룹, 순서 변경, 가져오기와 내보내기를 지원합니다.
@@ -38,6 +40,11 @@ IP 허용 목록은 기본으로 켜져 있고 `127.0.0.1`만 허용합니다. �
 
 [GitHub Releases](https://github.com/VaderChen/YourDesk/releases/latest)에서 macOS Apple Silicon용 DMG, Windows x64 또는 Windows ARM64 설치 프로그램을 받으세요. macOS 패키지는 서명 및 Apple 공증을 완료했습니다.
 
+| 플랫폼 | 다운로드 패키지 |
+| --- | --- |
+| macOS Apple Silicon | 서명 및 Apple 공증 완료 DMG |
+| Windows x64 | x64 설치 프로그램 |
+| Windows on ARM (WOA) | ARM64 설치 프로그램 |
 | Linux x64 / arm64 | CLI Host ZIP (데스크톱 / REMOTE 미포함) |
 
 1. 두 컴퓨터에 YourDesk를 설치하고 실행합니다.
