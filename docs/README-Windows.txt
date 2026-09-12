@@ -3,10 +3,10 @@ Portable Windows x64 ZIP: extract all files and run YourDesk.exe. Keep the DLLs 
 Windows x64 ポータブル ZIP：全て展開して YourDesk.exe を実行してください。DLL とライセンスを保持し、WebView2 Runtime を導入してください。設定はユーザープロファイルに保存されます。ログイン前サービスは別途有効化と管理者承認が必要です。
 Windows x64 무설치 ZIP: 전체 압축 해제 후 YourDesk.exe를 실행하세요. DLL과 라이선스를 유지하고 WebView2 Runtime을 설치하세요. 설정은 사용자 프로필에 저장됩니다. 로그인 전 서비스는 별도 활성화와 관리자 승인이 필요합니다.
 
-防毒偵測警語：部分防毒軟體會將部分版本判定為含有病毒，原因正在調查與處理中；尚未確認是否由 NAT／防火牆穿透功能觸發，也尚未取得誤報確認。請自行評估後使用，勿關閉防毒保護。
-Antivirus notice: some builds are flagged as malware. Investigation is ongoing; neither traversal as the cause nor false positives are confirmed. Assess the risk and do not disable antivirus protection.
-ウイルス対策の注意：一部のバージョンに検出があり調査中です。接続機能との因果関係や誤検知は未確認です。リスクを判断し、保護を無効にしないでください。
-백신 안내: 일부 빌드가 악성코드로 탐지되어 조사 중입니다. 통과 기능과의 인과관계나 오탐은 미확인입니다. 위험을 판단하고 백신 보호를 끄지 마세요.
+防毒偵測說明：目前部分防毒軟體會對 YourDesk 發出告警。我們測試的空 Go 專案也出現告警，Go 官方 FAQ 亦說明 Go 程式可能遭誤判；但目前尚未確認正式版的所有告警都是誤報。作者會持續調查與改善，朝消除這些告警的方向努力。請自行評估後下載使用，勿為此關閉防毒保護。
+Antivirus notice: some antivirus products currently flag YourDesk. Our empty Go test project also triggered detections, and the official Go FAQ describes possible false positives for Go programs. However, not all detections in the release have been confirmed as false positives. The author will continue investigating and improving the project to address these alerts. Assess the risk before downloading; do not disable antivirus protection.
+ウイルス対策ソフトに関する説明：現在、一部のウイルス対策ソフトが YourDesk に警告を出しています。テストした空の Go プロジェクトでも検出があり、Go 公式 FAQ にも誤検知の可能性が説明されています。ただし、正式版のすべての警告が誤検知と確認されたわけではありません。作者は警告の解消に向けて調査と改善を続けます。リスクをご判断のうえダウンロードし、ウイルス対策を無効にしないでください。
+백신 안내: 현재 일부 백신이 YourDesk에 경고를 표시합니다. 테스트한 빈 Go 프로젝트에서도 탐지가 발생했으며 Go 공식 FAQ도 Go 프로그램의 오탐 가능성을 설명합니다. 다만 정식 버전의 모든 경고가 오탐으로 확인된 것은 아닙니다. 개발자는 경고 해소를 위해 조사와 개선을 계속하겠습니다. 위험을 판단한 후 다운로드하고 백신 보호를 끄지 마세요.
 
 繁體中文
 --------------------

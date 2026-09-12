@@ -2,7 +2,7 @@
 
 ## 繁體中文
 
-> **防毒偵測警語：本程式具備 NAT／防火牆穿透連線功能。目前部分防毒軟體會將部分版本判定為含有病毒，原因正在調查與處理中；尚未確認是否由穿透功能觸發，也尚未取得防毒廠商的誤報確認。請自行評估後下載使用，勿為此關閉防毒保護。**
+> **防毒偵測說明：目前部分防毒軟體會對 YourDesk 發出告警。我們測試的空 Go 專案也出現告警，Go 官方 FAQ 亦說明 Go 程式可能遭誤判；但目前尚未確認正式版的所有告警都是誤報。作者會持續調查與改善，朝消除這些告警的方向努力。請自行評估後下載使用，勿為此關閉防毒保護。**
 
 防毒告警調查更新：我們建立了一個僅有 `package main` 與 `func main() {}`、沒有引用 YourDesk 或第三方套件的 Go 空專案。其 Windows x64 執行檔仍出現 **9／70 家引擎告警**（使用者提供的 VirusTotal 掃描快照，數字可能隨後續分析改變）。詳見 [空專案檢測報告](https://www.virustotal.com/gui/file/fb906e6611161faafc695ada5042ae82696b88dba3cd1309843d1f42adfe084f)。這表示告警不需要遠端控制或防火牆穿透功能才會發生。
 
@@ -26,7 +26,7 @@
 
 ## English
 
-> **Antivirus notice: YourDesk supports NAT/firewall traversal. Some antivirus products currently flag some builds as containing malware. We are investigating and addressing these detections. Their connection to traversal has not been established, and vendors have not confirmed false positives. Assess the risk before downloading; do not disable antivirus protection.**
+> **Antivirus notice: some antivirus products currently flag YourDesk. Our empty Go test project also triggered detections, and the official Go FAQ describes possible false positives for Go programs. However, not all detections in the release have been confirmed as false positives. The author will continue investigating and improving the project to address these alerts. Assess the risk before downloading; do not disable antivirus protection.**
 
 Antivirus investigation update: a minimal Go project containing only `package main` and `func main() {}`, with no YourDesk or third-party imports, still produced a Windows x64 executable flagged by **9/70 engines** in a user-provided VirusTotal snapshot. Counts may change. See the [empty-project scan report](https://www.virustotal.com/gui/file/fb906e6611161faafc695ada5042ae82696b88dba3cd1309843d1f42adfe084f). Remote-control or firewall-traversal functionality is therefore not required for a detection to occur.
 
@@ -42,7 +42,7 @@ The release includes macOS ARM64, Windows x64/ARM64 installers, Linux x64/ARM64 
 
 ## 日本語
 
-> **ウイルス対策ソフトに関する注意：YourDesk は NAT／ファイアウォール越えの接続に対応しています。現在、一部のバージョンが一部のウイルス対策ソフトでマルウェアと判定されており、原因を調査・対応中です。接続機能との因果関係や誤検知は未確認です。リスクをご判断のうえダウンロードし、ウイルス対策を無効にしないでください。**
+> **ウイルス対策ソフトに関する説明：現在、一部のウイルス対策ソフトが YourDesk に警告を出しています。テストした空の Go プロジェクトでも検出があり、Go 公式 FAQ にも誤検知の可能性が説明されています。ただし、正式版のすべての警告が誤検知と確認されたわけではありません。作者は警告の解消に向けて調査と改善を続けます。リスクをご判断のうえダウンロードし、ウイルス対策を無効にしないでください。**
 
 ウイルス対策の調査更新：`package main` と `func main() {}` のみで、YourDesk やサードパーティのパッケージをインポートしない Go の空プロジェクトでも、Windows x64 実行ファイルが **9/70 エンジンで検出**されました。利用者提供の VirusTotal スナップショットであり、数値は変わる可能性があります。[空プロジェクトの検出レポート](https://www.virustotal.com/gui/file/fb906e6611161faafc695ada5042ae82696b88dba3cd1309843d1f42adfe084f)をご覧ください。リモート操作やファイアウォール越えの機能がなくても検出は発生しています。
 
@@ -58,7 +58,7 @@ macOS ARM64、Windows x64／ARM64、Linux x64／ARM64 CLI、実験版 WinPE x64 
 
 ## 한국어
 
-> **백신 경고 안내: YourDesk는 NAT／방화벽 통과 연결 기능을 제공합니다. 현재 일부 백신이 일부 빌드를 악성코드로 판정하여 원인을 조사하고 대응 중입니다. 통과 기능과의 인과관계 및 오탐 여부는 아직 확인되지 않았습니다. 위험을 판단한 후 다운로드하고 백신 보호를 끄지 마세요.**
+> **백신 안내: 현재 일부 백신이 YourDesk에 경고를 표시합니다. 테스트한 빈 Go 프로젝트에서도 탐지가 발생했으며 Go 공식 FAQ도 Go 프로그램의 오탐 가능성을 설명합니다. 다만 정식 버전의 모든 경고가 오탐으로 확인된 것은 아닙니다. 개발자는 경고 해소를 위해 조사와 개선을 계속하겠습니다. 위험을 판단한 후 다운로드하고 백신 보호를 끄지 마세요.**
 
 백신 조사 업데이트: `package main`과 `func main() {}`만 있고 YourDesk 또는 타사 패키지를 가져오지 않는 빈 Go 프로젝트의 Windows x64 실행 파일도 **9/70 엔진에서 탐지**되었습니다. 사용자가 제공한 VirusTotal 스냅샷이며 수치는 달라질 수 있습니다. [빈 프로젝트 검사 보고서](https://www.virustotal.com/gui/file/fb906e6611161faafc695ada5042ae82696b88dba3cd1309843d1f42adfe084f)를 참고하세요. 원격 제어나 방화벽 통과 기능이 없어도 탐지가 발생한다는 뜻입니다.
 
