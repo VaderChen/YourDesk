@@ -47,7 +47,7 @@ IP 白名單預設開啟且只允許 `127.0.0.1`；名單內免 Token、名單�
 | 平台 | 下載套件 |
 | --- | --- |
 | macOS Apple Silicon | 已簽章並通過 Apple 公證的 DMG |
-| Windows x64 | Windows x64 安裝程式 |
+| Windows x64 | Windows x64 安裝程式／免安裝 ZIP（完整解壓縮後執行 YourDesk.exe） |
 | Windows on ARM（WOA） | Windows ARM64 安裝程式 |
 | Linux x64／arm64 | CLI Host ZIP（無桌面／REMOTE） |
 

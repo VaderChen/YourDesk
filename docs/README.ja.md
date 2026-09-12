@@ -45,7 +45,7 @@ IP 許可リストは初期状態で有効、許可先は `127.0.0.1` のみで�
 | プラットフォーム | ダウンロードパッケージ |
 | --- | --- |
 | macOS Apple Silicon | 署名・Apple 公証済み DMG |
-| Windows x64 | x64 インストーラー |
+| Windows x64 | x64 インストーラー／ポータブル ZIP（全て展開して YourDesk.exe を実行） |
 | Windows on ARM（WOA） | ARM64 インストーラー |
 | Linux x64／arm64 | CLI Host ZIP（デスクトップ／REMOTE なし） |
 

@@ -1,3 +1,13 @@
+Windows x64 免安裝 ZIP：請完整解壓縮後開啟 YourDesk.exe，保留同目錄 DLL 與授權資料；仍需 Microsoft Edge WebView2 Runtime。免安裝版沿用系統使用者設定目錄，並非將設定儲存在 USB 隨身碟。登入前服務仍須另行啟用與管理員授權。
+Portable Windows x64 ZIP: extract all files and run YourDesk.exe. Keep the DLLs and licenses together. Microsoft Edge WebView2 Runtime is required. Settings use the system user profile, not the ZIP folder. The pre-login service requires separate activation and administrator approval.
+Windows x64 ポータブル ZIP：全て展開して YourDesk.exe を実行してください。DLL とライセンスを保持し、WebView2 Runtime を導入してください。設定はユーザープロファイルに保存されます。ログイン前サービスは別途有効化と管理者承認が必要です。
+Windows x64 무설치 ZIP: 전체 압축 해제 후 YourDesk.exe를 실행하세요. DLL과 라이선스를 유지하고 WebView2 Runtime을 설치하세요. 설정은 사용자 프로필에 저장됩니다. 로그인 전 서비스는 별도 활성화와 관리자 승인이 필요합니다.
+
+防毒偵測警語：部分防毒軟體會將部分版本判定為含有病毒，原因正在調查與處理中；尚未確認是否由 NAT／防火牆穿透功能觸發，也尚未取得誤報確認。請自行評估後使用，勿關閉防毒保護。
+Antivirus notice: some builds are flagged as malware. Investigation is ongoing; neither traversal as the cause nor false positives are confirmed. Assess the risk and do not disable antivirus protection.
+ウイルス対策の注意：一部のバージョンに検出があり調査中です。接続機能との因果関係や誤検知は未確認です。リスクを判断し、保護を無効にしないでください。
+백신 안내: 일부 빌드가 악성코드로 탐지되어 조사 중입니다. 통과 기능과의 인과관계나 오탐은 미확인입니다. 위험을 판단하고 백신 보호를 끄지 마세요.
+
 繁體中文
 --------------------
 登入前啟動（實驗性功能）：在進階設定開啟後，經管理員授權安裝 Windows 自動啟動服務；開機後不需先登入，即啟動 Host，登入後持續運作。關閉時亦需管理員授權。更新或解除安裝前請先停用；不支援 BitLocker 開機前解鎖，登入畫面操作仍待實機驗證。

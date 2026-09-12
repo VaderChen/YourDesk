@@ -46,7 +46,7 @@ Download the latest package from [GitHub Releases](https://github.com/VaderChen/
 | Platform | Package |
 | --- | --- |
 | macOS Apple Silicon | Signed and Apple-notarized DMG |
-| Windows x64 | x64 installer |
+| Windows x64 | x64 installer / portable ZIP (extract all files and run YourDesk.exe) |
 | Windows on ARM | ARM64 installer |
 | Linux x64 / arm64 | CLI Host ZIP (no desktop / REMOTE) |
 

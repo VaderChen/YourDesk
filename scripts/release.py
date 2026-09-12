@@ -445,6 +445,34 @@ def windows_installer(folder, stem, version, arch):
         old_zip.unlink()
 
 
+def windows_portable_zip(folder, stem, version):
+    # 明列執行時內容，避免把舊安裝程式或 ZIP 再包入免安裝版。
+    programs = ('YourDesk.exe', 'yourdesk-client.exe', 'yourdesk-remote.exe')
+    windows_runtime.validate(folder, programs)
+    payload = (*programs, *windows_runtime.FFMPEG_DLLS,
+               'LICENSE.md', 'LICENSE.en.md', 'LICENSE.ja.md', 'LICENSE.ko.md',
+               'ThirdPartyLicenses')
+    with tempfile.TemporaryDirectory(prefix='yourdesk-portable-') as temporary:
+        stage = Path(temporary)
+        package = stage / 'YourDesk'
+        package.mkdir()
+        for name in payload:
+            source = folder / name
+            if source.is_dir():
+                shutil.copytree(source, package / name)
+            else:
+                shutil.copy2(source, package / name)
+        write_instructions(package, 'windows', version)
+        manifest(package)
+        archive = stage / (stem + '-portable.zip')
+        with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as output:
+            for item in sorted(package.rglob('*')):
+                if item.is_file():
+                    output.write(item, item.relative_to(stage))
+        shutil.copy2(archive, folder / archive.name)
+    return folder / archive.name
+
+
 def pack(release, targets=None):
     metadata = json.loads((release / 'release.json').read_text())
     version = metadata['version']
@@ -478,6 +506,8 @@ def pack(release, targets=None):
                 run(['spctl', '--assess', '--type', 'open', '--context', 'context:primary-signature', '--verbose=2', output])
         elif system == 'windows':
             windows_installer(folder, stem, version, arch)
+            if arch == 'amd64':
+                windows_portable_zip(folder, stem, version)
         elif system == 'linux':
             for pattern in ('YourDesk-*.tar.gz', 'YourDesk-*.zip'):
                 for previous in folder.glob(pattern):
