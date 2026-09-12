@@ -45,7 +45,7 @@ IP 허용 목록은 기본으로 켜져 있고 `127.0.0.1`만 허용합니다. �
 | 플랫폼 | 다운로드 패키지 |
 | --- | --- |
 | macOS Apple Silicon | 서명 및 Apple 공증 완료 DMG |
-| Windows x64 | x64 설치 프로그램 |
+| Windows x64 | x64 설치 프로그램 / 무설치 ZIP (전체 압축 해제 후 YourDesk.exe 실행) |
 | Windows on ARM (WOA) | ARM64 설치 프로그램 |
 | Linux x64 / arm64 | CLI Host ZIP (데스크톱 / REMOTE 미포함) |
 

@@ -27,7 +27,7 @@ pack.command 預設目標：
 | 目標 | 內容 | 封裝 |
 | --- | --- | --- |
 | macOS arm64 | 原生 Client UI、遠端顯示 | YourDesk.app、DMG |
-| Windows x64 | 原生 Client UI、遠端顯示 | Installer EXE |
+| Windows x64 | 原生 Client UI、遠端顯示 | Installer EXE + portable ZIP |
 | Windows arm64（WOA） | 原生 ARM64 Client UI、遠端顯示 | ARM64 Installer EXE |
 | WinPE x64（實驗性） | 原生 Win32 救援 Host | 便攜 ZIP |
 
