@@ -2,7 +2,7 @@
 
 [繁體中文](../README.md) · **English** · [日本語](README.ja.md) · [한국어](README.ko.md)
 
-> **YourDesk supports NAT/firewall traversal. Some antivirus products currently flag some builds as malware. We are investigating; traversal has not been established as the cause, and false positives have not been confirmed. Assess the risk before downloading.**
+> **Antivirus notice: some antivirus products currently flag YourDesk. Our empty Go test project also triggered detections, and the official Go FAQ describes possible false positives for Go programs. However, not all detections in the release have been confirmed as false positives. The author will continue investigating and improving the project to address these alerts. Assess the risk before downloading; do not disable antivirus protection.**
 
 YourDesk is a remote desktop app for macOS and Windows. Connect to another computer, organize your saved connections, and copy and paste across platforms with familiar controls.
 
