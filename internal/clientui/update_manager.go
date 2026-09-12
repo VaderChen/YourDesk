@@ -205,12 +205,21 @@ func fetchRelease(ctx context.Context) (updateStatus, error) {
 		system = "macos"
 		extensions = []string{".dmg"}
 	}
-	// 優先安裝程式，同時相容舊 Release 的 ZIP。
+	// 對外採 x64，保留舊 amd64 套件的相容性；安裝程式仍優先於 ZIP。
+	architectures := []string{runtime.GOARCH}
+	if runtime.GOARCH == "amd64" {
+		architectures = []string{"x64", "amd64"}
+	}
 	for _, ext := range extensions {
-		suffix := "-" + system + "-" + runtime.GOARCH + ext
-		for _, asset := range release.Assets {
-			if strings.HasPrefix(asset.Name, "YourDesk-") && strings.HasSuffix(asset.Name, suffix) && validReleaseAsset(asset) {
-				result.Asset = asset
+		for _, architecture := range architectures {
+			suffix := "-" + system + "-" + architecture + ext
+			for _, asset := range release.Assets {
+				if strings.HasPrefix(asset.Name, "YourDesk-") && strings.HasSuffix(asset.Name, suffix) && validReleaseAsset(asset) {
+					result.Asset = asset
+					break
+				}
+			}
+			if result.Asset.URL != "" {
 				break
 			}
 		}

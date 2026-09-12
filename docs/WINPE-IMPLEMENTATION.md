@@ -15,9 +15,9 @@
 
 ## 建置及產物
 
-一般 `pack.command` 預設目標已包含 `winpe/amd64`；`buildWin.command` 也會建置 WinPE，接著使用 `pack.command --no-build` 封裝。WinPE 固定提供便攜 ZIP，不使用 Installer；一般 Windows amd64 / arm64 仍使用既有 Installer。
+一般 `pack.command` 預設目標已包含 `winpe/x64`；`buildWin.command` 也會建置 WinPE，接著使用 `pack.command --no-build` 封裝。WinPE 固定提供便攜 ZIP，不使用 Installer；一般 Windows x64 / arm64 仍使用既有 Installer。
 
-一般打包產物：`dist/winpe-amd64/YourDesk-{版本}-winpe-amd64-experimental.zip`，與其他平台共用同一版本號。也可以設定 `YOURDESK_BUILD_TARGETS=winpe/amd64` 後執行 `pack.command`，只建置並封裝 WinPE；此入口依既有規則清空 `dist`。不需 NSIS 或 MinGW。
+一般打包產物：`dist/winpe-x64/YourDesk-{版本}-winpe-x64-experimental.zip`，與其他平台共用同一版本號。也可以設定 `YOURDESK_BUILD_TARGETS=winpe/x64` 後執行 `pack.command`，只建置並封裝 WinPE；此入口依既有規則清空 `dist`。不需 NSIS 或 MinGW。
 
 以下獨立入口共用 `scripts/release.py` 的編譯、授權與 ZIP 封裝邏輯，不清理一般 `dist`：
 

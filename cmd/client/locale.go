@@ -39,6 +39,14 @@ func cliText(text string) string {
 }
 
 var cliMessages = map[string][3]string{
+	"Login startup: on, off or status; uses the saved password":                                         {"登入後自動啟動：on、off 或 status；使用已儲存密碼", "ログイン時の起動：on、off、status。保存済みパスワードを使用", "로그인 시 자동 시작: on, off 또는 status. 저장된 암호 사용"},
+	"Use -autostart on, off or status":                                                                  {"請使用 -autostart on、off 或 status", "-autostart on、off、status を指定してください", "-autostart on, off 또는 status를 사용하세요"},
+	"Login startup is unavailable":                                                                      {"目前環境不支援登入後自動啟動", "この環境ではログイン時の起動を利用できません", "이 환경에서는 로그인 시 자동 시작을 사용할 수 없습니다"},
+	"Login startup is enabled":                                                                          {"已開啟登入後自動啟動", "ログイン時の起動を有効にしました", "로그인 시 자동 시작이 켜져 있습니다"},
+	"Login startup is disabled":                                                                         {"已關閉登入後自動啟動", "ログイン時の起動を無効にしました", "로그인 시 자동 시작이 꺼져 있습니다"},
+	"Disable pre-login access before disabling login startup":                                           {"請先關閉登入前連線，再關閉自動啟動", "ログイン前接続を無効にしてから、自動起動を無効にしてください", "로그인 전 연결을 끈 후 자동 시작을 끄세요"},
+	"Login startup uses the saved password; omit temporary password and parent-pipe options":            {"自動啟動使用已儲存密碼；請移除單次密碼與父管線參數", "自動起動では保存済みパスワードを使います。一時パスワードと親パイプの引数を外してください", "자동 시작은 저장된 암호를 사용합니다. 임시 암호와 부모 파이프 옵션을 빼세요"},
+	"Could not change login startup; check the installation path, account permissions and user session": {"無法變更自動啟動；請確認安裝位置、權限與登入工作階段", "自動起動を変更できません。インストール先、権限、ログインセッションを確認してください", "자동 시작을 변경할 수 없습니다. 설치 경로, 권한 및 로그인 세션을 확인하세요"},
 	"No desktop session detected; terminal connections only":                                            {"未偵測到桌面環境，僅提供命令列連線", "デスクトップ環境がないため、ターミナル接続のみ提供します", "데스크톱 환경이 없어 터미널 연결만 제공합니다"},
 	"Connection password loaded and validated. Starting Host.":                                          {"連線密碼已驗證，正在啟動 Host。", "パスワードを確認しました。Host を起動します。", "암호를 확인했습니다. Host를 시작합니다."},
 	"Connecting to the signaling server...":                                                             {"正在連線配對伺服器…", "接続サーバーに接続しています…", "연결 서버에 연결하는 중…"},

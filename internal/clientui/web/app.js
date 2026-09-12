@@ -1,10 +1,10 @@
 'use strict';
 const $ = (selector) => document.querySelector(selector);
-$('#project-github').addEventListener('click', event => {
-  if (typeof window.yourdeskOpenProject !== 'function') return;
+document.querySelectorAll('a[href="https://github.com/VaderChen/YourDesk"], a[href="https://buymeacoffee.com/vaderchen"]').forEach(link => link.addEventListener('click', event => {
+  if (typeof window.yourdeskOpenExternal !== 'function') return;
   event.preventDefault();
-  action(() => window.yourdeskOpenProject());
-});
+  action(() => window.yourdeskOpenExternal(link.href));
+}));
 
 // 裝置 ID 共用輸入格式；IP 在輸入分隔符號後保留原本形式。
 function bindDeviceIDInput(input) {
@@ -1231,7 +1231,7 @@ let preloginWasBusy=false;
 // 服務狀態由系統安裝結果決定，不存成一般偏好值。
 function renderPrelogin() {
  const service=state?.prelogin;
- const toggle=$('#prelogin-access');
+ const toggle=$('#ui-prelogin');
  toggle.checked=!!service?.enabled;
  toggle.disabled=!service?.supported||!!service?.busy;
  const row=toggle.closest('.preference-row');
@@ -1239,11 +1239,11 @@ function renderPrelogin() {
  row.dataset.tooltip=i18n.t(service?.message||'這台電腦目前不支援登入前連線。');
  $('#prelogin-access-reason').textContent=row.dataset.tooltip;
  $('#prelogin-progress').textContent=service?.busy ? i18n.t(service.message) : '';
- if (!service?.busy && preloginWasBusy && service?.message) toast(i18n.t(service.message),false,{warning:true,duration:15000});
+ if (!service?.busy && preloginWasBusy && service?.error) toast(i18n.t(service.error),false,{warning:true,duration:15000});
  preloginWasBusy=!!service?.busy;
 }
-$('#prelogin-access').addEventListener('change',()=>action(async()=>{
- const toggle=$('#prelogin-access');
+$('#ui-prelogin').addEventListener('change',()=>action(async()=>{
+ const toggle=$('#ui-prelogin');
  const enabled=toggle.checked;
  toggle.disabled=true;
  try {await api('prelogin','POST',{enabled});await updateRunning();}

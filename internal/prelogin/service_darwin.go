@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"golang.org/x/sys/unix"
 	"io"
+	"log/slog"
 	"net"
 	"os"
 	"os/exec"
@@ -71,8 +72,8 @@ func sourceApp() (string, error) {
 	return "", errors.New("請從已簽署的 YourDesk.app 啟用未登入連線。")
 }
 func verifyApp(ctx context.Context, p string) error {
-	// 僅接受 Apple 信任鏈的 Developer ID 簽章；不提升臨時開發執行檔。
-	return exec.CommandContext(ctx, "/usr/bin/codesign", "--verify", "--deep", "--strict", "-R", "anchor apple generic", p).Run()
+	// 驗證 Apple 信任鏈；-R 的內嵌規則必須以 = 開頭，否則會被當作檔案路徑。
+	return exec.CommandContext(ctx, "/usr/bin/codesign", "--verify", "--deep", "--strict", "-R", "=anchor apple generic", p).Run()
 }
 
 var versionOnce sync.Once
@@ -128,6 +129,15 @@ func Configure(ctx context.Context, enabled bool, c Config) error {
 	if err := c.validate(); err != nil {
 		return err
 	}
+	if _, active := activeSession(); !active {
+		return errors.New("請在目前使用中的 Mac 桌面啟用登入前連線。")
+	}
+	if !captureAllowed() {
+		return errors.New("請先允許 YourDesk 錄製螢幕，再開啟登入前連線。")
+	}
+	if !inputAllowed() {
+		return errors.New("請先允許 YourDesk 使用輔助使用權限，再開啟登入前連線。")
+	}
 	source, err := sourceApp()
 	if err != nil {
 		return err
@@ -161,7 +171,9 @@ func elevate(ctx context.Context, mode, path string) error {
 	quoted := strconv.Quote(command)
 	err = exec.CommandContext(ctx, "/usr/bin/osascript", "-e", "do shell script "+quoted+" with administrator privileges").Run()
 	if err != nil {
-		return fmt.Errorf("服務操作未完成或管理員授權已取消：%w", err)
+		// 底層程序錯誤供診斷使用，介面只接收可翻譯的操作提示。
+		slog.Warn("登入前服務操作未完成", "operation", mode, "error", err)
+		return errors.New("服務操作未完成或管理員授權已取消，請重新操作並完成授權。")
 	}
 	return nil
 }
@@ -518,6 +530,11 @@ func runDaemon(ctx context.Context) error {
 	}
 }
 func runAgent(ctx context.Context) error {
+	// launchd 可能同時啟動不同登入工作階段的代理；背景代理不能取得 Host 租約。
+	session, active := activeSession()
+	if !active {
+		return errors.New("桌面尚未就緒，登入前連線將自動重試。")
+	}
 	self, err := os.Executable()
 	if err != nil || self != executable {
 		return errors.New("桌面代理只能從受保護的安裝位置啟動")
@@ -553,6 +570,24 @@ func runAgent(ctx context.Context) error {
 	}
 	worker, stop := context.WithCancel(ctx)
 	defer stop()
+	// 同 UID 的工作階段重建也要交接；保留鎖定畫面仍在主控台的工作階段。
+	go func() {
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-worker.Done():
+				return
+			case <-ticker.C:
+				current, active := activeSession()
+				if !active || current != session {
+					stop()
+					conn.Close()
+					return
+				}
+			}
+		}
+	}()
 	cmd := exec.CommandContext(worker, executable, args...)
 	pipe, err := cmd.StdinPipe()
 	if err != nil {
@@ -630,6 +665,11 @@ func AcquireHost(ctx context.Context) (func(), error) {
 		return nil, err
 	}
 	for {
+		// 等待舊 Host 釋放鎖時，可能已登出或切換桌面，不能再註冊舊工作階段。
+		if _, active := activeSession(); !active {
+			f.Close()
+			return nil, errors.New("桌面尚未就緒，登入前連線將自動重試。")
+		}
 		err = unix.Flock(int(f.Fd()), unix.LOCK_EX|unix.LOCK_NB)
 		if err == nil {
 			return func() { f.Close() }, nil

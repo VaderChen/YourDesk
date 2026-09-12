@@ -10,12 +10,16 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"yourdesk/internal/prelogin"
 )
 
 func detachUpdateHelper(cmd *exec.Cmd) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x00000200}
 }
 func prepareAutomaticUpdate(ctx context.Context, archive string) error {
+	if prelogin.Status().Enabled {
+		return fmt.Errorf("請先停用未登入開機，再更新 APP；更新後重新啟用服務。")
+	}
 	if !strings.HasSuffix(strings.ToLower(archive), "-setup.exe") {
 		return fmt.Errorf("此套件不支援自動安裝，請手動開啟下載檔案")
 	}

@@ -1,4 +1,4 @@
-//go:build !darwin || !cgo
+//go:build !windows && (!darwin || !cgo)
 
 package prelogin
 
