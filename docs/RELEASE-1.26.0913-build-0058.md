@@ -72,9 +72,6 @@ macOS ARM64, Windows x64／ARM64, Linux x64／ARM64 CLI, 실험용 WinPE x64를 
 
 ## 檢測報告／Detection reports
 
-- [Windows x64 launcher](https://www.virustotal.com/gui/file/043b5952ba4c2a50edb6d320a0d5145713ae2e0ee1ae8aedac3f4db19c023871)
-- [Linux x64 client](https://www.virustotal.com/gui/file/a4de9638adff156da70e111138dbd8fe96b5ddf891455a2c1415f20770c63502)
-- [Linux ARM64 client](https://www.virustotal.com/gui/file/d5dd60197c8d038b34d775f2ef7669ebb522542d2e7686effb614af967d10784)
 
 - [Go empty project / 空專案（掃描快照 9/70）](https://www.virustotal.com/gui/file/fb906e6611161faafc695ada5042ae82696b88dba3cd1309843d1f42adfe084f)
 - [Go 官方 FAQ：Antivirus detections](https://go.dev/doc/faq#virus)
