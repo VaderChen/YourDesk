@@ -87,7 +87,7 @@ func runAgent(parent context.Context) error {
 	if err = windows.ProcessIdToSessionId(uint32(os.Getpid()), &session); err != nil {
 		return err
 	}
-	args := []string{"-signal", config.Signal, "-room", config.Room, "-codec", config.Codec, "-secret-stdin", "-parent-stdin", "-prelogin-host"}
+	args := []string{"-signal", config.Signal, "-room", config.Room, "-codec", config.Codec, "-codec-goal", config.CodecGoal, "-secret-stdin", "-parent-stdin", "-prelogin-host"}
 	if config.Direct {
 		args = append(args, "-direct-listen", ":47823")
 	}

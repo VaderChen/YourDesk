@@ -17,6 +17,7 @@ import (
 	"yourdesk/internal/clipboard"
 	"yourdesk/internal/desktop"
 	"yourdesk/internal/input"
+	"yourdesk/internal/optimization"
 	"yourdesk/internal/p2p"
 	"yourdesk/internal/peertransport"
 	"yourdesk/internal/rawkey"
@@ -41,6 +42,7 @@ type Options struct {
 	OnState               func(string)
 	Transport             peertransport.Mode
 	Display, FPS, Quality int
+	CodecGoal             optimization.Goal
 	Codec                 string
 }
 
@@ -49,7 +51,7 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 		return commandSession(ctx, sig, options)
 	}
 	switch video.Codec(options.Codec) {
-	case video.CodecAuto, video.CodecHardwareH264, video.CodecHardwareHEVC, video.CodecSoftwareH264, video.CodecHardwareJPEG, video.CodecSoftwareJPEG:
+	case video.CodecHardwareAV1, video.CodecAuto, video.CodecHardwareH264, video.CodecHardwareHEVC, video.CodecSoftwareH264, video.CodecHardwareJPEG, video.CodecSoftwareJPEG:
 	default:
 		return fmt.Errorf("不支援的影像編碼：%s", options.Codec)
 	}
@@ -58,9 +60,10 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 	defer jpegEncoder.Close()
 	slog.Info("JPEG 相容編碼器", "selected", jpegSelection.Selected)
 	var remoteCodecs atomic.Uint32
+	var remoteHardwareCodecs atomic.Uint32
 	var hardwareEncoder video.IntraEncoder
 	var activeCodec video.WireCodec
-	var hardwareFailed bool
+	failedCodecs := make(map[codecAttempt]bool)
 	defer func() {
 		if hardwareEncoder != nil {
 			hardwareEncoder.Close()
@@ -141,10 +144,17 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 			}
 			var mask uint32
 			for _, codec := range c.Codecs {
-				if codec == byte(video.WireH264) || codec == byte(video.WireHEVC) {
+				if codec == byte(video.WireH264) || codec == byte(video.WireHEVC) || codec == byte(video.WireAV1) {
 					mask |= 1 << codec
 				}
 			}
+			var hardwareMask uint32
+			for _, codec := range c.HardwareDecodeCodecs {
+				if codec == byte(video.WireH264) || codec == byte(video.WireHEVC) || codec == byte(video.WireAV1) {
+					hardwareMask |= 1 << codec
+				}
+			}
+			remoteHardwareCodecs.Store(hardwareMask & mask)
 			remoteCodecs.Store(mask)
 			return
 		}
@@ -350,6 +360,9 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 	fmt.Println(`YOURDESK_UI_EVENT {"event":"host-ready"}`)
 	fmt.Println(`YOURDESK_UI_EVENT {"event":"authenticated"}`)
 	slog.Info("遠端通道配對完成", "transport", peer.TransportMode())
+	// 通道建立後才固定策略，Host 等待配對期間仍可接收背景偵測結果。
+	policy := optimization.Snapshot()
+	slog.Info("套用本機影像策略", "version", policy.Version, "compareBytes", policy.CompareBytes, "verifiedEncoders", len(policy.Encoders))
 
 	baseFPS := max(1, options.FPS)
 	streamFPS := baseFPS
@@ -358,13 +371,20 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	var seq uint64
-	delta := desktop.DeltaEncoder{TileSize: desktop.DefaultTileSize, Quality: clamp(options.Quality, 1, 100), Encoder: jpegEncoder}
+	delta := desktop.DeltaEncoder{TileSize: desktop.DefaultTileSize, Quality: clamp(options.Quality, 1, 100), Encoder: jpegEncoder, CompareBytes: policy.CompareBytes}
 	lastKeyframe := time.Now().Add(-time.Hour)
 	var lastDisplayReport time.Time
 	lastCount := -1
 	profile := "standard"
 	enhancement := false
 	activeConfig := streamconfig.Compose("standard", 8192, 8192, false)
+	transmissionLimit := func() int {
+		if activeConfig.Source.Rate.Mode == "cbr" && activeConfig.Source.Rate.TargetBps > 0 {
+			return activeConfig.Source.Rate.TargetBps
+		}
+		// 尚未收到新版 Viewer 設定時也使用預設上限。
+		return 12_000_000
+	}
 	encodeQuality := clamp(options.Quality, 1, 100)
 	var streamScaler desktop.StreamScaler
 	defer streamScaler.Close()
@@ -391,9 +411,8 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 				result.Effective.Bitrate = 0
 				result.Effective.KeyframeInterval = 0
 			}
-			if activeConfig.Source.Rate.Mode == "cbr" && result.Effective.Bitrate == 0 {
-				result.Error = "編碼後端不支援目前碼率要求，已回退品質控制"
-			}
+			// 編碼器即使退回 JPEG，傳送階段仍會執行相同流量上限。
+			result.Effective.Bitrate = transmissionLimit()
 			previous := configResult.Load()
 			if previous == nil || *previous != *result {
 				configResult.Store(result)
@@ -523,7 +542,7 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 		recoveryGeneration := recovery.Load()
 		if encodedEpoch != raw.Epoch || encodedRecovery != recoveryGeneration {
 			encodedEpoch, encodedRecovery = raw.Epoch, recoveryGeneration
-			delta = desktop.DeltaEncoder{TileSize: desktop.DefaultTileSize, Quality: encodeQuality, Encoder: jpegEncoder}
+			delta = desktop.DeltaEncoder{TileSize: desktop.DefaultTileSize, Quality: encodeQuality, Encoder: jpegEncoder, CompareBytes: policy.CompareBytes}
 			if hardwareEncoder != nil {
 				hardwareEncoder.Close()
 				hardwareEncoder = nil
@@ -573,17 +592,9 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 			activeCodec = video.WireJPEG
 		}
 		// 未收到新協定能力前維持 JPEG，避免舊版 遠端顯示 黑畫面。
-		desired := video.WireJPEG
-		if !hardwareFailed {
-			for _, candidate := range []video.Codec{video.CodecHardwareHEVC, video.CodecHardwareH264} {
-				wire := video.WireForCodec(candidate)
-				requested := video.Codec(options.Codec)
-				if (requested == video.CodecAuto || requested == candidate) && remoteCodecs.Load()&(1<<wire) != 0 && video.SupportsIntra(candidate) {
-					desired = wire
-					break
-				}
-			}
-		}
+		plan := codecPlan(policy, video.Codec(options.Codec), size.X, size.Y, remoteCodecs.Load(), remoteHardwareCodecs.Load(), failedCodecs, video.SupportsIntra, options.CodecGoal)
+		desired := plan[0]
+
 		if desired != activeCodec {
 			if hardwareEncoder != nil {
 				hardwareEncoder.Close()
@@ -592,12 +603,15 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 			activeCodec = desired
 			if desired != video.WireJPEG {
 				chosen := video.CodecHardwareH264
+				if desired == video.WireAV1 {
+					chosen = video.CodecHardwareAV1
+				}
 				if desired == video.WireHEVC {
 					chosen = video.CodecHardwareHEVC
 				}
 				hardwareEncoder, err = video.NewIntraEncoder(chosen)
 				if err != nil {
-					hardwareFailed = true
+					failedCodecs[codecAttempt{activeCodec, (size.X + 1) &^ 1, (size.Y + 1) &^ 1}] = true
 					activeCodec = video.WireJPEG
 				}
 				slog.Info("影像編碼協商", "codec", activeCodec)
@@ -629,12 +643,12 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 				}
 				seq++
 				b := img.Bounds()
-				return encodedFrames{Frames: []p2p.Frame{{Display: current, Codec: byte(activeCodec), Sequence: seq, Width: uint32(b.Dx()), Height: uint32(b.Dy()), Keyframe: keyframe, JPEG: payload}}, Epoch: raw.Epoch, Recovery: recoveryGeneration}, nil
+				return encodedFrames{Frames: []p2p.Frame{{Display: current, Codec: byte(activeCodec), Sequence: seq, Width: uint32(b.Dx()), Height: uint32(b.Dy()), Keyframe: keyframe, JPEG: payload}}, Epoch: raw.Epoch, Recovery: recoveryGeneration, BitrateLimit: transmissionLimit()}, nil
 			}
-			slog.Warn("硬體壓縮失敗，退回 JPEG", "error", encodeErr)
+			slog.Warn("此編碼配置失敗，本張退回 JPEG，後續嘗試下一候選", "error", encodeErr)
 			hardwareEncoder.Close()
 			hardwareEncoder = nil
-			hardwareFailed = true
+			failedCodecs[codecAttempt{activeCodec, (size.X + 1) &^ 1, (size.Y + 1) &^ 1}] = true
 			activeCodec = video.WireJPEG
 			lastKeyframe = time.Time{}
 		}
@@ -647,7 +661,7 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 		}
 		reportEncoding(video.WireJPEG, jpegEncoder.Hardware())
 		b := img.Bounds()
-		batch := encodedFrames{Epoch: raw.Epoch, Recovery: recoveryGeneration}
+		batch := encodedFrames{Epoch: raw.Epoch, Recovery: recoveryGeneration, BitrateLimit: transmissionLimit()}
 		for _, patch := range patches {
 			seq++
 			batch.Frames = append(batch.Frames, p2p.Frame{Display: current, Sequence: seq, Width: uint32(b.Dx()), Height: uint32(b.Dy()), X: uint32(patch.X), Y: uint32(patch.Y), Keyframe: patch.Keyframe, JPEG: patch.JPEG})
@@ -668,7 +682,7 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 			if err := stageCtx.Err(); err != nil {
 				return err
 			}
-			if err := peer.SendFrameChecked(frame); err != nil {
+			if err := peer.SendFrameLimited(stageCtx, frame, batch.BitrateLimit); err != nil {
 				if errors.Is(err, p2p.ErrFrameDropped) {
 					recovery.Add(1)
 					return nil

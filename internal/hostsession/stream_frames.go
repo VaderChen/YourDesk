@@ -16,4 +16,5 @@ type capturedFrame struct {
 type encodedFrames struct {
 	Frames          []p2p.Frame
 	Epoch, Recovery uint64
+	BitrateLimit    int // 編碼當下的傳送上限快照，避免跨工作者讀取設定。
 }

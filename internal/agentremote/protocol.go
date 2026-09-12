@@ -18,6 +18,7 @@ type Request struct {
 	Expires int64           `json:"expires"`
 }
 type Response struct {
+	Visible      *bool           `json:"visible,omitempty"`
 	Result       json.RawMessage `json:"result,omitempty"`
 	ID           string          `json:"id"`
 	Error        string          `json:"error,omitempty"`

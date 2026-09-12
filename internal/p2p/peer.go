@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/pion/webrtc/v4"
@@ -71,6 +72,7 @@ type Control struct {
 	DisplayRequest       uint64                     `json:"displayRequest,omitempty"`
 	Display              *int                       `json:"display,omitempty"`
 	DisplayCount         int                        `json:"displayCount,omitempty"`
+	HardwareDecodeCodecs []byte                     `json:"hardwareDecodeCodecs,omitempty"`
 	Codecs               []byte                     `json:"codecs,omitempty"`
 	Type                 string                     `json:"type"`
 	X                    float64                    `json:"x,omitempty"`
@@ -82,6 +84,8 @@ type Control struct {
 }
 
 type Peer struct {
+	sentBytes      atomic.Uint64
+	receivedBytes  atomic.Uint64
 	transportMode  peertransport.Mode
 	commandsOnce   sync.Once
 	commands       commandState
@@ -140,12 +144,13 @@ func NewHostWithTransport(ctx context.Context, signal *signaling.Client, mode pe
 			p.mu.Lock()
 			p.screen = dc
 			p.mu.Unlock()
+			p.onMessage(dc, nil)
 		case ControlChannel:
 			p.mu.Lock()
 			p.control = dc
 			p.mu.Unlock()
 			dc.OnOpen(func() { p.flushControl(); p.announceCommands() })
-			dc.OnMessage(func(m webrtc.DataChannelMessage) {
+			p.onMessage(dc, func(m webrtc.DataChannelMessage) {
 				var c Control
 				if decodeControl(m.Data, &c) == nil && !p.handleCommand(c) && onControl != nil {
 					onControl(c)
@@ -158,6 +163,7 @@ func NewHostWithTransport(ctx context.Context, signal *signaling.Client, mode pe
 		_ = pc.Close()
 		return nil, err
 	}
+	p.onMessage(p.screen, nil)
 	if p.control, err = pc.CreateDataChannel(ControlChannel, &webrtc.DataChannelInit{Ordered: boolPtr(true)}); err != nil {
 		_ = pc.Close()
 		return nil, err
@@ -170,7 +176,7 @@ func NewHostWithTransport(ctx context.Context, signal *signaling.Client, mode pe
 	p.bindClipboard(dc)
 	// This channel is created locally by the host, so OnDataChannel is not
 	// invoked for it. Bind the receive callback explicitly.
-	p.control.OnMessage(func(m webrtc.DataChannelMessage) {
+	p.onMessage(p.control, func(m webrtc.DataChannelMessage) {
 		var c Control
 		if decodeControl(m.Data, &c) == nil && !p.handleCommand(c) && onControl != nil {
 			onControl(c)
@@ -280,7 +286,7 @@ func NewViewerWithTransport(ctx context.Context, signal *signaling.Client, mode 
 			p.mu.Lock()
 			p.screen = dc
 			p.mu.Unlock()
-			dc.OnMessage(func(m webrtc.DataChannelMessage) {
+			p.onMessage(dc, func(m webrtc.DataChannelMessage) {
 				if f, ok := assembler.add(m.Data); ok && onFrame != nil {
 					onFrame(f)
 				}
@@ -290,7 +296,7 @@ func NewViewerWithTransport(ctx context.Context, signal *signaling.Client, mode 
 			p.control = dc
 			p.mu.Unlock()
 			dc.OnOpen(func() { p.flushControl(); p.announceCommands() })
-			dc.OnMessage(func(m webrtc.DataChannelMessage) {
+			p.onMessage(dc, func(m webrtc.DataChannelMessage) {
 				var c Control
 				if decodeControl(m.Data, &c) == nil && !p.handleCommand(c) {
 					for _, handler := range onControl {
@@ -351,6 +357,38 @@ func (p *Peer) SendFrame(f Frame) error {
 
 // SendFrameChecked 對 JPEG 也回報丟幀，供管線重建差異基底。
 func (p *Peer) SendFrameChecked(f Frame) error {
+	return p.sendFrame(f, nil)
+}
+
+// SendFrameLimited 依應用層位元率逐片傳送，包含影格標頭。
+// 每片先等待其傳輸預算，不累積閒置額度；控制與剪貼簿通道不共用此等待。
+// 呼叫端須依影格順序由單一傳送工作者呼叫，以保留編碼參考關係。
+func (p *Peer) SendFrameLimited(ctx context.Context, f Frame, bitsPerSecond int) error {
+	if bitsPerSecond <= 0 {
+		return errors.New("影像流量上限必須大於零")
+	}
+	timer := time.NewTimer(time.Hour)
+	timer.Stop()
+	defer timer.Stop()
+	return p.sendFrame(f, func(size int) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		// 向上取整，避免小分片計算截斷後超出預算。
+		ns := (int64(size)*8*int64(time.Second) + int64(bitsPerSecond) - 1) / int64(bitsPerSecond)
+		timer.Reset(time.Duration(ns))
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-p.Done():
+			return errors.New("連線已結束")
+		case <-timer.C:
+			return ctx.Err()
+		}
+	})
+}
+
+func (p *Peer) sendFrame(f Frame, beforeSend func(int) error) error {
 	p.mu.RLock()
 	dc := p.screen
 	closed := p.closed
@@ -370,6 +408,14 @@ func (p *Peer) SendFrameChecked(f Frame) error {
 		if end > len(f.JPEG) {
 			end = len(f.JPEG)
 		}
+		if beforeSend != nil {
+			if err := beforeSend(frameHeaderSize + end - start); err != nil {
+				return err
+			}
+		}
+		if dc.ReadyState() != webrtc.DataChannelStateOpen || dc.BufferedAmount() > maxScreenBuffer {
+			return ErrFrameDropped
+		}
 		msg := make([]byte, frameHeaderSize+end-start)
 		binary.BigEndian.PutUint64(msg[0:8], f.Sequence)
 		binary.BigEndian.PutUint32(msg[8:12], f.Width)
@@ -385,7 +431,7 @@ func (p *Peer) SendFrameChecked(f Frame) error {
 		msg[41] = f.Codec
 		binary.BigEndian.PutUint16(msg[42:44], uint16(f.Display+1))
 		copy(msg[frameHeaderSize:], f.JPEG[start:end])
-		if err := dc.Send(msg); err != nil {
+		if err := p.sendData(dc, msg); err != nil {
 			return err
 		}
 	}
@@ -413,7 +459,7 @@ func (p *Peer) SendControl(c Control) error {
 		p.controlMu.Unlock()
 		return nil
 	}
-	return dc.Send(b)
+	return p.sendData(dc, b)
 }
 
 func (p *Peer) flushControl() {
@@ -428,7 +474,7 @@ func (p *Peer) flushControl() {
 	p.pendingControl = nil
 	p.controlMu.Unlock()
 	for _, b := range queued {
-		_ = dc.Send(b)
+		_ = p.sendData(dc, b)
 	}
 }
 
@@ -480,16 +526,30 @@ func connectionConfig(signal *signaling.Client) webrtc.Configuration {
 	return config()
 }
 
-// TrafficBytes 回傳此連線影像、控制與剪貼簿通道的累計有效資料量。
-// 不包含網路封包標頭、重傳與其他程式的流量。
-func (p *Peer) TrafficBytes() (sent, received uint64) {
-	for _, stats := range p.pc.GetStats() {
-		if channel, ok := stats.(webrtc.DataChannelStats); ok {
-			sent += channel.BytesSent
-			received += channel.BytesReceived
-		}
+// sendData 僅累計成功交給通道的資料；尚在應用程式佇列與傳送失敗不計入。
+func (p *Peer) sendData(dc *webrtc.DataChannel, data []byte) error {
+	if err := dc.Send(data); err != nil {
+		return err
 	}
-	return
+	p.sentBytes.Add(uint64(len(data)))
+	return nil
+}
+
+// onMessage 在解析、重組與佇列處理之前計數，避免丟幀或拒收漏算已收到的資料。
+func (p *Peer) onMessage(dc *webrtc.DataChannel, handler func(webrtc.DataChannelMessage)) {
+	dc.OnMessage(func(m webrtc.DataChannelMessage) {
+		p.receivedBytes.Add(uint64(len(m.Data)))
+		if handler != nil {
+			handler(m)
+		}
+	})
+}
+
+// TrafficBytes 回傳此連線影像、控制與剪貼簿通道的累計應用層資料量。
+// 包含應用層影格標頭，不包含網路封包標頭、重傳與其他程式的流量。
+// 直接使用收送計數，不依賴第三方統計 ID 的唯一性；每個 Peer 獨立累計。
+func (p *Peer) TrafficBytes() (sent, received uint64) {
+	return p.sentBytes.Load(), p.receivedBytes.Load()
 }
 
 // RoundTripMS 只採用被選用的 ICE 連線；沒有有效量測時保留未知。

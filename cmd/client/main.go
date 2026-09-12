@@ -17,8 +17,10 @@ import (
 	"yourdesk/internal/autostart"
 	"yourdesk/internal/clientui"
 	"yourdesk/internal/deviceid"
+	"yourdesk/internal/hardwareprobe"
 	"yourdesk/internal/hostguard"
 	"yourdesk/internal/hostsession"
+	"yourdesk/internal/optimization"
 	"yourdesk/internal/peertransport"
 	"yourdesk/internal/prelogin"
 	"yourdesk/internal/runtimeenv"
@@ -28,6 +30,9 @@ import (
 )
 
 func main() {
+	if hardwareprobe.HandleHelper(os.Args[1:]) {
+		return
+	}
 	if len(os.Args) > 1 && os.Args[1] == "--terminal-window" {
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer stop()
@@ -59,6 +64,7 @@ func main() {
 	quality := flag.Int("quality", 70, cliText("JPEG quality 1-100"))
 	printSecret := flag.Bool("print-secret", false, cliText("Print the saved connection password (generate on first use) and exit"))
 	printUID := flag.Bool("print-uid", false, cliText("print hardware-derived device UID and exit"))
+	codecGoal := flag.String("codec-goal", "balanced", "串流偏好：balanced、low-latency、bandwidth")
 	codec := flag.String("codec", "auto", cliText("codec mode: auto, hardware-h264, hardware-hevc, software-jpeg"))
 	ui := flag.Bool("ui", false, cliText("Open the Client desktop window"))
 	directListen := flag.String("direct-listen", "", cliText("Listen address for direct IP connections over TLS; opt-in"))
@@ -161,7 +167,7 @@ func main() {
 		scanner := bufio.NewScanner(os.Stdin)
 		scanner.Buffer(make([]byte, 1024), 4096)
 		if !scanner.Scan() || json.Unmarshal(scanner.Bytes(), &input) != nil {
-			fatal(fmt.Errorf(cliText("Could not read connection password JSON from standard input")))
+			fatal(fmt.Errorf("%s", cliText("Could not read connection password JSON from standard input")))
 		}
 		parentScanner = scanner
 		secretText = input.Secret
@@ -199,10 +205,16 @@ func main() {
 		go func() {
 			for parentScanner.Scan() {
 				var request struct {
-					Disconnect bool `json:"disconnect"`
+					Disconnect   bool                 `json:"disconnect"`
+					Optimization *optimization.Policy `json:"optimization"`
 				}
-				if json.Unmarshal(parentScanner.Bytes(), &request) == nil && request.Disconnect {
-					hostsession.Disconnect()
+				if json.Unmarshal(parentScanner.Bytes(), &request) == nil {
+					if request.Disconnect {
+						hostsession.Disconnect()
+					}
+					if request.Optimization != nil {
+						optimization.Apply(*request.Optimization)
+					}
 				}
 			}
 			authlog.Event("parent-pipe-closed", nil)
@@ -241,7 +253,7 @@ func main() {
 	defer releaseHost()
 	fmt.Println(`YOURDESK_UI_EVENT {"event":"host-ready"}`)
 	ctx = signaling.WithHostCapabilities(ctx, signaling.HostCapabilities{Schema: 1, OS: runtime.GOOS, Arch: runtime.GOARCH, Version: clientui.ApplicationVersion(), Desktop: !headless, Terminal: terminal.Available(), Clipboard: !headless})
-	options := hostsession.Options{Headless: headless, Version: clientui.ApplicationVersion(), Transport: peertransport.Mode(*transport), Display: *display, FPS: *fps, Quality: *quality, Codec: *codec}
+	options := hostsession.Options{Headless: headless, Version: clientui.ApplicationVersion(), Transport: peertransport.Mode(*transport), Display: *display, FPS: *fps, Quality: *quality, Codec: *codec, CodecGoal: optimization.Goal(*codecGoal)}
 	if *directListen != "" {
 		go func() {
 			err := signaling.ListenDirect(ctx, *directListen, secret, func(session context.Context, sig *signaling.Client) {

@@ -6,6 +6,7 @@ import (
 	"image"
 	"log/slog"
 	"sync"
+	"yourdesk/internal/optimization"
 )
 
 // WireCodec 使用影格標頭的保留位元組；0 保留給舊版 JPEG。
@@ -15,6 +16,7 @@ const (
 	WireJPEG WireCodec = iota
 	WireH264
 	WireHEVC
+	WireAV1
 )
 
 // IntraEncoder 保留既有名稱；協商後可輸出含參考影格的 GOP。
@@ -37,6 +39,7 @@ type IntraCapability struct {
 	Codec       Codec  `json:"codec"`
 	Encode      bool   `json:"encode"`
 	Decode      bool   `json:"decode"`
+	DecodeMode  string `json:"decodeMode,omitempty"`
 	EncodeError string `json:"encodeError,omitempty"`
 	DecodeError string `json:"decodeError,omitempty"`
 }
@@ -52,6 +55,9 @@ var probeH264 []byte
 
 //go:embed probes/hevc.bin
 var probeHEVC []byte
+
+//go:embed probes/av1-128.obu
+var probeAV1 []byte
 
 func startIntraProbe() {
 	intraOnce.Do(func() { go probeIntraCapabilities() })
@@ -74,25 +80,18 @@ func IntraCapabilities() []IntraCapability {
 }
 func probeIntraCapabilities() {
 	defer close(intraReady)
-	for _, codec := range []Codec{CodecHardwareH264, CodecHardwareHEVC} {
-		cap := IntraCapability{Codec: codec}
-		fixture := probeH264
-		if codec == CodecHardwareHEVC {
-			fixture = probeHEVC
-		}
-		decoder, err := newIntraDecoder(WireForCodec(codec))
-		if err == nil {
-			pixels, decodeErr := decoder.Decode(fixture)
-			if decodeErr != nil {
-				cap.DecodeError = decodeErr.Error()
+	startDecodeProbe()
+	<-decodeReady
+	policy := optimization.Snapshot()
+	for _, cap := range decodeCaps {
+		codec := cap.Codec
+		if usable, known := policy.EncoderDecision(decodePolicyCodec(WireForCodec(codec)), 128, 128); known {
+			cap.Encode = usable
+			if !usable {
+				cap.EncodeError = "本機偵測已確認此尺寸編碼不可用"
 			}
-			cap.Decode = decodeErr == nil && pixels != nil && pixels.Bounds().Dx() == 128 && pixels.Bounds().Dy() == 128
-			if reporter, ok := decoder.(BackendReporter); ok && cap.Decode {
-				slog.Info("硬體解碼能力探測通過", "codec", codec, "backend", reporter.Backend())
-			}
-			decoder.Close()
-		} else {
-			cap.DecodeError = err.Error()
+			intraCaps = append(intraCaps, cap)
+			continue
 		}
 		enc, err := NewIntraEncoder(codec)
 		if err == nil {
@@ -129,6 +128,9 @@ func probeIntraCapabilities() {
 	}
 }
 func WireForCodec(codec Codec) WireCodec {
+	if codec == CodecHardwareAV1 {
+		return WireAV1
+	}
 	if codec == CodecHardwareH264 {
 		return WireH264
 	}

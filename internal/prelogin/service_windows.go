@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -16,6 +17,7 @@ import (
 	"time"
 	"unicode/utf16"
 	"unsafe"
+	"yourdesk/internal/softwarevideo"
 
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
@@ -210,6 +212,16 @@ func install(path string) error {
 	}
 	if err = os.WriteFile(executable, binaryData, 0600); err != nil {
 		return err
+	}
+	// 服務使用獨立受保護副本，動態庫也必須一同複製。
+	for _, name := range softwarevideo.RuntimeFiles() {
+		library, readErr := os.ReadFile(filepath.Join(filepath.Dir(self), name))
+		if readErr != nil {
+			return fmt.Errorf("登入前服務缺少 %s：%w", name, readErr)
+		}
+		if err = os.WriteFile(filepath.Join(root, name), library, 0600); err != nil {
+			return err
+		}
 	}
 	if err = secureWrite(filepath.Join(root, "config.json"), data, "D:P(A;;FA;;;SY)(A;;FA;;;BA)"); err != nil {
 		return err

@@ -61,7 +61,7 @@ func (s *server) handlePrelogin(w http.ResponseWriter, r *http.Request) bool {
 	}
 	s.preloginBusy = true
 	s.preloginMessage = "正在變更系統服務，請完成管理員授權。"
-	config := prelogin.Config{Tailcat: s.preferences.TailcatEnabled, Room: s.info["room"], Signal: s.options.Signal, Secret: s.options.Secret, Codec: s.preferences.Codec, Direct: s.preferences.DirectListen}
+	config := prelogin.Config{Tailcat: s.preferences.TailcatEnabled, Room: s.info["room"], Signal: s.options.Signal, Secret: s.options.Secret, Codec: s.preferences.Codec, CodecGoal: s.preferences.CodecGoal, Direct: s.preferences.DirectListen}
 	host := s.children["host"]
 	if host != nil {
 		host.stdin.Close()

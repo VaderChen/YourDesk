@@ -13,10 +13,25 @@ type JPEGCapabilities struct {
 }
 
 var (
-	jpegProbeMu sync.Mutex
-	jpegProbe   func() JPEGCapabilities
-	jpegCached  *JPEGCapabilities
+	jpegWarmOnce sync.Once
+	jpegProbeMu  sync.Mutex
+	jpegProbe    func() JPEGCapabilities
+	jpegCached   *JPEGCapabilities
 )
+
+// CachedHardwareJPEG 給 UI 使用：快取鎖被原生查詢持有時直接回報待偵測，絕不等待。
+func CachedHardwareJPEG() JPEGCapabilities {
+	if jpegProbeMu.TryLock() {
+		if jpegCached != nil {
+			result := *jpegCached
+			jpegProbeMu.Unlock()
+			return result
+		}
+		jpegProbeMu.Unlock()
+	}
+	jpegWarmOnce.Do(func() { go ProbeHardwareJPEG() })
+	return JPEGCapabilities{Backend: "pending", Detail: "背景偵測中，暫用既有安全後端"}
+}
 
 // RegisterHardwareJPEGProbe is used by a platform build-tag implementation.
 // It is intentionally internal-facing so a failed probe can be cached and
@@ -49,7 +64,7 @@ func SelectJPEGEncoder(requested Codec) Selection {
 		if c.Encode {
 			return Selection{Requested: requested, Selected: CodecHardwareJPEG, Backend: c.Backend, Hardware: true, Detail: c.Detail}
 		}
-		return Selection{Requested: requested, Selected: CodecSoftwareJPEG, Backend: "Go image/jpeg", Detail: "硬體 JPEG probe 失敗，退回軟體 JPEG"}
+		return Selection{Requested: requested, Selected: CodecSoftwareJPEG, Backend: preferredSoftwareJPEGBackend, Detail: "硬體 JPEG probe 失敗，退回軟體 JPEG"}
 	}
 	if requested == CodecAuto {
 		c := ProbeHardwareJPEG()
@@ -57,7 +72,7 @@ func SelectJPEGEncoder(requested Codec) Selection {
 			return Selection{Requested: requested, Selected: CodecHardwareJPEG, Backend: c.Backend, Hardware: true, Detail: c.Detail}
 		}
 	}
-	return Selection{Requested: requested, Selected: CodecSoftwareJPEG, Backend: "Go image/jpeg", Detail: "使用軟體 JPEG"}
+	return Selection{Requested: requested, Selected: CodecSoftwareJPEG, Backend: preferredSoftwareJPEGBackend, Detail: "使用軟體 JPEG"}
 }
 
 func SelectJPEGDecoder(requested string) DecoderSelection {

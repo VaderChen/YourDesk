@@ -1,4 +1,58 @@
 {
+ "低延遲": ["Low latency","低遅延","낮은 지연 시간"],
+ "傳輸策略": ["Transmission strategy","伝送方針","전송 전략"],
+ "均衡": ["Balanced","バランス","균형"],
+ "省頻寬": ["Save bandwidth","帯域節約","대역폭 절약"],
+ "自動編碼的選擇偏好；變更會重新建立目前連線。": ["Automatic codec preference; changing this reconnects the current session.","自動コーデックの優先設定。変更すると現在の接続を再確立します。","자동 코덱 우선 설정입니다. 변경하면 현재 연결을 다시 설정합니다."],
+  "結果": ["Result", "結果", "결과"],
+  "後端": ["Backend", "バックエンド", "백엔드"],
+  "耗時": ["Elapsed", "所要時間", "소요 시간"],
+  "編碼實測": ["Encoding test", "エンコードテスト", "인코딩 테스트"],
+  "解碼實測": ["Decoding test", "デコードテスト", "디코딩 테스트"],
+  "格式 / 輸出 / 尺寸": ["Format / Output / Size", "形式 / 出力 / サイズ", "형식 / 출력 / 크기"],
+  "格式 / 輸入 / 尺寸": ["Format / Input / Size", "形式 / 入力 / サイズ", "형식 / 입력 / 크기"],
+  "Windows 原生格式": ["Windows native format", "Windows ネイティブ形式", "Windows 네이티브 형식"],
+
+  "軟體獨立測試": ["Independent software test", "ソフトウェア独立テスト", "독립 소프트웨어 테스트"],
+  "優先圖形 API": ["Preferred graphics API", "優先グラフィックス API", "우선 그래픽 API"],
+  "記憶體": ["Memory", "メモリ", "메모리"],
+  "編解碼分析": ["Codec analysis","コーデック分析","코덱 분석"],
+  "未確認": ["Unconfirmed","未確認","미확인"],
+  "尚未開始偵測": ["Detection not started","検出未開始","감지 시작 전"],
+  "偵測中": ["Detecting","検出中","감지 중"],
+  "偵測完成": ["Detection complete","検出完了","감지 완료"],
+  "部分偵測未完成": ["Detection partially complete","一部の検出が未完了","일부 감지 미완료"],
+  "偵測未完成": ["Detection incomplete","検出未完了","감지 미완료"],
+  "偵測已取消": ["Detection cancelled","検出をキャンセルしました","감지 취소됨"],
+  "等待偵測": ["Pending detection","検出待ち","감지 대기"],
+  "硬體概況": ["Hardware overview","ハードウェア概要","하드웨어 개요"],
+  "邏輯處理器": ["Logical processors","論理プロセッサ","논리 프로세서"],
+  "加速指令集": ["Acceleration instruction sets","高速化命令セット","가속 명령어 집합"],
+  "偵測結果": ["Detection results","検出結果","감지 결과"],
+  "編解碼實測": ["Codec probe results","コーデック実測結果","코덱 실측 결과"],
+  "結果僅代表列出的格式與尺寸；實測未通過或未確認的項目，保守顯示為不支援。": ["Results apply only to the listed formats and sizes. Failed or unconfirmed tests are conservatively shown as unsupported.", "結果は記載の形式とサイズに限ります。失敗または未確認の項目は保守的に非対応と表示します。", "결과는 표시된 형식과 크기에 한정됩니다. 실패하거나 확인되지 않은 항목은 보수적으로 미지원으로 표시합니다."],
+  "格式 / 尺寸": ["Format / dimensions","形式 / サイズ","형식 / 크기"],
+  "編碼結果": ["Encoding result","エンコード結果","인코딩 결과"],
+  "解碼結果": ["Decoding result","デコード結果","디코딩 결과"],
+  "實測未通過": ["Probe unsuccessful","実測不成功","실측 실패"],
+  "硬體加速可用": ["Hardware acceleration available","ハードウェア高速化が利用可能","하드웨어 가속 사용 가능"],
+  "軟體運算": ["Software processing","ソフトウェア処理","소프트웨어 연산"],
+  "可用 (加速未知)": ["Available; acceleration unknown","利用可能、高速化方式は不明","사용 가능, 가속 방식 알 수 없음"],
+  "正在最佳化中": [
+    "Optimizing…",
+    "最適化しています…",
+    "최적화 중…"
+  ],
+  "正在偵測硬體加速能力，完成後會自動關閉。": [
+    "Checking hardware acceleration capabilities. This dialog will close automatically when finished.",
+    "ハードウェアアクセラレーション機能を確認しています。完了すると自動的に閉じます。",
+    "하드웨어 가속 기능을 확인하고 있습니다. 완료되면 자동으로 닫힙니다."
+  ],
+  "繼續使用": [
+    "Continue using the app",
+    "アプリの使用を続ける",
+    "앱 계속 사용"
+  ],
   "允許 IP 直連": [
     "Allow direct IP connections",
     "IP 直接接続を許可",
@@ -184,10 +238,10 @@
     "アプリの起動中は Client が動作します。ウィンドウを閉じても非表示になるだけです。完全に終了するにはトレイメニューから終了を選択してください。",
     "앱이 실행되는 동안 Client가 작동합니다. 창을 닫으면 화면만 숨겨집니다. 완전히 종료하려면 트레이 메뉴에서 프로그램 종료를 선택하세요."
   ],
-  "影像傳輸": [
-    "Image transport",
-    "映像転送",
-    "영상 전송"
+  "傳輸到遠端的編碼": [
+    "Encoding for transmission to the remote device",
+    "リモートへの送信に使用するエンコード",
+    "원격 장치로 전송할 인코딩"
   ],
   "增量 JPEG": [
     "Incremental JPEG",
@@ -2204,10 +2258,10 @@
     "値を小さくすると画面の復旧が早くなりますが、通信量も増えます。H.264／HEVC のみ。",
     "값이 작으면 화면 복구가 빠르지만 데이터를 더 사용합니다. H.264/HEVC 전용입니다."
   ],
-  "變更會中斷目前連線；無法使用的選項會停用。": [
-    "Changes disconnect current sessions. Unavailable options are disabled.",
-    "変更すると現在の接続が切れます。非対応の項目は選べません。",
-    "변경하면 현재 연결이 끊어집니다. 지원되지 않는 항목은 선택할 수 없습니다."
+  "設定本機畫面傳輸到遠端時使用的編碼；實際使用的編碼也需配合對方的解碼能力。變更會中斷目前連線；無法使用的選項會停用。": [
+    "Choose the encoding used to send this device's screen to the remote device. The actual encoding also depends on the remote device's decoding capabilities. Changes disconnect current sessions. Unavailable options are disabled.",
+    "この端末の画面をリモートへ送信する際のエンコードを設定します。実際に使用するエンコードは、相手側のデコード能力にも依存します。変更すると現在の接続が切れます。使用できない項目は無効になります。",
+    "이 장치의 화면을 원격 장치로 전송할 때 사용할 인코딩을 설정합니다. 실제 인코딩은 상대 장치의 디코딩 기능도 지원해야 합니다. 변경하면 현재 연결이 끊어집니다. 사용할 수 없는 항목은 비활성화됩니다."
   ],
   "自動調整，優先讓操作更即時；套用到所有遠端畫面。": [
     "Adjust automatically for faster response. Applies to all remote displays.",
@@ -2578,5 +2632,10 @@
     "Start before login",
     "ログイン前に自動起動",
     "로그인 전 자동 시작"
-  ]
+  ],
+  "預設顯示啟動時的偵測結果；長按「深度測試」一秒，重新執行全部測試項目。指令集可用不代表目前編解碼路徑已採用；實際傳輸也需配合對方的解碼能力。": ["Shows startup results by default. Hold Deep test for one second to rerun every test. Available instruction sets may not be used by the current codec; transmission also depends on the remote decoder.", "初期表示は起動時の検出結果です。「詳細テスト」を1秒間押すと全項目を再実行します。利用可能な命令セットが現在使用されているとは限りません。送信は相手側のデコード能力にも依存します。", "기본적으로 시작 시 감지 결과를 표시합니다. 상세 테스트를 1초간 누르면 모든 항목을 다시 실행합니다. 사용 가능한 명령어 집합이 현재 사용되는 것은 아니며 전송은 상대 디코더에도 의존합니다."],
+  "深度測試": ["Deep test", "詳細テスト", "상세 테스트"],
+  "深度測試進度": ["Deep test progress", "詳細テストの進捗", "상세 테스트 진행률"],
+  "正在啟動深度測試…": ["Starting deep test…", "詳細テストを開始中…", "상세 테스트 시작 중…"],
+  "按住一秒，重新測試完整清單。測試期間可能影響效能。": ["Hold for one second to rerun all tests. Testing may affect performance.", "1秒間押すと全項目を再テストします。テスト中は性能に影響する場合があります。", "1초간 누르면 모든 테스트를 다시 실행합니다. 테스트 중 성능에 영향을 줄 수 있습니다."]
 }

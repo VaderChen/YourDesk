@@ -133,3 +133,9 @@ RIFE 4.25 Lite 的轉換模型內嵌於 `internal/frameinterp`，來源、SHA256
 若程式仍在執行，請先完整結束後再開啟 `clientUI.app`。一般安裝版與直接執行 `runUITest.command` 維持正常版本判斷；後者也可用 `YOURDESK_TEST_UPDATE=1 ./runUITest.command` 啟用相同測試。
 
 Linux CLI 目標為 `linux/x64`、`linux/arm64`，兩者均包含於預設全平台建置，輸出 `YourDesk-版本-linux-架構-cli.zip`。套件只有 Host，不包含圖形 Viewer。各平台 README 提供繁中、英、日、韓使用方式；不附重複的使用說明.txt。
+
+## Windows FFmpeg LGPL
+
+Windows 桌面 Client／Viewer 正式建置使用 `turbojpeg,ffmpeg` tags，附帶三個 FFmpeg 動態庫、授權與來源封存。快取以來源版本、編譯器與組態識別；命中有效快取便不重新編譯。DLL 相依閉包檢查會阻止缺檔套件發布。macOS 沿用原生 VideoToolbox，不加入 FFmpeg。詳見 [編解碼分析](HARDWARE-DETECTION.md)。
+
+目前發布排除 `android/`、`androidcore/` 與本機編譯輸出；預設六個平台維持不變。

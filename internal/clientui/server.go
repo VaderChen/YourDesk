@@ -32,6 +32,7 @@ import (
 	"yourdesk/internal/deviceid"
 	"yourdesk/internal/diagnostics"
 	"yourdesk/internal/frameinterp"
+	"yourdesk/internal/hardwareprobe"
 	"yourdesk/internal/hostguard"
 	"yourdesk/internal/prelogin"
 	"yourdesk/internal/security"
@@ -112,6 +113,7 @@ type Preferences struct {
 	TailcatEnabled          bool     `json:"tailcatEnabled"`
 	DirectListen            bool     `json:"directListen"`
 	Codec                   string   `json:"codec"`
+	CodecGoal               string   `json:"codecGoal"`
 	Language                string   `json:"language"`
 	Theme                   string   `json:"theme"`
 }
@@ -161,6 +163,13 @@ func Run(ctx context.Context, options Options) error {
 		return err
 	}
 	defer releaseInstance()
+	// 不等待偵測；視窗與連線維持原本啟動流程，退出時取消所有偵測子程序。
+	probeCtx, stopProbe := context.WithCancel(ctx)
+	defer func() {
+		stopProbe()
+		hardwareprobe.WaitForShutdown()
+	}()
+	hardwareprobe.Start(probeCtx)
 	s := &server{transferNotice: make(chan struct{}, 1), options: options, executable: executable, configPath: filepath.Join(configDir, "sites.json"),
 		viewerClosed: make(chan struct{}, 1), children: make(map[string]*process), library: Library{Groups: []Group{}, Sites: []Site{}}}
 	if data, err := os.ReadFile(s.configPath); err == nil {
@@ -189,6 +198,9 @@ func Run(ctx context.Context, options Options) error {
 		}
 	} else if !errors.Is(readErr, os.ErrNotExist) {
 		return readErr
+	}
+	if s.preferences.CodecGoal == "" {
+		s.preferences.CodecGoal = "balanced"
 	}
 	if s.preferences.Codec == "" {
 		s.preferences.Codec = "auto"
@@ -403,6 +415,14 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 		respond(w, 200, map[string]bool{"ok": true})
 	case r.URL.Path == "/api/stream-auto" && r.Method == "POST":
 		s.autoStream(w, r)
+	case r.URL.Path == "/api/hardware-deep" && r.Method == "POST":
+		if !hardwareprobe.StartDeep() {
+			respond(w, 409, map[string]string{"error": "硬體測試尚未就緒或正在執行"})
+			return
+		}
+		respond(w, 202, hardwareprobe.DeepSnapshot())
+	case r.URL.Path == "/api/hardware-deep" && r.Method == "GET":
+		respond(w, 200, hardwareprobe.DeepSnapshot())
 	case r.URL.Path == "/api/diagnostics" && (r.Method == "GET" || r.Method == "POST" || r.Method == "DELETE"):
 		s.connectionDiagnostics(w, r)
 	case r.URL.Path == "/api/transfers" && r.Method == "GET":
@@ -420,7 +440,7 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 		if p := s.children["quick"]; p != nil {
 			quick = map[string]any{"room": p.room, "stage": p.stage, "authRequired": p.authRequired, "message": p.authMessage}
 		}
-		respond(w, 200, map[string]any{"incomingConnected": s.incomingActive, "prelogin": s.preloginState(), "info": s.info, "library": publicLibrary(s.library), "running": running, "sessions": sessions, "notice": s.notice, "hostConflict": s.hostConflict, "quick": quick, "passwordPrompt": s.passwordPrompt(), "preferences": s.preferences, "updates": s.updater.snapshot(), "hardwareJPEG": video.ProbeHardwareJPEG().Encode, "superResolutionCapabilities": superres.Capabilities(), "coreMLModels": superres.Models(), "appleInterpolationSupported": frameinterp.AppleSupported(), "videoCapabilities": video.CachedIntraCapabilities()})
+		respond(w, 200, map[string]any{"incomingConnected": s.incomingActive, "prelogin": s.preloginState(), "info": s.info, "library": publicLibrary(s.library), "running": running, "sessions": sessions, "notice": s.notice, "hostConflict": s.hostConflict, "quick": quick, "passwordPrompt": s.passwordPrompt(), "preferences": s.preferences, "updates": s.updater.snapshot(), "hardwareJPEG": video.CachedHardwareJPEG().Encode, "superResolutionCapabilities": superres.Capabilities(), "coreMLModels": superres.Models(), "appleInterpolationSupported": frameinterp.AppleSupported(), "videoCapabilities": hardwareprobe.CachedVideoCapabilities(), "hardwareDetection": hardwareprobe.Snapshot()})
 	case r.URL.Path == "/api/local-password" && r.Method == "PUT":
 		if s.preloginBusy || prelogin.Status().Enabled {
 			fail(w, errors.New("請先停用未登入開機，再修改配對密碼。"))
@@ -463,7 +483,7 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 			fail(w, err)
 			return
 		}
-		if (s.preloginBusy || prelogin.Status().Enabled) && (preferences.Codec != s.preferences.Codec || preferences.DirectListen != s.preferences.DirectListen || preferences.TailcatEnabled != s.preferences.TailcatEnabled) {
+		if (s.preloginBusy || prelogin.Status().Enabled) && (preferences.CodecGoal != s.preferences.CodecGoal || preferences.Codec != s.preferences.Codec || preferences.DirectListen != s.preferences.DirectListen || preferences.TailcatEnabled != s.preferences.TailcatEnabled) {
 			fail(w, errors.New("請先停用未登入開機，再修改 Host 的影像傳輸、IP 直連或 Tailcat 模式。"))
 			return
 		}
@@ -489,7 +509,7 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 			s.mcpStop()
 			s.mcpStop = nil
 		}
-		hostChanged := s.preferences.Codec != preferences.Codec || s.preferences.DirectListen != preferences.DirectListen || s.preferences.TailcatEnabled != preferences.TailcatEnabled
+		hostChanged := s.preferences.CodecGoal != preferences.CodecGoal || s.preferences.Codec != preferences.Codec || s.preferences.DirectListen != preferences.DirectListen || s.preferences.TailcatEnabled != preferences.TailcatEnabled
 		s.preferences = preferences
 		if hostChanged {
 			if host := s.children["host"]; host != nil {
@@ -844,6 +864,9 @@ func (s *server) start(kind, siteID, binary string, args []string) error {
 		return err
 	}
 	s.children[key] = p
+	if kind == "viewer" || kind == "quick" {
+		go s.sendViewerOptimization(key, p)
+	}
 	s.notice = ""
 	go func() {
 		if output != nil {
@@ -855,6 +878,9 @@ func (s *server) start(kind, siteID, binary string, args []string) error {
 					var response agentremote.Response
 					if json.Unmarshal([]byte(payload), &response) == nil {
 						s.mu.Lock()
+						if response.Error == "" && response.Visible != nil && p.mcpOwned {
+							p.mcpVisible = *response.Visible
+						}
 						if ch := p.agentPending[response.ID]; ch != nil {
 							select {
 							case ch <- response:
@@ -988,6 +1014,31 @@ func (s *server) start(kind, siteID, binary string, args []string) error {
 	return nil
 }
 
+// 每個 Viewer 僅傳送一次本機策略；不等待偵測才啟動或傳送連線密碼。
+func (s *server) sendViewerOptimization(key string, p *process) {
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		status := hardwareprobe.Snapshot().Status
+		if status == "failed" || status == "cancelled" {
+			return
+		}
+		if policy := hardwareprobe.Policy(); policy != nil {
+			s.mu.Lock()
+			if s.children[key] == p && p.stdin != nil && !p.terminalConnection {
+				_ = json.NewEncoder(p.stdin).Encode(map[string]any{"optimization": policy})
+			}
+			s.mu.Unlock()
+			return
+		}
+		select {
+		case <-p.done:
+			return
+		case <-ticker.C:
+		}
+	}
+}
+
 func sendProcessSecret(p *process, secret string) error {
 	if p == nil || p.stdin == nil {
 		return errors.New("子程序的密碼通道尚未就緒")
@@ -1037,7 +1088,7 @@ func (s *server) keepHostRunning(ctx context.Context) {
 			s.mu.Unlock()
 			continue
 		}
-		args := append(append([]string{}, s.options.HostArgs...), "-codec", s.preferences.Codec, "-secret-stdin", "-parent-stdin")
+		args := append(append([]string{}, s.options.HostArgs...), "-codec", s.preferences.Codec, "-codec-goal", s.preferences.CodecGoal, "-secret-stdin", "-parent-stdin")
 		if s.preferences.TailcatEnabled {
 			args = append(args, "-transport", "tailcat")
 		}
@@ -1063,6 +1114,7 @@ func (s *server) keepHostRunning(ctx context.Context) {
 		s.mu.Unlock()
 		if child != nil {
 			ticker := time.NewTicker(time.Second)
+			policySent := false
 			waiting := true
 			for waiting {
 				select {
@@ -1072,6 +1124,16 @@ func (s *server) keepHostRunning(ctx context.Context) {
 				case <-child.done:
 					waiting = false
 				case <-ticker.C:
+					// Host 已可正常接受連線；偵測完成後再透過私有管道送策略。
+					if !policySent {
+						if policy := hardwareprobe.Policy(); policy != nil {
+							s.mu.Lock()
+							if child.stdin != nil {
+								policySent = json.NewEncoder(child.stdin).Encode(map[string]any{"optimization": policy}) == nil
+							}
+							s.mu.Unlock()
+						}
+					}
 					if prelogin.Status().Enabled {
 						child.stdin.Close()
 					}
@@ -1145,8 +1207,13 @@ func (p Preferences) validate() error {
 	}
 	// 設定驗證只檢查格式；硬體可用性由背景探測及串流協商決定。
 	// 暫時不可用不可阻止讀取已保存的設定或啟動主畫面。
+	switch p.CodecGoal {
+	case "", "balanced", "low-latency", "bandwidth":
+	default:
+		return errors.New("不支援的串流偏好")
+	}
 	switch p.Codec {
-	case "", "auto", "software-jpeg", "hardware-h264", "hardware-hevc", "hardware-jpeg":
+	case "", "auto", "software-jpeg", "hardware-h264", "hardware-hevc", "hardware-av1", "hardware-jpeg":
 	default:
 		return errors.New("不支援此影像傳輸方式")
 	}

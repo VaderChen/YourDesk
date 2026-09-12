@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include "../pixelconv/swizzle.h"
 
 typedef struct { unsigned char *data; size_t size; OSStatus status; } yd_intra_result;
 static void yd_put32(unsigned char *p, uint32_t v) { p[0]=v>>24;p[1]=v>>16;p[2]=v>>8;p[3]=v; }
@@ -36,6 +37,7 @@ static void yd_intra_callback(void *ref,void *source,OSStatus status,VTEncodeInf
  r->data=data;r->size=total;
 }
 static void yd_intra_close(VTCompressionSessionRef session) {VTCompressionSessionInvalidate(session);CFRelease(session);}
+static void yd_pixel_close(uintptr_t pixel) { CVPixelBufferRelease((CVPixelBufferRef)pixel); }
 static OSStatus yd_intra_create(int w,int h,CMVideoCodecType codec,int gop,VTCompressionSessionRef *out) {
  *out=NULL;
  const void *key=kVTVideoEncoderSpecification_RequireHardwareAcceleratedVideoEncoder;
@@ -65,18 +67,16 @@ static OSStatus yd_intra_rate(VTCompressionSessionRef session,int bitrate,int fp
  if(!s)s=VTSessionSetProperty(session,kVTCompressionPropertyKey_ExpectedFrameRate,frames);
  CFRelease(frames);return s;
 }
-static OSStatus yd_intra_encode(VTCompressionSessionRef session,const unsigned char *rgba,int w,int h,int stride,int64_t sequence,int quality,int fps,int gop,unsigned char **out,size_t *len) {
+static OSStatus yd_intra_encode(VTCompressionSessionRef session,uintptr_t *cached,const unsigned char *rgba,int w,int h,int stride,int64_t sequence,int quality,int fps,int gop,unsigned char **out,size_t *len) {
  *out=NULL;*len=0;
- CVPixelBufferRef pixel=NULL;
- OSStatus s=CVPixelBufferCreate(NULL,w,h,kCVPixelFormatType_32BGRA,NULL,&pixel);
+ CVPixelBufferRef pixel=(CVPixelBufferRef)*cached;
+ OSStatus s=noErr;
+ if(!pixel){s=CVPixelBufferCreate(NULL,w,h,kCVPixelFormatType_32BGRA,NULL,&pixel);if(!s)*cached=(uintptr_t)pixel;}
  if(s)return s;
  s=CVPixelBufferLockBaseAddress(pixel,0);
- if(s){CFRelease(pixel);return s;}
+ if(s)return s;
  unsigned char *base=CVPixelBufferGetBaseAddress(pixel);size_t row=CVPixelBufferGetBytesPerRow(pixel);
- for(int y=0;y<h;y++)for(int x=0;x<w;x++){
-  const unsigned char *p=rgba+y*stride+x*4;unsigned char *q=base+y*row+x*4;
-  q[0]=p[2];q[1]=p[1];q[2]=p[0];q[3]=255;
- }
+ for(int y=0;y<h;y++)yd_swap_rb_opaque(base+y*row,rgba+y*stride,w);
  CVPixelBufferUnlockBaseAddress(pixel,0);
  float q=(quality<1?1:quality>100?100:quality)/100.0f;
  CFNumberRef qualityNumber=CFNumberCreate(NULL,kCFNumberFloatType,&q);
@@ -88,7 +88,7 @@ static OSStatus yd_intra_encode(VTCompressionSessionRef session,const unsigned c
  s=VTCompressionSessionEncodeFrame(session,pixel,CMTimeMake(sequence,fps),CMTimeMake(1,fps),options,&result,NULL);
  CFRelease(options);
  OSStatus complete=VTCompressionSessionCompleteFrames(session,kCMTimeInvalid);
- CFRelease(pixel);
+ // CompleteFrames 已同步完成，下一張才可覆寫同一 pixel buffer。
  if(!s)s=complete;if(!s)s=result.status;
  if(s){free(result.data);return s;}
  *out=result.data;*len=result.size;return noErr;
@@ -99,8 +99,9 @@ static void yd_intra_decode_callback(void *ref,void *source,OSStatus status,VTDe
  if(!status&&image)r->image=CVPixelBufferRetain(image);
 }
 typedef struct { VTDecompressionSessionRef session; CMVideoFormatDescriptionRef format; } yd_decoder;
+typedef struct { int width,height,mode; } yd_decode_policy;
 static void yd_decoder_close(yd_decoder *d) { if(d->session){VTDecompressionSessionInvalidate(d->session);CFRelease(d->session);} if(d->format)CFRelease(d->format); d->session=NULL;d->format=NULL; }
-static OSStatus yd_intra_decode(yd_decoder *decoder,CMVideoCodecType codec,const unsigned char *data,size_t length,unsigned char **out,int *width,int *height,int *hardware) {
+static OSStatus yd_intra_decode(yd_decoder *decoder,CMVideoCodecType codec,const unsigned char *data,size_t length,const yd_decode_policy *policy,int policyCount,unsigned char **out,int *width,int *height,int *hardware) {
  *out=NULL;*width=0;*height=0;*hardware=-1;
  if(length<1||data[0]!=(codec==kCMVideoCodecType_HEVC?3:2))return -1;
  size_t count=data[0],pos=1,sizes[3];const uint8_t *params[3];
@@ -114,6 +115,10 @@ static OSStatus yd_intra_decode(yd_decoder *decoder,CMVideoCodecType codec,const
  if(s)return s;
  CMVideoDimensions dims=CMVideoFormatDescriptionGetDimensions(format);
  if(dims.width<=0||dims.height<=0||dims.width>8192||dims.height>8192||(int64_t)dims.width*dims.height>32*1024*1024){CFRelease(format);return -1;}
+ // 使用壓縮參數集的真實尺寸，而非可由對端任意填寫的外層尺寸。
+ int preference=0;
+ for(int i=0;i<policyCount;i++)if(policy[i].width==dims.width&&policy[i].height==dims.height){preference=policy[i].mode;break;}
+ if(preference==-2){CFRelease(format);return -1;}
  int pixelFormat=kCVPixelFormatType_32BGRA;CFNumberRef pixelNumber=CFNumberCreate(NULL,kCFNumberIntType,&pixelFormat);
  const void *attrKey=kCVPixelBufferPixelFormatTypeKey,*attrValue=pixelNumber;
  CFDictionaryRef attrs=CFDictionaryCreate(NULL,&attrKey,&attrValue,1,&kCFTypeDictionaryKeyCallBacks,&kCFTypeDictionaryValueCallBacks);
@@ -121,8 +126,16 @@ static OSStatus yd_intra_decode(yd_decoder *decoder,CMVideoCodecType codec,const
  yd_intra_decoded result={NULL,-1};VTDecompressionOutputCallbackRecord cb={yd_intra_decode_callback,NULL};
  VTDecompressionSessionRef session=decoder->session;
  if(session&&!CMFormatDescriptionEqual(decoder->format,format)){yd_decoder_close(decoder);session=NULL;}
- // 允許 VideoToolbox 自動選擇硬體解碼或軟體解碼，兩者皆可接收硬體壓縮影格。
- if(!session){s=VTDecompressionSessionCreate(NULL,format,NULL,attrs,&cb,&session);if(!s){decoder->session=session;decoder->format=(CMVideoFormatDescriptionRef)CFRetain(format);}}CFRelease(attrs);
+ // 已驗證硬解時優先啟用；硬解探測失敗時先用軟解；未測尺寸維持系統自選。
+ if(!session){
+  CFDictionaryRef spec=NULL;
+  if(preference){const void *key=kVTVideoDecoderSpecification_EnableHardwareAcceleratedVideoDecoder,*value=preference>0?kCFBooleanTrue:kCFBooleanFalse;spec=CFDictionaryCreate(NULL,&key,&value,1,&kCFTypeDictionaryKeyCallBacks,&kCFTypeDictionaryValueCallBacks);}
+  s=VTDecompressionSessionCreate(NULL,format,spec,attrs,&cb,&session);
+  if(spec)CFRelease(spec);
+  // 策略不是保證：驅動／資源狀態改變時，允許既有自選路徑再建立一次。
+  if(s&&preference){if(session){VTDecompressionSessionInvalidate(session);CFRelease(session);session=NULL;}s=VTDecompressionSessionCreate(NULL,format,NULL,attrs,&cb,&session);}
+  if(!s){decoder->session=session;decoder->format=(CMVideoFormatDescriptionRef)CFRetain(format);}
+ }CFRelease(attrs);
  CMBlockBufferRef block=NULL;CMSampleBufferRef sample=NULL;size_t bytes=length-pos;
  if(!s)s=CMBlockBufferCreateWithMemoryBlock(NULL,NULL,bytes,NULL,NULL,0,bytes,0,&block);
  if(!s)s=CMBlockBufferReplaceDataBytes(data+pos,block,0,bytes);
@@ -146,10 +159,8 @@ static OSStatus yd_intra_decode(yd_decoder *decoder,CMVideoCodecType codec,const
    if(w!=(size_t)dims.width||h!=(size_t)dims.height||!base)s=-1;
    unsigned char *pixels=s?NULL:malloc(w*h*4);
    if(!pixels)s=-1;
-   if(!s){for(size_t y=0;y<h;y++)for(size_t x=0;x<w;x++){
-    const unsigned char *p=base+y*row+x*4;unsigned char *q=pixels+(y*w+x)*4;
-    q[0]=p[2];q[1]=p[1];q[2]=p[0];q[3]=255;
-   }*out=pixels;*width=(int)w;*height=(int)h;}
+   if(!s){for(size_t y=0;y<h;y++)yd_swap_rb_opaque(pixels+y*w*4,base+y*row,w);
+   *out=pixels;*width=(int)w;*height=(int)h;}
    CVPixelBufferUnlockBaseAddress(result.image,kCVPixelBufferLock_ReadOnly);
   }
  }

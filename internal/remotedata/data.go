@@ -14,6 +14,7 @@ import (
 	"time"
 	"unicode/utf8"
 	"yourdesk/internal/p2p"
+	"yourdesk/internal/useraccess"
 )
 
 type Search struct {
@@ -55,9 +56,9 @@ func decode(raw json.RawMessage, target any) error {
 	return nil
 }
 
-// 未登入 root 工作階段不註冊檔案或 Shell 能力。
+// root、Windows 服務帳號或非互動工作階段不註冊檔案或 Shell 能力。
 func Register(peer *p2p.Peer, authorized func() bool) {
-	if os.Geteuid() == 0 {
+	if !useraccess.Allowed() {
 		return
 	}
 	home, err := os.UserHomeDir()
@@ -66,6 +67,9 @@ func Register(peer *p2p.Peer, authorized func() bool) {
 	}
 	register := func(name string, handler func(context.Context, json.RawMessage) (any, error)) {
 		_ = peer.RegisterCommandParams(name, func(ctx context.Context, raw json.RawMessage) (any, error) {
+			if !useraccess.Allowed() {
+				return nil, errors.New("目前執行身分不允許遠端檔案或 Shell 操作")
+			}
 			if !authorized() || ctx.Err() != nil {
 				return nil, errors.New("遠端工作階段不可用")
 			}

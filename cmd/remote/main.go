@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"image"
 	"image/color"
-	"image/draw"
 	"log/slog"
 	"math"
 	"os"
@@ -136,6 +135,8 @@ func (g *game) toggleFullscreen() {
 }
 
 func (g *game) Update() error {
+	// 顯示／隱藏是本機視窗操作，不依賴新影格或仍存活的遠端連線。
+	g.updateAgent()
 	if g.peer != nil {
 		select {
 		case <-g.peer.Done():
@@ -160,7 +161,6 @@ func (g *game) Update() error {
 		default:
 		}
 	}
-	g.updateAgent()
 	g.updateWindowFit()
 	if algorithm := viewerSuperResolution.Load(); algorithm != g.superResolution {
 		g.superResolution = algorithm
@@ -611,7 +611,7 @@ func main() {
 		}
 		codecStatusMu.Lock()
 		receivedWire = f.Codec
-		receivedCodec = map[byte]string{0: "JPEG", 1: "H.264", 2: "HEVC"}[f.Codec]
+		receivedCodec = map[byte]string{0: "JPEG", 1: "H.264", 2: "HEVC", 3: "AV1"}[f.Codec]
 		receivedMode = mode
 		codecStatusMu.Unlock()
 		g.mu.Lock()
@@ -626,13 +626,10 @@ func main() {
 		if f.Keyframe {
 			g.displayPending = false
 		}
+		var changed bool
+		g.frame, changed = compositeDecodedFrame(g.frame, img, image.Rect(0, 0, int(f.Width), int(f.Height)), int(f.X), int(f.Y), f.Keyframe)
+		g.dirty = g.dirty || changed || g.frameDisplay != f.Display
 		g.frameDisplay = f.Display
-		if g.frame == nil || g.frame.Bounds().Dx() != int(f.Width) || g.frame.Bounds().Dy() != int(f.Height) || f.Keyframe {
-			g.frame = image.NewRGBA(image.Rect(0, 0, int(f.Width), int(f.Height)))
-		}
-		dst := image.Rect(int(f.X), int(f.Y), int(f.X)+img.Bounds().Dx(), int(f.Y)+img.Bounds().Dy())
-		draw.Draw(g.frame, dst, img, img.Bounds().Min, draw.Src)
-		g.dirty = true
 		g.width, g.height = int(f.Width), int(f.Height)
 		g.mu.Unlock()
 	})
@@ -652,7 +649,7 @@ func main() {
 		}
 		if c.Type == "video-status" {
 			g.remoteEnhancement.Store(c.EnhancementReport)
-			if c.VideoCodec <= 2 && (c.EncodingMode == "hardware" || c.EncodingMode == "software") {
+			if c.VideoCodec <= byte(video.WireAV1) && (c.EncodingMode == "hardware" || c.EncodingMode == "software") {
 				codecStatusMu.Lock()
 				sourceModes[c.VideoCodec] = c.EncodingMode
 				codecStatusMu.Unlock()
@@ -682,14 +679,6 @@ func main() {
 	go func() {
 		ticker := time.NewTicker(time.Second)
 		defer ticker.Stop()
-		var codecs []byte
-		if *codec != "software" && *codec != "software-jpeg" {
-			for _, cap := range video.IntraCapabilities() {
-				if cap.Decode {
-					codecs = append(codecs, byte(video.WireForCodec(cap.Codec)))
-				}
-			}
-		}
 		// 背景每秒取樣，避免統計收集阻塞繪圖；以實際間隔計算速度。
 		lastSent, lastReceived := peer.TrafficBytes()
 		lastSample := time.Now()
@@ -725,11 +714,14 @@ func main() {
 				lastFrames = frames
 				lastSent, lastReceived, lastSample = sent, received, now
 			}
-			advertised := codecs
+			var advertised []byte
+			if *codec != "software" && *codec != "software-jpeg" {
+				advertised = video.ReceiverCodecs()
+			}
 			if videoDecodeFailed.Load() {
 				advertised = nil
 			}
-			_ = peer.SendControl(p2p.Control{Type: "video-capabilities", Codecs: advertised, KeyframeInterval: 10})
+			_ = peer.SendControl(p2p.Control{Type: "video-capabilities", Codecs: advertised, HardwareDecodeCodecs: video.ReceiverHardwareCodecs(advertised), KeyframeInterval: 10})
 			select {
 			case <-ctx.Done():
 				return

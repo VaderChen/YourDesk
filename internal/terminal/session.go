@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"os"
 	"sync"
 	"yourdesk/internal/p2p"
+	"yourdesk/internal/useraccess"
 )
 
 type console interface {
@@ -71,7 +71,7 @@ func (s *session) read() {
 		}
 	}
 }
-func Available() bool { return os.Geteuid() != 0 && supported() }
+func Available() bool { return useraccess.Allowed() && supported() }
 
 func Register(peer *p2p.Peer, authorized func() bool, active func(bool)) {
 	if !Available() {
@@ -92,6 +92,9 @@ func Register(peer *p2p.Peer, authorized func() bool, active func(bool)) {
 	for _, action := range []string{"open", "read", "write", "resize", "close"} {
 		action := action
 		_ = peer.RegisterCommandParams("terminal."+action, func(ctx context.Context, raw json.RawMessage) (any, error) {
+			if !useraccess.Allowed() {
+				return nil, errors.New("目前執行身分不允許遠端 Shell 操作")
+			}
 			if !authorized() || ctx.Err() != nil {
 				return nil, errors.New("遠端連線已結束")
 			}

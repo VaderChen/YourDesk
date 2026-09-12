@@ -27,8 +27,8 @@ BUILD_VERSION="1.$(date +%y.%m%d) build $(date +%H%M)"
 mkdir -p bin .local-run
 BUILD_STAGE="$(mktemp -d "$ROOT/.local-run/signed-build.XXXXXX")"
 echo "編譯 YourDesk Client 與 Viewer……"
-CGO_ENABLED=1 go build -ldflags "-X 'yourdesk/internal/clientui.Version=$BUILD_VERSION'" -o "$BUILD_STAGE/yourdesk-client" ./cmd/client
-go build -ldflags "-X 'yourdesk/internal/clientui.Version=$BUILD_VERSION'" -o "$BUILD_STAGE/yourdesk-remote" ./cmd/remote
+python3 scripts/turbojpeg.py darwin/arm64 go build -ldflags "-X 'yourdesk/internal/clientui.Version=$BUILD_VERSION'" -o "$BUILD_STAGE/yourdesk-client" ./cmd/client
+python3 scripts/turbojpeg.py darwin/arm64 go build -ldflags "-X 'yourdesk/internal/clientui.Version=$BUILD_VERSION'" -o "$BUILD_STAGE/yourdesk-remote" ./cmd/remote
 "$ROOT/scripts/sign-local.sh" "$BUILD_STAGE/yourdesk-client" "$BUILD_STAGE/yourdesk-remote"
 # 原路徑只會出現已完整簽署的執行檔，避免重建期間留下 ad-hoc 版本。
 mv -f "$BUILD_STAGE/yourdesk-client" "$ROOT/bin/yourdesk-client"

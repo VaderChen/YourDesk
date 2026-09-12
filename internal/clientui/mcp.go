@@ -59,7 +59,7 @@ type mcpAction struct {
 	expectedProcess *process
 	Params          json.RawMessage `json:"-"`
 	Session         string          `json:"session"`
-	Action          string          `json:"action" jsonschema:"screenshot、move、button、key、scroll、text、display"`
+	Action          string          `json:"action" jsonschema:"show、hide（不等待影格）；screenshot、move、button、key、scroll、text、display"`
 	X               float64         `json:"x,omitempty" jsonschema:"畫面相對座標 0～1"`
 	Y               float64         `json:"y,omitempty" jsonschema:"畫面相對座標 0～1"`
 	Button          int             `json:"button,omitempty" jsonschema:"0 左鍵、1 右鍵、2 中鍵"`
@@ -178,7 +178,8 @@ func (s *server) callRemoteAgent(ctx context.Context, in mcpAction) (agentremote
 		s.mu.Unlock()
 		return agentremote.Response{}, fmt.Errorf("終端機尚未連線")
 	}
-	if p == nil || (p.kind != "viewer" && p.kind != "quick") || p.diagnosticConnection || p.stage != "connected" || p.stdin == nil {
+	visibilityOnly := in.Action == "show" || in.Action == "hide"
+	if p == nil || (p.kind != "viewer" && p.kind != "quick") || p.diagnosticConnection || p.stdin == nil || (!visibilityOnly && p.stage != "connected") || (visibilityOnly && p.terminalConnection) {
 		s.mu.Unlock()
 		return agentremote.Response{}, fmt.Errorf("遠端顯示尚未連線或不支援操作")
 	}
@@ -191,7 +192,8 @@ func (s *server) callRemoteAgent(ctx context.Context, in mcpAction) (agentremote
 	}
 	if !p.mcpOwned && !p.terminalConnection {
 		p.mcpOwned = true
-		setMCPVisibility(p, s.preferences.MCPOpenDisplay)
+		// 接管使用者已開啟的視窗，不因背景 MCP 偏好而自動隱藏。
+		p.mcpVisible = true
 	}
 	p.agentPending[id] = ch
 	_, err = p.stdin.Write(append(data, '\n'))

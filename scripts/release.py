@@ -16,6 +16,9 @@ import time
 import zipfile
 from datetime import datetime
 from zoneinfo import ZoneInfo
+import turbojpeg
+import ffmpeg
+import windows_runtime
 
 ROOT = Path(__file__).resolve().parent.parent
 DIST = ROOT / 'dist'
@@ -122,7 +125,17 @@ def compile_program(name, folder, target, version):
                 shutil.copy2(icon, Path(temporary) / 'icon.ico')
                 source.write_text('1 ICON "icon.ico"\n')
                 run([windres, '-i', source, '-O', 'coff', '-o', resource], cwd=Path(temporary))
-        run(['go', 'build', '-buildvcs=false', '-trimpath', '-ldflags', flags, '-o', folder / output, './cmd/' + name], environment(target, gui))
+        env = environment(target, gui)
+        tags = []
+        if gui:
+            env, source = turbojpeg.prepare(target, env)
+            tags = ['-tags', 'turbojpeg']
+            turbojpeg.copy_licenses(source, folder)
+            if system == 'windows':
+                env, ffmpeg_prefix = ffmpeg.prepare(target, env)
+                tags = ['-tags', 'turbojpeg,ffmpeg']
+                ffmpeg.copy_runtime(ffmpeg_prefix, folder)
+        run(['go', 'build', *tags, '-buildvcs=false', '-trimpath', '-ldflags', flags, '-o', folder / output, './cmd/' + name], env)
         if system == 'darwin':
             run([ROOT / 'scripts/sign-local.sh', folder / output])
     finally:
@@ -212,6 +225,8 @@ def mac_bundle(folder, version):
             run(['iconutil', '-c', 'icns', iconset, '-o', resources / 'AppIcon.icns'])
         info['CFBundleIconFile'] = 'AppIcon.icns'
     copy_project_licenses(resources)
+    if (folder / 'ThirdPartyLicenses' / 'libjpeg-turbo').is_dir():
+        shutil.copytree(folder / 'ThirdPartyLicenses' / 'libjpeg-turbo', resources / 'ThirdPartyLicenses' / 'libjpeg-turbo', dirs_exist_ok=True)
     copy_model_licenses(resources)
     (app / 'Contents/Info.plist').write_bytes(plistlib.dumps(info))
     identity = signing_identity()
@@ -411,6 +426,7 @@ def clean_apple_output(folder):
 
 
 def windows_installer(folder, stem, version, arch):
+    windows_runtime.validate(folder, ('YourDesk.exe', 'yourdesk-client.exe', 'yourdesk-remote.exe'))
     compiler = os.environ.get('YOURDESK_MAKENSIS') or shutil.which('makensis')
     if not compiler:
         raise ValueError('Windows 封裝需要 NSIS：macOS 執行 brew install nsis；Windows 安裝 NSIS 並將 makensis 加入 PATH，或設定 YOURDESK_MAKENSIS')

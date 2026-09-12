@@ -41,6 +41,12 @@ sites.json
 
 # 本機研究產物及直接 go build 輸出。
 /reports/
+/try/
 /remote
 /remote.exe
 /client.exe
+
+# Android 開發暫不發布；本機編譯輸出不提交。
+/android/
+/androidcore/
+/client
