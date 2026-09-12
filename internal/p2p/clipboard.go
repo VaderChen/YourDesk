@@ -20,7 +20,7 @@ func (p *Peer) bindClipboard(dc *webrtc.DataChannel) {
 	p.clipboard = dc
 	p.mu.Unlock()
 	dc.OnClose(func() { p.clipboardOnce.Do(func() { close(p.clipboardDone) }) })
-	dc.OnMessage(func(m webrtc.DataChannelMessage) {
+	p.onMessage(dc, func(m webrtc.DataChannelMessage) {
 		if len(m.Data) > MaxClipboardMessage {
 			_ = dc.Close()
 			return
@@ -70,7 +70,7 @@ func (p *Peer) SendClipboard(ctx context.Context, data []byte) error {
 		}
 		if dc != nil && dc.ReadyState() == webrtc.DataChannelStateOpen && dc.BufferedAmount()+uint64(len(data)) <= bufferLimit &&
 			(control == nil || control.BufferedAmount() == 0) && screenBuffered < 256*1024 {
-			return dc.Send(data)
+			return p.sendData(dc, data)
 		}
 		select {
 		case <-ctx.Done():

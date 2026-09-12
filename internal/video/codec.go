@@ -7,6 +7,7 @@ import (
 type Codec string
 
 const (
+	CodecHardwareAV1  Codec = "hardware-av1"
 	CodecAuto         Codec = "auto"
 	CodecHardwareH264 Codec = "hardware-h264"
 	CodecHardwareHEVC Codec = "hardware-hevc"
@@ -27,7 +28,7 @@ func Select(requested Codec) (Selection, error) {
 	if requested == "" {
 		requested = CodecAuto
 	}
-	if requested != CodecAuto && requested != CodecHardwareH264 && requested != CodecHardwareHEVC && requested != CodecSoftwareH264 && requested != CodecHardwareJPEG && requested != CodecSoftwareJPEG {
+	if requested != CodecHardwareAV1 && requested != CodecAuto && requested != CodecHardwareH264 && requested != CodecHardwareHEVC && requested != CodecSoftwareH264 && requested != CodecHardwareJPEG && requested != CodecSoftwareJPEG {
 		return Selection{}, fmt.Errorf("不支援 codec %q", requested)
 	}
 	if requested == CodecSoftwareJPEG {
@@ -42,6 +43,14 @@ func Select(requested Codec) (Selection, error) {
 			return Selection{requested, CodecSoftwareH264, "software H.264", false, "軟體 H.264 encoder 可用"}, nil
 		}
 		return selectJPEGFallback(requested, "軟體 H.264 encoder 不可用"), nil
+	}
+	if requested == CodecHardwareAV1 {
+		if caps.av1 {
+			return Selection{requested, CodecHardwareAV1, caps.backend, true, caps.detail}, nil
+		}
+		fallback, err := Select(CodecHardwareHEVC)
+		fallback.Requested = requested
+		return fallback, err
 	}
 	if requested == CodecHardwareHEVC {
 		if caps.hevc {
@@ -86,8 +95,8 @@ func selectJPEGFallback(requested Codec, reason string) Selection {
 }
 
 type capabilities struct {
-	h264, hevc, swH264 bool
-	backend, detail    string
+	h264, hevc, av1, swH264 bool
+	backend, detail         string
 }
 
 type DecoderSelection struct {

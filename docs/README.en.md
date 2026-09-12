@@ -2,13 +2,15 @@
 
 [繁體中文](../README.md) · **English** · [日本語](README.ja.md) · [한국어](README.ko.md)
 
+> **YourDesk supports NAT/firewall traversal. Some antivirus products currently flag some builds as malware. We are investigating; traversal has not been established as the cause, and false positives have not been confirmed. Assess the risk before downloading.**
+
 YourDesk is a remote desktop app for macOS and Windows. Connect to another computer, organize your saved connections, and copy and paste across platforms with familiar controls.
 
 ![YourDesk interface](../images/cap001.png)
 
 ## Features
 
-This release adds independent terminal windows, Linux CLI x64/arm64 ZIP packages and MCP interactive terminals. Disconnected windows can stay open, and icons show a spinner while waiting for the remote Host to recover. See the [release notes](RELEASE-1.26.0911-build-2247.md).
+This release adds independent codec analysis, deep tests and automatic transmission strategies, plus FFmpeg LGPL software decoding for H.264, HEVC and AV1 on Windows. It also fixes startup failures caused by missing DLL dependencies. See the [release notes](RELEASE-1.26.0913-build-0058.md).
 
 - **GUI and command-line modes:** choose remote desktop or an interactive terminal for your task. Terminals use independent windows and can connect to Linux CLI Hosts.
 - **Remote control through MCP AI agents:** AI agents can connect through MCP, operate the desktop or terminal, query site capabilities and disconnect when finished.

@@ -6,11 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"sync"
 	"time"
 
 	"yourdesk/internal/agentremote"
+	"yourdesk/internal/optimization"
 	"yourdesk/internal/security"
 )
 
@@ -48,8 +50,16 @@ func (p *passwordInput) read(ctx context.Context, prompt bool) ([]byte, error) {
 			scanner.Buffer(make([]byte, 1024), 65536)
 			for scanner.Scan() {
 				var envelope struct {
-					Agent    *agentremote.Request `json:"agent"`
-					ProbeFPS *int                 `json:"probeFPS"`
+					Agent        *agentremote.Request `json:"agent"`
+					ProbeFPS     *int                 `json:"probeFPS"`
+					Optimization *optimization.Policy `json:"optimization"`
+				}
+				if json.Unmarshal(scanner.Bytes(), &envelope) == nil && envelope.Optimization != nil {
+					// 本機父程序的控制訊息不得進入密碼重試佇列。
+					if optimization.Apply(*envelope.Optimization) {
+						slog.Info("觀看端已接收本機解碼策略", "combinations", len(envelope.Optimization.Decoders))
+					}
+					continue
 				}
 				if json.Unmarshal(scanner.Bytes(), &envelope) == nil && envelope.ProbeFPS != nil {
 					if *envelope.ProbeFPS == 30 {

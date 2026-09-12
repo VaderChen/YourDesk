@@ -64,6 +64,27 @@ if (location.hash) {
   history.replaceState(null, '', location.pathname);
 }
 let state = null;
+let startupMainReady = false;
+let startupOptimizationDismissed = false;
+let startupOptimizationFinished = false;
+function startupOptimizationPending() {
+  return ['not-started', 'running'].includes(state?.hardwareDetection?.status);
+}
+function renderStartupOptimization() {
+  const dialog = $('#startup-optimization-dialog');
+  if (!startupOptimizationPending()) {
+    if (state?.hardwareDetection) startupOptimizationFinished = true;
+    if (dialog.open) dialog.close();
+    return;
+  }
+  if (state?.passwordPrompt || connectionWait) {
+    if (dialog.open) dialog.close();
+    return;
+  }
+  if (!startupMainReady || startupOptimizationDismissed || startupOptimizationFinished || document.hidden || busy) return;
+  if (!dialog.open && !document.querySelector('dialog[open]')) openDialog('#startup-optimization-dialog');
+}
+$('#startup-optimization-dialog').addEventListener('close', () => { startupOptimizationDismissed = true; });
 let selectedGroup = '*';
 let groupSaveQueue = Promise.resolve();
 function rememberGroup(id) {
@@ -137,6 +158,11 @@ async function action(callback) {
   }
 }
 function openDialog(id) {
+  // 使用者操作或其他重要對話框優先；不把背景偵測疊在它們上方。
+  if (id !== '#startup-optimization-dialog' && $('#startup-optimization-dialog').open) {
+    startupOptimizationDismissed = true;
+    $('#startup-optimization-dialog').close();
+  }
   const dialog = $(id);
   dialog.querySelectorAll('.form-error').forEach(el => el.remove());
   dialog.showModal();
@@ -161,6 +187,11 @@ function siteOnline(site) { const value=sitePresence[site?.id]; return value && 
 function siteCapability(site,name) { return sitePresence[site?.id]?.capabilities?.[name]; }
 function applySiteCapabilities(card,site) {
  const recovering=siteRecovery.has(site?.id);
+ const device=card.querySelector('.mini-device');
+ if(device){
+  device.classList.toggle('mode-recovering',recovering);
+  device.setAttribute('aria-busy',String(recovering));
+ }
 
  for(const [name,label] of [['desktop','此裝置沒有桌面環境，請改用命令列連線。'],['terminal','對方尚未支援命令列，請更新對方的 YourDesk 後再試。']]){
   const btn=card.querySelector(`[data-connect-mode="${name}"]`);if(!btn)continue;
@@ -396,6 +427,11 @@ function connect(site,terminal=false) {
 
 async function updateRunning() {
   const latest = await api('state');
+  state.hardwareDetection = latest.hardwareDetection;
+  if(!$('#settings-panel-hardware').hidden||deepHardwareState?.status==='running')deepHardwareState=await api('hardware-deep');
+  renderHardwareAnalysis();
+  state.passwordPrompt = latest.passwordPrompt;
+  renderStartupOptimization();
   const now=Date.now();
   for(const site of state.library.sites){
    const key=`viewer:${site.id}`;
@@ -454,7 +490,124 @@ $('#toggle-secret').addEventListener('click', () => {
   $('#toggle-secret').textContent = visible ? i18n.t('隱藏') : i18n.t('顯示');
   $('#toggle-secret').setAttribute('aria-label', visible ? i18n.t('隱藏連線密碼') : i18n.t('顯示連線密碼'));
 });
+let deepHardwareState=null;
+let deepHardwareSubmitting=false;
+let hardwareHold=null;
+const hardwareDeepButton=$('#hardware-deep-test');
+function cancelHardwareHold(){clearTimeout(hardwareHold);hardwareHold=null;hardwareDeepButton.classList.remove('holding');}
+function startHardwareHold(){
+ if(hardwareHold!==null||hardwareDeepButton.disabled)return;
+ hardwareDeepButton.classList.add('holding');
+ hardwareHold=setTimeout(()=>{
+  cancelHardwareHold();
+  if($('#settings-panel-hardware').hidden||!$('#settings-dialog').open||document.hidden)return;
+  deepHardwareSubmitting=true;renderHardwareAnalysis();
+  action(async()=>{try{deepHardwareState=await api('hardware-deep','POST');}finally{deepHardwareSubmitting=false;renderHardwareAnalysis();}});
+ },1000);
+}
+hardwareDeepButton.addEventListener('pointerdown',event=>{if(event.button===0){event.preventDefault();startHardwareHold();}});
+for(const event of ['pointerup','pointerleave','pointercancel','blur'])hardwareDeepButton.addEventListener(event,cancelHardwareHold);
+hardwareDeepButton.addEventListener('keydown',event=>{if([' ','Enter'].includes(event.key)){event.preventDefault();if(!event.repeat)startHardwareHold();}});
+hardwareDeepButton.addEventListener('keyup',event=>{if([' ','Enter'].includes(event.key)){event.preventDefault();cancelHardwareHold();}});
+hardwareDeepButton.addEventListener('click',event=>event.preventDefault());
+hardwareDeepButton.addEventListener('contextmenu',event=>event.preventDefault());
+window.addEventListener('blur',cancelHardwareHold);
+document.addEventListener('visibilitychange',cancelHardwareHold);
+$('#settings-dialog').addEventListener('close',cancelHardwareHold);
+function renderHardwareAnalysis() {
+ const panel=$('#settings-panel-hardware');
+ if(panel.hidden)return;
+ const detection=deepHardwareState&&deepHardwareState.status!=='not-started'?deepHardwareState:state?.hardwareDetection;
+ const busy=deepHardwareSubmitting||deepHardwareState?.status==='running';
+ hardwareDeepButton.disabled=busy||!state?.hardwareDetection||['running','not-started'].includes(state.hardwareDetection.status);
+ hardwareDeepButton.setAttribute('aria-busy',String(busy));
+ const progress=$('#hardware-deep-progress');
+ progress.hidden=!busy;
+ const progressLabel=$('#hardware-deep-progress-label');
+ progressLabel.hidden=progress.hidden;
+ if(deepHardwareSubmitting){
+  progress.removeAttribute('value');
+  progressLabel.textContent=i18n.t('正在啟動深度測試…');
+ }else{
+  const total=Math.max(1,deepHardwareState?.total||0);
+  const completed=deepHardwareState?.completed||0;
+  progress.max=total;progress.value=completed;
+  progressLabel.textContent=`${i18n.t('深度測試')} · ${Math.round(completed/total*100)}% · ${completed}/${deepHardwareState?.total||0}`;
+ }
+ const t=value=>i18n.t(value);
+ const unknown=t('未確認');
+ const states={'not-started':'尚未開始偵測',running:'偵測中',complete:'偵測完成',partial:'部分偵測未完成',failed:'偵測未完成',cancelled:'偵測已取消',pending:'等待偵測'};
+ const status=t(states[detection?.status]||'尚未開始偵測');
+ const elapsed=Number.isFinite(detection?.durationMS)?` · ${Math.round(detection.durationMS)} ms`:'';
+ $('#hardware-analysis-status').hidden=!busy&&detection?.status!=='running';
+ $('#hardware-analysis-status').textContent=`${status}${detection?` · ${detection.completed}/${detection.total}`:''}${elapsed}`;
+ const root=$('#hardware-analysis-results');
+ // 狀態輪詢不重建未變動的內容，保留使用者選取與捲動位置。
+ const signature=JSON.stringify([detection,i18n.t('編解碼分析'),state?.info]);
+ if(root.dataset.signature===signature)return;
+ root.dataset.signature=signature;root.replaceChildren();
+ const heading=label=>root.append(text('h4',t(label)));
+ const list=()=>{const node=document.createElement('dl');node.className='settings-details';root.append(node);return node;};
+ const row=(node,label,value)=>{const item=document.createElement('div');item.append(text('dt',t(label)),text('dd',String(value??unknown)));node.append(item);};
+ const results=detection?.results||[];
+ const inventory=results.find(r=>r.key==='inventory'&&r.state==='complete')?.data||{};
+ heading('硬體概況');const overview=list();
+ row(overview,'CPU',inventory.cpu?.brand||unknown);
+ row(overview,'邏輯處理器',inventory.logicalCPUs??inventory.cpu?.['hw.logicalcpu']);
+ row(overview,'GPU',inventory.gpus?.map(g=>g.name).filter(Boolean).join(' / ')||unknown);
+ const memory=inventory.memoryBytes??inventory.cpu?.['hw.memsize'];
+ row(overview,'記憶體',Number.isFinite(memory)&&memory>0?`${Number((memory/1024**3).toFixed(1))} GiB`:unknown);
+ if(typeof inventory.preferredGraphicsAPI==='string'){
+  const api=inventory.preferredGraphicsAPI, level=inventory.preferredGraphicsFeatureLevel;
+  row(overview,'優先圖形 API',api?`${api}${level?` (FL ${level})`:''}`:t(inventory.graphicsDetectionIncomplete?'偵測未完成':'不支援'));
+ }
+ for(const gpu of inventory.gpus||[]){
+  for(const apiName of ['d3d11','d3d12']){
+   if(!(apiName in gpu))continue;
+   const level=gpu[`${apiName}FeatureLevel`];
+   row(overview,`${gpu.name} · ${apiName.toUpperCase()}`,gpu[apiName]?`${t('可用')}${level?` (FL ${level})`:''}`:t(gpu[apiName]===false?'不支援':'偵測未完成'));
+  }
+ }
+ heading('加速指令集');const features=list();
+ const flags=inventory.cpuFeatures||Object.fromEntries(Object.entries({'NEON / ASIMD':'hw.optional.neon',DotProd:'hw.optional.arm.FEAT_DotProd',I8MM:'hw.optional.arm.FEAT_I8MM',SVE:'hw.optional.arm.FEAT_SVE',SME:'hw.optional.arm.FEAT_SME',SSE2:'hw.optional.sse2',SSSE3:'hw.optional.supplementalsse3',AVX2:'hw.optional.avx2_0',AVX512F:'hw.optional.avx512f'}).map(([name,key])=>[name,inventory.cpu?.[key]]));
+ // 指令集缺少可用證據時，介面保守顯示不支援。
+ for(const [name,value] of Object.entries(flags))row(features,name,value===true||value===1?t('可用'):value===false||value===0?t('未提供'):t('不支援'));
+ if(!Object.keys(flags).length)row(features,'偵測結果',t('不支援'));
+ root.append(text('p',t('結果僅代表列出的格式與尺寸；實測未通過或未確認的項目，保守顯示為不支援。'),'help-description'));
+ // 原生 NSNumber 與 Go JSON 的布林表示不同；缺值仍保留未知。
+ const probeBool=value=>value===true||value===1?true:value===false||value===0?false:undefined;
+ const outcome=(data,decode)=>{
+  const statusKeys=decode?['decoder_create_status','decode_status','decode_callback_status']:['create_status','prepare_status','buffer_status','buffer_lock_status','encode_status','encode_callback_status'];
+  if(statusKeys.some(key=>Number.isFinite(data[key])&&data[key]!==0))return t('不支援');
+  if(!decode&&data.status==='unavailable')return t('不支援');
+  const ok=probeBool(decode?(data.decodeOK??data.decoded_size_matches):(data.encodeOK??data.sample_produced));
+  if(ok===false)return t('不支援');
+  if(ok!==true)return t('不支援');
+  const hardware=probeBool(decode?(data.hardwareDecoder??data.hardware_decoder?.value):(data.hardwareEncoder??data.hardware_encoder?.value));
+  const mode=decode?data.decodingMode:null;
+  return t(hardware===true||mode==='hardware'?'硬體加速可用':hardware===false||mode==='software'?'軟體運算':'可用 (加速未知)');
+ };
+ const separated=results.some(r=>/\/(encode|decode)$/.test(r.key));
+ for(const decode of [false,true]){
+  heading(decode?'解碼實測':'編碼實測');
+  const wrap=document.createElement('div');wrap.className='hardware-table-wrap';
+  const table=document.createElement('table');table.className='hardware-table';
+  const head=table.createTHead().insertRow();
+  for(const label of [decode?'格式 / 輸出 / 尺寸':'格式 / 輸入 / 尺寸','結果','後端','耗時']){const th=text('th',t(label));th.scope='col';head.append(th);}
+  const body=table.createTBody();
+  for(const result of results.filter(r=>r.key!=='inventory'&&(!separated||r.key.endsWith(decode?'/decode':'/encode')))){
+   const data=result.data||{};const tr=body.insertRow();const base=result.key.replace(/\/(encode|decode)$/,'');
+   tr.append(text('td',data.probeKind==='windows-software'?`${data.codec} / ${t('軟體獨立測試')} / ${data.width}×${data.height}`:data.probeKind==='windows-native'?`${t('Windows 原生格式')} / ${base}`:base));
+   tr.append(text('td',result.state==='complete'?outcome(data,decode):t(states[result.state]||'偵測未完成')));
+   tr.append(text('td',(decode?data.decoderBackend:(data.encoderBackend||data.backend))||'—'));
+   tr.append(text('td',separated&&Number.isFinite(result.durationMS)&&result.state!=='pending'?`${Math.round(result.durationMS)} ms`:'—'));
+  }
+  wrap.append(table);root.append(wrap);
+ }
+
+}
 function selectSettingsTab(name) {
+  cancelHardwareHold();
   document.querySelectorAll('[data-settings-tab]').forEach(tab => {
     const active = tab.dataset.settingsTab === name;
     tab.setAttribute('aria-selected', String(active));
@@ -462,6 +615,7 @@ function selectSettingsTab(name) {
     document.getElementById(tab.getAttribute('aria-controls')).hidden = !active;
   });
   // 切換功能頁時重新遮蔽密碼。
+  if(name==='hardware')renderHardwareAnalysis();
   $('#local-secret').type = 'password';
   $('#toggle-secret').textContent = i18n.t('顯示');
   $('#toggle-secret').setAttribute('aria-label', i18n.t('顯示連線密碼'));
@@ -640,8 +794,13 @@ function applyPreferences(preferences) {
  renderPrelogin();
   hints.setEnabled(!values.disableHints);
   refreshCodecOptions(values.codec);
+ $('#stream-codec-goal').value=values.codecGoal||'balanced';
   if (state) { renderDevice(); renderLibrary(); renderQuick();
  renderRelease(state.updates); }
+}
+function refreshCodecGoalState() {
+ const codecs=$('#stream-codec');
+ $('#stream-codec-goal').disabled=codecs.disabled||codecs.value!=='auto';
 }
 function refreshCodecOptions(selected) {
   const codecs = $('#stream-codec');
@@ -652,23 +811,16 @@ function refreshCodecOptions(selected) {
     ['auto', '自動 (按排列順序優先)', true],
     ['hardware-hevc', 'HEVC (H.265) 硬體', !!state?.videoCapabilities?.some(cap => cap.codec === 'hardware-hevc' && cap.encode)],
     ['hardware-h264', 'H.264 硬體', !!state?.videoCapabilities?.some(cap => cap.codec === 'hardware-h264' && cap.encode)],
+    ['hardware-av1', 'AV1 硬體', !!state?.videoCapabilities?.some(cap => cap.codec === 'hardware-av1' && cap.encode)],
     ['hardware-jpeg', 'JPEG 硬體', !!state?.hardwareJPEG],
     ['software-jpeg', 'JPEG 軟體', true]
   ]) {
+    if (value === 'hardware-av1' && !state?.videoCapabilities?.some(cap => cap.codec === 'hardware-av1')) continue;
     const option = text('option', i18n.t(label)); option.value = value; option.disabled = !supported;
     (supported ? available : unsupported).append(option);
   }
   codecs.append(available, unsupported); codecs.value = selected || 'auto';
-  let diagnostics = $('#codec-diagnostics');
-  if (!diagnostics) {
-    diagnostics = document.createElement('small'); diagnostics.id = 'codec-diagnostics';
-    diagnostics.style.cssText = 'display:block;white-space:pre-wrap;overflow-wrap:anywhere;user-select:text';
-    codecs.insertAdjacentElement('afterend', diagnostics);
-  }
-  diagnostics.textContent = (state?.videoCapabilities || [])
-    .filter(cap => !cap.encode && cap.encodeError && cap.encodeError !== '硬體影像編碼不可用')
-    .map(cap => `${cap.codec}: ${cap.encodeError}`).join('\n');
-  diagnostics.hidden = !diagnostics.textContent;
+ refreshCodecGoalState();
 
 }
 async function savePreferences() {
@@ -676,7 +828,7 @@ async function savePreferences() {
  for(const id of ['#ui-source-fps','#ui-bitrate-limit','#ui-gop']){if(!$(id).checkValidity()){$(id).reportValidity();return}}
   const previous = state.preferences;
  if(!$('#ui-enhancement-budget').checkValidity()){$('#ui-enhancement-budget').reportValidity();return}
-	const preferences = { tailcatEnabled:$('#tailcat-mode').checked, mcpOpenDisplay:$('#ui-mcp-open-display').checked, mcpWhitelistEnabled:$('#ui-mcp-whitelist-enabled').checked, mcpWhitelist:[...new Set($('#ui-mcp-whitelist').value.split(/\r?\n/).map(v=>v.trim()).filter(Boolean))], mcpEnabled:$('#ui-mcp-enabled').checked, fitWindow:$('#ui-fit-window').checked, closeWindowOnDisconnect:$('#ui-close-on-disconnect').checked, sourceFPSLimit:Number($('#ui-source-fps').value), bitrateLimitMbps:Number($('#ui-bitrate-limit').value), keyframeInterval:Number($('#ui-gop').value), interpolation: $('#ui-interpolation').checked, interpolationMethod: $('#ui-interpolation-method').value, coreMLModel: $('#ui-coreml-model').value || 'quicksrnet-small', enhancementStrategy: $('#ui-enhancement-strategy').value, enhancementBitrateMbps: Number($('#ui-enhancement-budget').value), superResolution: $('#ui-super-resolution').value, imageEnhancement: $('#ui-enhancement').checked, language: $('#ui-language').value, theme: $('#ui-theme').value, codec: $('#stream-codec').value, disableHints: !$('#ui-hints').checked, disableKeyMapping:!$('#ui-key-mapping').checked, directListen: $('#direct-listen').checked };
+	const preferences = { tailcatEnabled:$('#tailcat-mode').checked, mcpOpenDisplay:$('#ui-mcp-open-display').checked, mcpWhitelistEnabled:$('#ui-mcp-whitelist-enabled').checked, mcpWhitelist:[...new Set($('#ui-mcp-whitelist').value.split(/\r?\n/).map(v=>v.trim()).filter(Boolean))], mcpEnabled:$('#ui-mcp-enabled').checked, fitWindow:$('#ui-fit-window').checked, closeWindowOnDisconnect:$('#ui-close-on-disconnect').checked, sourceFPSLimit:Number($('#ui-source-fps').value), bitrateLimitMbps:Number($('#ui-bitrate-limit').value), keyframeInterval:Number($('#ui-gop').value), interpolation: $('#ui-interpolation').checked, interpolationMethod: $('#ui-interpolation-method').value, coreMLModel: $('#ui-coreml-model').value || 'quicksrnet-small', enhancementStrategy: $('#ui-enhancement-strategy').value, enhancementBitrateMbps: Number($('#ui-enhancement-budget').value), superResolution: $('#ui-super-resolution').value, imageEnhancement: $('#ui-enhancement').checked, language: $('#ui-language').value, theme: $('#ui-theme').value, codec: $('#stream-codec').value, codecGoal: $('#stream-codec-goal').value, disableHints: !$('#ui-hints').checked, disableKeyMapping:!$('#ui-key-mapping').checked, directListen: $('#direct-listen').checked };
   $('#ui-mcp-whitelist-enabled').disabled=true;$('#ui-mcp-whitelist').disabled=true;
  $('#ui-mcp-enabled').disabled=true;
  $('#ui-language').disabled = true;
@@ -686,6 +838,7 @@ async function savePreferences() {
  $('#ui-fit-window').disabled=true;
  $('#ui-source-fps').disabled=true;$('#ui-bitrate-limit').disabled=true;$('#ui-gop').disabled=true;$('#ui-interpolation').disabled=true;$('#ui-interpolation-method').disabled=true;$('#ui-enhancement').disabled=true;$('#ui-super-resolution').disabled=true;$('#ui-coreml-model').disabled=true;$('#ui-enhancement-strategy').disabled=true;$('#ui-enhancement-budget').disabled=true;
   $('#stream-codec').disabled = true;
+ $('#stream-codec-goal').disabled = true;
 	$('#direct-listen').disabled = true;
  $('#tailcat-mode').disabled = true;
   await action(async () => {
@@ -704,6 +857,7 @@ async function savePreferences() {
  $('#ui-fit-window').disabled=false;
  $('#ui-source-fps').disabled=false;$('#ui-bitrate-limit').disabled=false;$('#ui-gop').disabled=false;$('#ui-interpolation').disabled=false;renderInterpolationSupport();$('#ui-enhancement').disabled=false;$('#ui-super-resolution').disabled=false;$('#ui-coreml-model').disabled=false;$('#ui-enhancement-strategy').disabled=false;$('#ui-enhancement-budget').disabled=false;
   $('#stream-codec').disabled = false;
+ refreshCodecGoalState();
 	$('#direct-listen').disabled = false;
  $('#tailcat-mode').disabled = false;
 }
@@ -726,7 +880,8 @@ $('#ui-close-on-disconnect').addEventListener('change',savePreferences);
  $('#ui-coreml-model').addEventListener('change',savePreferences);
  $('#ui-enhancement-strategy').addEventListener('change',()=>{renderEnhancementStrategy();savePreferences()});
  $('#ui-enhancement-budget').addEventListener('change',()=>{renderEnhancementStrategy();savePreferences()});
-$('#stream-codec').addEventListener('change', savePreferences);
+$('#stream-codec').addEventListener('change', () => { refreshCodecGoalState(); savePreferences(); });
+$('#stream-codec-goal').addEventListener('change', savePreferences);
 $('#direct-listen').addEventListener('change', savePreferences);
 systemTheme.addEventListener('change', () => { if (state) applyPreferences(state.preferences); });
 window.addEventListener('languagechange', () => { if (state?.preferences.language === 'auto') applyPreferences(state.preferences); });
@@ -739,6 +894,11 @@ async function initialize() {
     selectedGroup=state.preferences?.selectedGroup ?? '*';
     applyPreferences(state.preferences);
     renderDevice(); renderLibrary(); renderQuick();
+    // 先讓主畫面完成一次繪製，再決定是否需要顯示背景最佳化提示。
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      startupMainReady = true;
+      renderStartupOptimization();
+    }));
     refreshPresence();
   } catch (error) {
     $('#connection-error').textContent = i18n.t(`無法載入介面：${error.message}。請重新執行 runUITest.command。`);
@@ -747,13 +907,15 @@ async function initialize() {
   }
   setInterval(async () => {
     if (busy || statePolling || (document.hidden && !connectionWait)) return;
-    if (!connectionWait && Date.now()-lastStatePoll<2500) return;
+    if (!connectionWait && !startupOptimizationPending() && deepHardwareState?.status!=='running' && Date.now()-lastStatePoll<2500) return;
     lastStatePoll=Date.now();
     statePolling=true;
     try {
       await updateRunning();
       $('#connection-error').hidden = true;
     } catch {
+      // 本機服務失聯時不要留下無限旋轉的 modal；偵測仍由後端自行管理。
+      if ($('#startup-optimization-dialog').open) $('#startup-optimization-dialog').close();
       $('#connection-error').textContent = i18n.t('本機 Client UI 服務無法連線，請確認啟動終端仍在執行。');
       $('#connection-error').hidden = false;
       if(connectionWait)failConnection('本機 Client UI 服務無法連線，請確認啟動終端仍在執行。');
@@ -1133,7 +1295,7 @@ $('#stream-auto-apply').addEventListener('click',()=>{
 async function autoConfigureStream(mode) {
  if (busy || streamAutoRun) return;
  const run={cancelled:false,applying:false};streamAutoRun=run;
- const buttons=[$('#stream-auto-latency'),$('#stream-auto-traffic')];
+ const buttons=[];
  buttons.forEach(button=>button.disabled=true);
  $('#settings-dialog').close();
  $('#stream-auto-message').dataset.error='false';
@@ -1210,8 +1372,6 @@ async function autoConfigureStream(mode) {
  streamAutoRun=null;
  buttons.forEach(button=>button.disabled=false);
 }
-$('#stream-auto-latency').addEventListener('click',()=>autoConfigureStream('latency'));
-$('#stream-auto-traffic').addEventListener('click',()=>autoConfigureStream('traffic'));
 
 let lastHostConflict = '';
 function showHostConflict(owner) {

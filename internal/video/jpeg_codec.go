@@ -43,6 +43,13 @@ func (softwareJPEGEncoder) Close() error    { return nil }
 type softwareJPEGDecoder struct{}
 
 func (softwareJPEGDecoder) Decode(b []byte) (image.Image, error) {
+	config, err := jpeg.DecodeConfig(bytes.NewReader(b))
+	if err != nil {
+		return nil, err
+	}
+	if config.Width < 1 || config.Height < 1 || config.Width > 8192 || config.Height > 8192 || int64(config.Width)*int64(config.Height) > 32<<20 {
+		return nil, errors.New("JPEG 影像尺寸不支援")
+	}
 	return jpeg.Decode(bytes.NewReader(b))
 }
 func (softwareJPEGDecoder) Backend() string { return "Go image/jpeg" }
@@ -66,8 +73,8 @@ func (e *fallbackEncoder) Encode(img image.Image, q int) ([]byte, error) {
 	if err == nil {
 		return out, nil
 	}
-	if e.current.Hardware() {
-		slog.Warn("hardware JPEG encode failed; falling back", "backend", e.current.Backend(), "error", err)
+	if e.current.Backend() != e.fallback.Backend() {
+		slog.Warn("JPEG 編碼後端失敗，使用備援", "backend", e.current.Backend(), "error", err)
 		_ = e.current.Close()
 		e.current = e.fallback
 		return e.current.Encode(img, q)
@@ -117,8 +124,8 @@ func (d *fallbackDecoder) Decode(b []byte) (image.Image, error) {
 	if err == nil {
 		return img, nil
 	}
-	if d.current.Hardware() {
-		slog.Warn("hardware JPEG decode failed; falling back", "backend", d.current.Backend(), "error", err)
+	if d.current.Backend() != d.fallback.Backend() {
+		slog.Warn("JPEG 解碼後端失敗，使用備援", "backend", d.current.Backend(), "error", err)
 		_ = d.current.Close()
 		d.current = d.fallback
 		return d.current.Decode(b)
@@ -154,7 +161,10 @@ func (d *fallbackDecoder) Close() error {
 var ErrHardwareJPEGUnavailable = errors.New("hardware JPEG unavailable")
 
 func NewJPEGEncoder(preferHardware bool) (JPEGEncoder, Selection) {
-	sw := softwareJPEGEncoder{}
+	var sw JPEGEncoder = softwareJPEGEncoder{}
+	if turbo := newTurboJPEGEncoder(); turbo != nil {
+		sw = &fallbackEncoder{current: turbo, fallback: sw}
+	}
 	if preferHardware {
 		if hw, err := newHardwareJPEGEncoder(); err == nil {
 			enc := &fallbackEncoder{current: hw, fallback: sw}
@@ -189,7 +199,10 @@ func NewJPEGEncoderForCodec(requested Codec) (JPEGEncoder, Selection) {
 }
 
 func NewJPEGDecoder(preferHardware bool) (JPEGDecoder, DecoderSelection) {
-	sw := softwareJPEGDecoder{}
+	var sw JPEGDecoder = softwareJPEGDecoder{}
+	if turbo := newTurboJPEGDecoder(); turbo != nil {
+		sw = &fallbackDecoder{current: turbo, fallback: sw}
+	}
 	if preferHardware {
 		if hw, err := newHardwareJPEGDecoder(); err == nil {
 			dec := &fallbackDecoder{current: hw, fallback: sw}

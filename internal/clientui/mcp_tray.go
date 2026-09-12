@@ -58,9 +58,8 @@ func setMCPVisibility(p *process, visible bool) {
 	if visible {
 		action = "show"
 	}
-	if err := json.NewEncoder(p.stdin).Encode(map[string]any{"agent": agentremote.Request{ID: "tray-visibility", Action: action, Expires: time.Now().Add(10 * time.Second).UnixMilli()}}); err == nil {
-		p.mcpVisible = visible
-	}
+	// Viewer 接受指令後回覆同步狀態；寫入成功不代表已處理。
+	_ = json.NewEncoder(p.stdin).Encode(map[string]any{"agent": agentremote.Request{ID: "tray-visibility", Action: action, Expires: time.Now().Add(10 * time.Second).UnixMilli()}})
 }
 
 func (s *server) incomingConnected() bool {

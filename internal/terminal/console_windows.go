@@ -22,14 +22,7 @@ type winConsole struct {
 }
 
 func supported() bool {
-	user, err := windows.GetCurrentProcessToken().GetTokenUser()
-	if err != nil || user.User.Sid.IsWellKnown(windows.WinLocalSystemSid) || user.User.Sid.IsWellKnown(windows.WinLocalServiceSid) || user.User.Sid.IsWellKnown(windows.WinNetworkServiceSid) {
-		return false
-	}
-	var sessionID uint32
-	if windows.ProcessIdToSessionId(uint32(os.Getpid()), &sessionID) != nil || sessionID == 0 {
-		return false
-	}
+	// 帳號與工作階段檢查集中於 useraccess；此處只驗證 ConPTY。
 	return windows.NewLazySystemDLL("kernel32.dll").NewProc("CreatePseudoConsole").Find() == nil
 }
 func start(cols, rows int) (console, error) {

@@ -14,6 +14,8 @@ import (
 	"image/draw"
 	"sync"
 	"unsafe"
+	"yourdesk/internal/optimization"
+	_ "yourdesk/internal/pixelconv" // 將共用原生標頭納入 Go 建置相依性。
 )
 
 type nativeIntraEncoder struct {
@@ -21,6 +23,8 @@ type nativeIntraEncoder struct {
 	session                    C.VTCompressionSessionRef
 	codec                      C.CMVideoCodecType
 	width, height              int
+	pixels                     *image.RGBA
+	pixelBuffer                C.uintptr_t
 	sequence                   int64
 	closed                     bool
 	bitrate, fps               int
@@ -61,6 +65,11 @@ func (e *nativeIntraEncoder) Close() error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.closed = true
+	e.pixels = nil
+	if e.pixelBuffer != 0 {
+		C.yd_pixel_close(e.pixelBuffer)
+		e.pixelBuffer = 0
+	}
 	if e.session != 0 {
 		C.yd_intra_close(e.session)
 		e.session = 0
@@ -81,6 +90,10 @@ func (e *nativeIntraEncoder) Encode(src image.Image, quality int) ([]byte, error
 	// 4:2:0 硬體編碼採偶數尺寸，畫面顯示時依原始尺寸裁切。
 	pw, ph := (w+1)&^1, (h+1)&^1
 	if e.session == 0 || e.width != pw || e.height != ph {
+		if e.pixelBuffer != 0 {
+			C.yd_pixel_close(e.pixelBuffer)
+			e.pixelBuffer = 0
+		}
 		if e.session != 0 {
 			C.yd_intra_close(e.session)
 			e.session = 0
@@ -103,12 +116,30 @@ func (e *nativeIntraEncoder) Encode(src image.Image, quality int) ([]byte, error
 	if fps < 1 {
 		fps = 30
 	}
-	rgba := image.NewRGBA(image.Rect(0, 0, pw, ph))
-	draw.Draw(rgba, image.Rect(0, 0, w, h), src, b.Min, draw.Src)
+	// 偶數 RGBA 直接讀來源；僅補邊／非 RGBA 需要重用中間緩衝。
+	rgba, direct := src.(*image.RGBA)
+	if !direct || pw != w || ph != h {
+		if e.pixels == nil || e.pixels.Bounds().Size() != image.Pt(pw, ph) {
+			e.pixels = image.NewRGBA(image.Rect(0, 0, pw, ph))
+		}
+		rgba = e.pixels
+		draw.Draw(rgba, image.Rect(0, 0, w, h), src, b.Min, draw.Src)
+		if pw > w {
+			for y := 0; y < h; y++ {
+				i := y * rgba.Stride
+				copy(rgba.Pix[i+w*4:i+pw*4], rgba.Pix[i+(w-1)*4:i+w*4])
+			}
+		}
+		if ph > h {
+			copy(rgba.Pix[h*rgba.Stride:h*rgba.Stride+pw*4], rgba.Pix[(h-1)*rgba.Stride:(h-1)*rgba.Stride+pw*4])
+		}
+	}
 	var output *C.uchar
 	var size C.size_t
 	e.sequence++
-	status := C.yd_intra_encode(e.session, (*C.uchar)(unsafe.Pointer(&rgba.Pix[0])), C.int(pw), C.int(ph), C.int(rgba.Stride), C.int64_t(e.sequence), C.int(quality), C.int(fps), C.int(e.gop), &output, &size)
+	pixelBuffer := e.pixelBuffer
+	status := C.yd_intra_encode(e.session, &pixelBuffer, (*C.uchar)(unsafe.Pointer(&rgba.Pix[0])), C.int(pw), C.int(ph), C.int(rgba.Stride), C.int64_t(e.sequence), C.int(quality), C.int(fps), C.int(e.gop), &output, &size)
+	e.pixelBuffer = pixelBuffer
 	if output != nil {
 		defer C.free(unsafe.Pointer(output))
 	}
@@ -128,6 +159,26 @@ type platformDecoder struct {
 	native C.yd_decoder
 	codec  WireCodec
 	mode   string
+	policy []C.yd_decode_policy
+}
+
+func (d *platformDecoder) SetDecodePolicy(p optimization.Policy) {
+	d.policy = nil
+	for _, entry := range p.Decoders {
+		if entry.Codec != decodePolicyCodec(d.codec) {
+			continue
+		}
+		mode := 0
+		switch entry.Mode {
+		case "hardware":
+			mode = 1
+		case "software":
+			mode = -1
+		case "unavailable":
+			mode = -2
+		}
+		d.policy = append(d.policy, C.yd_decode_policy{width: C.int(entry.Width), height: C.int(entry.Height), mode: C.int(mode)})
+	}
 }
 
 func newIntraDecoder(codec WireCodec) (IntraDecoder, error) {
@@ -162,7 +213,11 @@ func (d *platformDecoder) decode(payload []byte) (image.Image, string, error) {
 	}
 	var output *C.uchar
 	var w, h, hardware C.int
-	status := C.yd_intra_decode(&d.native, kind, (*C.uchar)(unsafe.Pointer(&payload[0])), C.size_t(len(payload)), &output, &w, &h, &hardware)
+	var policy *C.yd_decode_policy
+	if len(d.policy) > 0 {
+		policy = &d.policy[0]
+	}
+	status := C.yd_intra_decode(&d.native, kind, (*C.uchar)(unsafe.Pointer(&payload[0])), C.size_t(len(payload)), policy, C.int(len(d.policy)), &output, &w, &h, &hardware)
 	if output != nil {
 		defer C.free(unsafe.Pointer(output))
 	}

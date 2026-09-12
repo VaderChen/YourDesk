@@ -171,6 +171,27 @@ dialog input:focus, dialog select:focus, dialog textarea:focus { outline: 2px so
 .settings-tab[aria-selected="true"] { background: #e3eee6; color: #246445; font-weight: 600; }
 .settings-content { padding: 18px 22px; overflow-y: auto; min-width: 0; }
 .settings-panel-title { font-size: 16px; margin: 0 0 14px; }
+#settings-panel-hardware { font-size: 13px; }
+#settings-panel-hardware .settings-panel-title { font-size: 15px; margin: 0; }
+#hardware-deep-test { font-size: 12px; }
+#hardware-analysis-results { display: flow-root; }
+.hardware-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+#hardware-deep-test { position: relative; overflow: hidden; isolation: isolate; flex-shrink: 0; touch-action: none; user-select: none; }
+#hardware-deep-test::before { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--green); opacity: .28; transform: scaleX(0); transform-origin: left; pointer-events: none; }
+#hardware-deep-test.holding::before { animation: hardware-hold-progress 1s linear forwards; }
+@keyframes hardware-hold-progress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+#hardware-deep-test.holding { outline: 2px solid var(--green); }
+#hardware-deep-progress { width: 100%; height: 12px; accent-color: var(--green); }
+#hardware-analysis-results > .settings-details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 20px; }
+#hardware-analysis-results > .settings-details > div { grid-template-columns: minmax(0, 90px) minmax(0, 1fr); gap: 8px; font-size: 11px; align-items: start; line-height: 1.6; }
+@media (max-width: 600px) { #hardware-analysis-results > .settings-details { grid-template-columns: minmax(0, 1fr); } }
+#hardware-analysis-results > h4 { margin: 18px 0 8px; padding: 2px 0; font-size: 13px; font-weight: 600; line-height: 1.6; height: auto; overflow: visible; overflow-wrap: anywhere; }
+#hardware-analysis-results > h4:first-child { margin-top: 8px; }
+.hardware-table-wrap { overflow-x: auto; }
+.hardware-table { width: 100%; border-collapse: collapse; font-size: 11px; user-select: text; }
+.hardware-table th, .hardware-table td { padding: 9px 6px; border-bottom: 1px solid var(--line); text-align: left; overflow-wrap: anywhere; }
+.hardware-table th { color: var(--muted); }
+.hardware-table th:nth-child(2), .hardware-table td:nth-child(2) { min-width: 8em; white-space: nowrap; overflow-wrap: normal; }
 .settings-about-brand { display: flex; align-items: center; gap: 10px; font-size: 23px; font-weight: 700; color: #246445; margin: 21px 0 5px; }
 .settings-shell > .modal-actions { margin: 0; padding: 10px 18px; flex-shrink: 0; }
 @media (max-width: 600px) { .settings-layout { grid-template-columns: 120px minmax(0, 1fr); } .settings-content { padding: 15px; } }
@@ -292,6 +313,10 @@ dialog .remember-row input { display: inline-block; width: 16px; height: 16px; m
 
 /* 連線等待由實際 遠端顯示 狀態驅動，動畫不代表假進度。 */
 #connection-progress-dialog{width:min(360px,calc(100% - 32px));text-align:center}
+#startup-optimization-dialog{width:min(360px,calc(100% - 32px));text-align:center}
+#startup-optimization-title{font-size:19px}
+#startup-optimization-description{margin-top:12px;line-height:1.6;color:var(--muted)}
+#startup-optimization-dialog .modal-actions{justify-content:center}
 #connection-progress-name{overflow-wrap:anywhere;font-weight:600}
 #connection-progress-status{color:var(--muted);min-height:36px}
 .connection-spinner{width:38px;height:38px;margin:12px auto 20px;border:3px solid var(--line);border-top-color:var(--green);border-radius:50%;animation:connection-spin .85s linear infinite}
@@ -362,10 +387,10 @@ dialog .remember-row input { display: inline-block; width: 16px; height: 16px; m
 [data-theme="dark"] .site-action.mode-available { color: #8fe2b4; background: transparent; box-shadow: none; }
 [data-theme="dark"] .site-action.mode-available:hover { color: #b2f4ce; background: transparent; }
 
-.site-action.mode-recovering { position: relative; color: var(--green); cursor: wait; }
-.site-action.mode-recovering svg { visibility: hidden; }
-.site-action.mode-recovering::after { content: ""; position: absolute; width: 15px; height: 15px; left: 50%; top: 50%; margin: -7.5px; border: 2px solid var(--line); border-top-color: currentColor; border-radius: 50%; animation: connection-spin .85s linear infinite; }
-@media (prefers-reduced-motion: reduce) { .site-action.mode-recovering::after { animation: none; } }
+:is(.site-action, .mini-device).mode-recovering { position: relative; color: var(--green); cursor: wait; }
+:is(.site-action, .mini-device).mode-recovering svg { visibility: hidden; }
+:is(.site-action, .mini-device).mode-recovering::after { content: ""; position: absolute; box-sizing: border-box; width: 15px; height: 15px; inset: 0; margin: auto; border: 2px solid var(--line); border-top-color: currentColor; border-radius: 50%; animation: connection-spin .85s linear infinite; }
+@media (prefers-reduced-motion: reduce) { :is(.site-action, .mini-device).mode-recovering::after { animation: none; } }
 
 /* 設定與停止共用工具欄第一欄，顯示停止按鈕不新增 grid 欄位。 */
 .host-actions { display: flex; align-items: center; gap: 4px; min-width: 0; }

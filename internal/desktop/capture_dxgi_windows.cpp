@@ -1,6 +1,7 @@
 //go:build windows && cgo
 
 #include "capture_dxgi_windows.h"
+#include "../pixelconv/swizzle.h"
 #include <windows.h>
 #include <d3d11.h>
 #include <dxgi1_2.h>
@@ -64,7 +65,7 @@ struct yd_dxgi_capture {
   for(int y=0;y<h;y++){
    auto src=static_cast<const unsigned char*>(mapped.pData)+(size_t)y*mapped.RowPitch;
    auto dst=rgba+(size_t)y*w*4;
-   for(int x=0;x<w;x++){dst[x*4]=src[x*4+2];dst[x*4+1]=src[x*4+1];dst[x*4+2]=src[x*4];dst[x*4+3]=255;}
+   yd_swap_rb_opaque(dst,src,w);
   }
   captured=true;return S_OK;
  }

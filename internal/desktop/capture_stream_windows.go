@@ -11,6 +11,7 @@ import (
 	"unsafe"
 
 	"github.com/lxn/win"
+	"yourdesk/internal/pixelconv"
 )
 
 type captureReply struct {
@@ -165,8 +166,8 @@ func (s *gdiSurface) capture(bounds image.Rectangle) (image.Image, error) {
 	src := unsafe.Slice((*byte)(s.bits), w*h*4)
 	out := image.NewRGBA(image.Rect(0, 0, w, h))
 	// 每幀輸出獨立記憶體，避免下一次 BitBlt 覆寫編碼中的畫面。
-	for i := 0; i < len(src); i += 4 {
-		out.Pix[i], out.Pix[i+1], out.Pix[i+2], out.Pix[i+3] = src[i+2], src[i+1], src[i], 255
+	if !pixelconv.SwapOpaque(out.Pix, src, w, h, w*4, out.Stride) {
+		return nil, fmt.Errorf("GDI 像素緩衝區無效")
 	}
 	return out, nil
 }

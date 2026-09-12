@@ -47,6 +47,7 @@ func (g *game) agentAction(r agentremote.Request) (out agentremote.Response) {
 	}
 	if r.Action == "hide" {
 		g.agentShow = false
+		out.Visible = new(bool)
 		if !g.agentHeadless {
 			nativeHideAgentWindow()
 		}
@@ -54,6 +55,8 @@ func (g *game) agentAction(r agentremote.Request) (out agentremote.Response) {
 	}
 	if r.Action == "show" {
 		g.agentShow = true
+		visible := true
+		out.Visible = &visible
 		if !g.agentHeadless {
 			nativeShowAgentWindow()
 		}
@@ -171,6 +174,12 @@ func (g *game) runAgentHidden(ctx context.Context) bool {
 			return false
 		case <-ticker.C:
 		}
+		// 先處理顯示要求；尚無首張影格也直接建立 Viewer。
+		g.updateAgent()
+		if g.agentShow {
+			g.agentHeadless = false
+			return true
+		}
 		g.mu.Lock()
 		ready := g.frame != nil && !g.displayPending
 		if ready {
@@ -183,13 +192,8 @@ func (g *game) runAgentHidden(ctx context.Context) bool {
 			g.firstPresented = true
 			emitUIEvent("frame", "")
 		}
-		g.updateAgent()
 		if ready {
 			g.updateQuality()
-		}
-		if g.agentShow {
-			g.agentHeadless = false
-			return true
 		}
 	}
 }

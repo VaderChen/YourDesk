@@ -109,14 +109,6 @@ func runBackgroundDiagnostic(url, room, codec string, mode peertransport.Mode) e
 	}
 	defer func() { worker.Close(); peer.Close() }()
 	emitUIEvent("authenticated", "")
-	var codecs []byte
-	if codec != "software" && codec != "software-jpeg" {
-		for _, cap := range video.IntraCapabilities() {
-			if cap.Decode {
-				codecs = append(codecs, byte(video.WireForCodec(cap.Codec)))
-			}
-		}
-	}
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	life := time.NewTimer(45 * time.Second)
@@ -139,11 +131,14 @@ func runBackgroundDiagnostic(url, room, codec string, mode peertransport.Mode) e
 				emitUIEvent("frame", "")
 			}
 		case <-ticker.C:
-			advertised := codecs
+			var advertised []byte
+			if codec != "software" && codec != "software-jpeg" {
+				advertised = video.ReceiverCodecs()
+			}
 			if failed.Load() {
 				advertised = nil
 			}
-			_ = peer.SendControl(p2p.Control{Type: "video-capabilities", Codecs: advertised, KeyframeInterval: 10})
+			_ = peer.SendControl(p2p.Control{Type: "video-capabilities", Codecs: advertised, HardwareDecodeCodecs: video.ReceiverHardwareCodecs(advertised), KeyframeInterval: 10})
 			if cap := capabilities.Load(); cap != nil {
 				request := streamconfig.Compose("standard", 8192, 8192, false)
 				applySourceFPSLimit(&request, cap)
@@ -159,7 +154,7 @@ func runBackgroundDiagnostic(url, room, codec string, mode peertransport.Mode) e
 			}
 			_, receivedBytes := peer.TrafficBytes()
 			received, decoded, failures, gaps, nanos, attempts := stats.received.Load(), stats.decoded.Load(), stats.failed.Load(), stats.gaps.Load(), stats.decodeNanos.Load(), stats.attempts.Load()
-			sample := diagnostics.Sample{Transport: peer.TransportMode(), Background: true, StartedAt: at.UnixMilli(), Seconds: elapsed, RTTMS: peer.RoundTripMS(), ReceiveMbps: float64(receivedBytes-lastBytes) * 8 / elapsed / 1e6, DecodedPerSec: float64(decoded-lastDecoded) / elapsed, ReceivedPerSec: float64(received-lastReceived) / elapsed, Received: received - lastReceived, Errors: failures - lastErrors, Gaps: gaps - lastGaps, Codec: map[uint32]string{0: "JPEG（可能為區塊）", 1: "H.264", 2: "HEVC"}[stats.wire.Load()]}
+			sample := diagnostics.Sample{Transport: peer.TransportMode(), Background: true, StartedAt: at.UnixMilli(), Seconds: elapsed, RTTMS: peer.RoundTripMS(), ReceiveMbps: float64(receivedBytes-lastBytes) * 8 / elapsed / 1e6, DecodedPerSec: float64(decoded-lastDecoded) / elapsed, ReceivedPerSec: float64(received-lastReceived) / elapsed, Received: received - lastReceived, Errors: failures - lastErrors, Gaps: gaps - lastGaps, Codec: map[uint32]string{0: "JPEG（可能為區塊）", 1: "H.264", 2: "HEVC", 3: "AV1"}[stats.wire.Load()]}
 			if version, ok := remoteVersion.Load().(string); ok {
 				sample.RemoteVersion = version
 			}

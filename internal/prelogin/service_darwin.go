@@ -561,7 +561,7 @@ func runAgent(ctx context.Context) error {
 	if err = c.validate(); err != nil {
 		return err
 	}
-	args := []string{"-signal", c.Signal, "-room", c.Room, "-codec", c.Codec, "-secret-stdin", "-parent-stdin", "-prelogin-host"}
+	args := []string{"-signal", c.Signal, "-room", c.Room, "-codec", c.Codec, "-codec-goal", c.CodecGoal, "-secret-stdin", "-parent-stdin", "-prelogin-host"}
 	if c.Tailcat {
 		args = append(args, "-transport", "tailcat")
 	}

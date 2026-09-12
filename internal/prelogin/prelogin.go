@@ -10,12 +10,13 @@ import (
 )
 
 type Config struct {
-	Tailcat bool   `json:"tailcat,omitempty"`
-	Room    string `json:"room"`
-	Signal  string `json:"signal"`
-	Secret  string `json:"secret"`
-	Codec   string `json:"codec"`
-	Direct  bool   `json:"direct"`
+	Tailcat   bool   `json:"tailcat,omitempty"`
+	Room      string `json:"room"`
+	Signal    string `json:"signal"`
+	Secret    string `json:"secret"`
+	Codec     string `json:"codec"`
+	CodecGoal string `json:"codecGoal,omitempty"`
+	Direct    bool   `json:"direct"`
 }
 
 func (c Config) validate() error {
@@ -27,6 +28,11 @@ func (c Config) validate() error {
 	}
 	if _, err := security.DecodeSecret(c.Secret); err != nil {
 		return err
+	}
+	switch c.CodecGoal {
+	case "", "balanced", "low-latency", "bandwidth":
+	default:
+		return errors.New("不支援的串流偏好")
 	}
 	switch c.Codec {
 	case "auto", "hardware-h264", "hardware-hevc", "software-jpeg", "software", "":

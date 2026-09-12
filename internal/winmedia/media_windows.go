@@ -22,6 +22,7 @@ type result struct {
 	data, config []byte
 	image        *image.RGBA
 	backend      string
+	software     bool
 	err          error
 }
 type operation struct {
@@ -85,15 +86,18 @@ func validRGBA(src *image.RGBA) bool {
 	return src != nil && !src.Bounds().Empty() && src.Stride >= src.Bounds().Dx()*4 && len(src.Pix) >= (src.Bounds().Dy()-1)*src.Stride+src.Bounds().Dx()*4
 }
 func (s *Session) Encode(src *image.RGBA, bitrate, fps, quality, gop int) ([]byte, []byte, string, error) {
+	return s.EncodeCodec(src, bitrate, fps, quality, gop, 1)
+}
+func (s *Session) EncodeCodec(src *image.RGBA, bitrate, fps, quality, gop, codec int) ([]byte, []byte, string, error) {
 	if !validRGBA(src) {
 		return nil, nil, "", fmt.Errorf("無效的 RGBA 影格")
 	}
 	r := s.call(func(native *C.yd_media) result {
 		var out C.yd_media_output
 		defer C.yd_media_free(&out)
-		hr := C.yd_media_encode(native, (*C.uchar)(unsafe.Pointer(&src.Pix[0])), C.int(src.Bounds().Dx()), C.int(src.Bounds().Dy()), C.int(src.Stride), C.int(bitrate), C.int(fps), C.int(quality), C.int(gop), &out)
+		hr := C.yd_media_encode_format(native, C.int(codec), (*C.uchar)(unsafe.Pointer(&src.Pix[0])), C.int(src.Bounds().Dx()), C.int(src.Bounds().Dy()), C.int(src.Stride), C.int(bitrate), C.int(fps), C.int(quality), C.int(gop), &out)
 		if hr < 0 {
-			return result{err: failure("H.264 硬體編碼", hr)}
+			return result{err: failure("影片硬體編碼", hr)}
 		}
 		return result{data: C.GoBytes(unsafe.Pointer(out.data), C.int(out.size)), config: C.GoBytes(unsafe.Pointer(out.config), C.int(out.config_size)), backend: C.GoString(C.yd_media_backend(native))}
 	})
@@ -101,23 +105,27 @@ func (s *Session) Encode(src *image.RGBA, bitrate, fps, quality, gop int) ([]byt
 	return r.data, r.config, r.backend, r.err
 }
 func (s *Session) Decode(data []byte, width, height int) (*image.RGBA, string, error) {
+	image, backend, _, err := s.DecodeCodec(data, width, height, 1)
+	return image, backend, err
+}
+func (s *Session) DecodeCodec(data []byte, width, height, codec int) (*image.RGBA, string, bool, error) {
 	if len(data) == 0 || len(data) > 32<<20 {
-		return nil, "", fmt.Errorf("無效的 H.264 影格")
+		return nil, "", false, fmt.Errorf("無效的影片影格")
 	}
 	r := s.call(func(native *C.yd_media) result {
 		var out C.yd_media_output
 		defer C.yd_media_free(&out)
-		hr := C.yd_media_decode(native, (*C.uchar)(unsafe.Pointer(&data[0])), C.size_t(len(data)), C.int(width), C.int(height), &out)
+		hr := C.yd_media_decode_format(native, C.int(codec), (*C.uchar)(unsafe.Pointer(&data[0])), C.size_t(len(data)), C.int(width), C.int(height), &out)
 		if hr < 0 {
-			return result{err: failure("H.264 硬體解碼", hr)}
+			return result{err: failure("影片解碼", hr)}
 		}
 		w, h := int(out.width), int(out.height)
 		if w < 1 || h < 1 || w > 8192 || h > 8192 || w*h > 32<<20 || uint64(out.size) != uint64(w*h*4) {
 			return result{err: fmt.Errorf("硬體解碼輸出尺寸無效")}
 		}
-		return result{image: &image.RGBA{Pix: C.GoBytes(unsafe.Pointer(out.data), C.int(out.size)), Stride: w * 4, Rect: image.Rect(0, 0, w, h)}, backend: C.GoString(C.yd_media_backend(native))}
+		return result{image: &image.RGBA{Pix: C.GoBytes(unsafe.Pointer(out.data), C.int(out.size)), Stride: w * 4, Rect: image.Rect(0, 0, w, h)}, backend: C.GoString(C.yd_media_backend(native)), software: C.yd_media_decoder_software(native) != 0}
 	})
-	return r.image, r.backend, r.err
+	return r.image, r.backend, r.software, r.err
 }
 func (s *Session) Scale(src, dst *image.RGBA) (string, error) {
 	if !validRGBA(src) || !validRGBA(dst) {

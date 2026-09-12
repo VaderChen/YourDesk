@@ -2,7 +2,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -12,7 +11,7 @@ import (
 func main() {
 	executable, err := os.Executable()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		reportLaunchFailure(err)
 		os.Exit(1)
 	}
 	name := "yourdesk-client"
@@ -23,7 +22,7 @@ func main() {
 	child := childprocess.Command(filepath.Join(filepath.Dir(executable), name), args...)
 	child.Stdout, child.Stderr = os.Stdout, os.Stderr
 	if err = child.Run(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		reportLaunchFailure(err)
 		os.Exit(1)
 	}
 }

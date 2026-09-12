@@ -16,6 +16,14 @@
   </main>
   <div id="notice" role="status" aria-live="polite" hidden></div>
   <div id="connection-error" role="alert" hidden></div>
+  <dialog id="startup-optimization-dialog" aria-labelledby="startup-optimization-title" aria-describedby="startup-optimization-description">
+    <form method="dialog">
+      <div class="connection-spinner" aria-hidden="true"></div>
+      <h2 id="startup-optimization-title">正在最佳化中</h2>
+      <p id="startup-optimization-description" role="status" aria-live="polite">正在偵測硬體加速能力，完成後會自動關閉。</p>
+      <div class="modal-actions"><button type="submit" class="button" autofocus>繼續使用</button></div>
+    </form>
+  </dialog>
   <dialog id="settings-dialog" aria-labelledby="settings-title">
     <form method="dialog" class="settings-shell">
       <div class="modal-heading"><h2 id="settings-title">設定</h2><button type="button" class="close icon-button" aria-label="關閉設定">×</button></div>
@@ -27,6 +35,7 @@
           <button type="button" id="settings-tab-stream" class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-panel-stream" data-settings-tab="stream" tabindex="-1">串流方式</button>
           <button type="button" id="settings-tab-enhancement" class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-panel-enhancement" data-settings-tab="enhancement" tabindex="-1">畫面增強</button>
           <button type="button" id="settings-tab-mcp" class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-panel-mcp" data-settings-tab="mcp" tabindex="-1">MCP 設定</button>
+          <button type="button" id="settings-tab-hardware" class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-panel-hardware" data-settings-tab="hardware" tabindex="-1">編解碼分析</button>
           <button type="button" id="settings-tab-about" class="settings-tab" role="tab" aria-selected="false" aria-controls="settings-panel-about" data-settings-tab="about" tabindex="-1">關於</button>
         </nav>
         <div class="settings-content">
@@ -60,11 +69,8 @@
             <div class="preference-row" data-tooltip="FPS 越高越流暢；碼率越高通常越清晰，也更耗流量。"><label for="ui-bitrate-limit">碼率上限（Mbps）</label><input id="ui-bitrate-limit" type="number" required min="1" max="64" step="1" value="12"></div>
 
             <div class="preference-row" data-tooltip="數值越小，畫面越快恢復，也更耗流量；僅適用 H.264／HEVC。"><label for="ui-gop">GOP（關鍵影格間隔）</label><input id="ui-gop" type="number" required min="1" max="300" step="1" value="10"></div>
-            <div class="preference-row" data-tooltip="變更會中斷目前連線；無法使用的選項會停用。"><label for="stream-codec">影像傳輸</label><select id="stream-codec" data-tooltip="變更會中斷目前連線；無法使用的選項會停用。"></select></div><p class="help-description">變更會中斷目前連線；無法使用的選項會停用。</p><dl class="settings-details"><div><dt>連線方式</dt><dd id="transport-summary">WebRTC / 自動協商</dd></div><div><dt>畫面通道</dt><dd>低延遲、不重傳</dd></div><div><dt>控制通道</dt><dd>可靠、有序傳輸</dd></div></dl>
-          <div class="stream-auto-actions">
- <button type="button" class="button" id="stream-auto-latency" data-tooltip="自動調整，優先讓操作更即時；套用到所有遠端畫面。">自動配置/延遲優先</button>
- <button type="button" class="button" id="stream-auto-traffic" data-tooltip="自動減少流量，畫面可能較不流暢；套用到所有遠端畫面。">自動配置/流量優先</button>
- </div><p id="stream-auto-status" class="form-note" role="status" aria-live="polite" hidden></p>
+            <div class="preference-row" data-tooltip="設定本機畫面傳輸到遠端時使用的編碼；實際使用的編碼也需配合對方的解碼能力。變更會中斷目前連線；無法使用的選項會停用。"><label for="stream-codec">傳輸到遠端的編碼</label><select id="stream-codec" data-tooltip="設定本機畫面傳輸到遠端時使用的編碼；實際使用的編碼也需配合對方的解碼能力。變更會中斷目前連線；無法使用的選項會停用。"></select></div><p class="help-description">設定本機畫面傳輸到遠端時使用的編碼；實際使用的編碼也需配合對方的解碼能力。變更會中斷目前連線；無法使用的選項會停用。</p><div class="preference-row" data-tooltip="自動編碼的選擇偏好；變更會重新建立目前連線。"><label for="stream-codec-goal">傳輸策略</label><select id="stream-codec-goal"><option value="balanced">均衡</option><option value="low-latency">低延遲</option><option value="bandwidth">省頻寬</option></select></div><dl class="settings-details"><div><dt>連線方式</dt><dd id="transport-summary">WebRTC / 自動協商</dd></div><div><dt>畫面通道</dt><dd>低延遲、不重傳</dd></div><div><dt>控制通道</dt><dd>可靠、有序傳輸</dd></div></dl>
+<p id="stream-auto-status" class="form-note" role="status" aria-live="polite" hidden></p>
  </section>
           <section id="settings-panel-enhancement" role="tabpanel" aria-labelledby="settings-tab-enhancement" tabindex="0" hidden>
             <h3 class="settings-panel-title">畫面增強</h3>
@@ -89,6 +95,14 @@
             <p id="mcp-whitelist-note" class="help-description">每行填一個 IP。開啟時只允許名單內連線，免驗證金鑰；關閉時皆需金鑰（Token）。</p>
             <dl class="settings-details"><div><dt>服務位址</dt><dd class="mcp-address"><span id="mcp-address" data-tooltip="關閉後，AI 助理將無法透過 MCP 操作。" tabindex="0">http://127.0.0.1:12345/mcp</span><button type="button" class="icon-button" id="copy-mcp-address" aria-label="複製 MCP 位址" data-tooltip="複製 MCP 位址">⧉</button></dd></div></dl>
             <p class="help-description">關閉後，AI 助理將無法透過 MCP 操作。</p>
+          </section>
+          <section id="settings-panel-hardware" role="tabpanel" aria-labelledby="settings-tab-hardware" tabindex="0" hidden>
+            <div class="hardware-heading"><h3 class="settings-panel-title">編解碼分析</h3><button id="hardware-deep-test" type="button" class="button" data-tooltip="按住一秒，重新測試完整清單。測試期間可能影響效能。">深度測試</button></div>
+            <p id="hardware-deep-progress-label" role="status" aria-live="polite" hidden></p>
+            <progress id="hardware-deep-progress" max="1" value="0" aria-label="深度測試進度" aria-describedby="hardware-deep-progress-label" hidden></progress>
+            <p class="help-description">預設顯示啟動時的偵測結果；長按「深度測試」一秒，重新執行全部測試項目。指令集可用不代表目前編解碼路徑已採用；實際傳輸也需配合對方的解碼能力。</p>
+            <p id="hardware-analysis-status" role="status" aria-live="polite"></p>
+            <div id="hardware-analysis-results"></div>
           </section>
           <section id="settings-panel-about" role="tabpanel" aria-labelledby="settings-tab-about" tabindex="0" hidden>
 

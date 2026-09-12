@@ -10,6 +10,9 @@ var ErrNeedKeyframe = errors.New("等待 IDR 以恢復參考影格")
 
 // IsKeyframe 讀取實際 NAL，不能把全畫面更新等同於 IDR。
 func IsKeyframe(codec WireCodec, data []byte) (bool, error) {
+	if codec == WireAV1 {
+		return av1Keyframe(data)
+	}
 	count := 2
 	if codec == WireHEVC {
 		count = 3

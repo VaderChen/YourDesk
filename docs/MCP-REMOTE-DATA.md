@@ -1,5 +1,11 @@
 # MCP 遠端資料與 Shell
 
+## Windows 服務身分安全修正
+
+互動終端機與 MCP 檔案／短指令共用 `useraccess` 帳號檢查，在能力註冊及每次請求時驗證。Windows 拒絕 SYSTEM、LocalService、NetworkService、Session 0 與身分查詢失敗；macOS／Linux 拒絕 root。Windows 的 `os.Geteuid()` 不能辨識 SYSTEM，不能作為這些入口唯一的權限防線。
+
+此修正不提供 SYSTEM Shell，也未新增服務模式下以登入使用者身分執行 Shell 的代理。更新 Windows Host 後才會生效；既有服務使用獨立副本，需更新該副本並重新啟動 Host。尚未部署至實機。
+
 Agent 先透過 `connect` 建立一般密碼驗證連線，以 `get_status` 取得 connected 工作階段，將其 `session` 傳給下列工具。資料由遠端 Host 經既有可靠的 P2P control DataChannel 回傳，不在近端代為讀檔或執行 Shell，也不新增 Server 管理指令或監聽埠。
 
 | MCP 工具 | P2P 指令 | 參數與結果 |

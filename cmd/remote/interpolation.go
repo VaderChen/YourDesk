@@ -74,19 +74,20 @@ func interpolationSnapshot(src *image.RGBA, method string) *image.RGBA {
 // 先顯示中間幀，再於半個影格週期後顯示新真實幀；逾期結果不採用。
 // 使用接收端時間，不改動來源 FPS 與舊版線上協定。
 func (p *frameInterpolator) frame(src *image.RGBA, display int, dirty, enabled bool) (*image.RGBA, bool) {
-	method := frameinterp.ResolveMethod([]string{"", "apple", "rife"}[viewerInterpolationMethod.Load()])
-	if method != p.method {
-		p.reset()
-		p.method = method
-		dirty = true
-	}
+	// 未啟用補幀時不在每次繪圖查詢原生／模型能力。
 	if !enabled || src == nil {
-		if p.previous != nil {
+		if p.previous != nil || p.target != nil || p.queued != nil {
 			p.reset()
 			dirty = true
 		}
 		p.status = "尚未啟用"
 		return src, dirty
+	}
+	method := frameinterp.ResolveMethod([]string{"", "apple", "rife"}[viewerInterpolationMethod.Load()])
+	if method != p.method {
+		p.reset()
+		p.method = method
+		dirty = true
 	}
 	if ok, reason := frameinterp.MethodStatus(method); !ok {
 		if p.previous != nil {
