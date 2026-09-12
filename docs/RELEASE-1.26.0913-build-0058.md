@@ -6,8 +6,6 @@
 
 防毒告警調查更新：我們建立了一個僅有 `package main` 與 `func main() {}`、沒有引用 YourDesk 或第三方套件的 Go 空專案。其 Windows x64 執行檔仍出現 **9／70 家引擎告警**（使用者提供的 VirusTotal 掃描快照，數字可能隨後續分析改變）。詳見 [空專案檢測報告](https://www.virustotal.com/gui/file/fb906e6611161faafc695ada5042ae82696b88dba3cd1309843d1f42adfe084f)。這表示告警不需要遠端控制或防火牆穿透功能才會發生。
 
-空程式的工具鏈核對結果：重新下載官方 Go 1.27.1 並驗證公布的 SHA-256，與目前使用的工具鏈比對 12,028 個檔案，均無差異。在同一台主機使用獨立官方工具鏈與全新快取重建，所得 EXE 與上述空程式逐位元組完全一致。這是工具鏈與重建結果的核對，不是另一台乾淨作業系統的驗證。
-
 [Go 官方 FAQ：為什麼防毒軟體認為我的 Go 程式受到感染？](https://go.dev/doc/faq#virus) 也說明 Go 程式可能遭防毒誤判。不過，這不代表正式版的全部告警已確認為誤報。**作者依舊會持續調查與改善，朝消除這些病毒告警的方向努力。**
 
 新增 Windows x64 免安裝 ZIP：完整解壓縮後執行 `YourDesk.exe`，仍需 WebView2 Runtime。與本版安裝程式使用相同執行檔，包含必要 DLL 與授權資料。
@@ -32,8 +30,6 @@
 
 Antivirus investigation update: a minimal Go project containing only `package main` and `func main() {}`, with no YourDesk or third-party imports, still produced a Windows x64 executable flagged by **9/70 engines** in a user-provided VirusTotal snapshot. Counts may change. See the [empty-project scan report](https://www.virustotal.com/gui/file/fb906e6611161faafc695ada5042ae82696b88dba3cd1309843d1f42adfe084f). Remote-control or firewall-traversal functionality is therefore not required for a detection to occur.
 
-Empty-project toolchain check: we downloaded official Go 1.27.1 and verified its published SHA-256. Comparing 12,028 files with the active toolchain found no differences. Rebuilding on the same host with the separate official toolchain and a fresh cache produced an executable identical byte-for-byte to the empty sample above. This checks the toolchain and reproducibility; it is not verification on a separate clean operating system.
-
 The [official Go FAQ on antivirus detections](https://go.dev/doc/faq#virus) also explains that Go programs can be falsely flagged. This does not establish that all release detections are false positives. **The author will continue investigating and improving the project, working toward eliminating these antivirus alerts.**
 
 Added a Windows x64 portable ZIP: extract all files and run `YourDesk.exe`. WebView2 Runtime is required. It contains the same binaries as this release’s installer, with required DLLs and licenses.
@@ -50,8 +46,6 @@ The release includes macOS ARM64, Windows x64/ARM64 installers, Linux x64/ARM64 
 
 ウイルス対策の調査更新：`package main` と `func main() {}` のみで、YourDesk やサードパーティのパッケージをインポートしない Go の空プロジェクトでも、Windows x64 実行ファイルが **9/70 エンジンで検出**されました。利用者提供の VirusTotal スナップショットであり、数値は変わる可能性があります。[空プロジェクトの検出レポート](https://www.virustotal.com/gui/file/fb906e6611161faafc695ada5042ae82696b88dba3cd1309843d1f42adfe084f)をご覧ください。リモート操作やファイアウォール越えの機能がなくても検出は発生しています。
 
-空プロジェクトのツールチェーン検証：公式 Go 1.27.1 を再ダウンロードし、公開 SHA-256 を確認しました。使用中のツールチェーンと 12,028 ファイルを比較し、差異はありませんでした。同じホスト上で独立した公式ツールチェーンと新しいキャッシュから再ビルドした EXE も、上記の空プログラムとバイト単位で完全に一致しました。これはツールチェーンと再現性の確認であり、別のクリーンな OS 上での検証ではありません。
-
 [Go 公式 FAQ](https://go.dev/doc/faq#virus) にも Go プログラムの誤検知について説明があります。ただし、正式版の全警告が誤検知と確認されたわけではありません。**作者は引き続き調査と改善を行い、これらのウイルス警告の解消に向けて取り組みます。**
 
 Windows x64 ポータブル ZIP を追加しました。全て展開して `YourDesk.exe` を実行してください。WebView2 Runtime が必要です。同版インストーラーと同じ実行ファイル、必要な DLL とライセンスを同梱します。
@@ -67,8 +61,6 @@ macOS ARM64、Windows x64／ARM64、Linux x64／ARM64 CLI、実験版 WinPE x64 
 > **백신 경고 안내: YourDesk는 NAT／방화벽 통과 연결 기능을 제공합니다. 현재 일부 백신이 일부 빌드를 악성코드로 판정하여 원인을 조사하고 대응 중입니다. 통과 기능과의 인과관계 및 오탐 여부는 아직 확인되지 않았습니다. 위험을 판단한 후 다운로드하고 백신 보호를 끄지 마세요.**
 
 백신 조사 업데이트: `package main`과 `func main() {}`만 있고 YourDesk 또는 타사 패키지를 가져오지 않는 빈 Go 프로젝트의 Windows x64 실행 파일도 **9/70 엔진에서 탐지**되었습니다. 사용자가 제공한 VirusTotal 스냅샷이며 수치는 달라질 수 있습니다. [빈 프로젝트 검사 보고서](https://www.virustotal.com/gui/file/fb906e6611161faafc695ada5042ae82696b88dba3cd1309843d1f42adfe084f)를 참고하세요. 원격 제어나 방화벽 통과 기능이 없어도 탐지가 발생한다는 뜻입니다.
-
-빈 프로젝트의 도구 체인 확인: 공식 Go 1.27.1을 다시 내려받아 공개 SHA-256을 검증하고 사용 중인 도구 체인과 12,028개 파일을 비교했으며 차이는 없었습니다. 같은 호스트에서 별도의 공식 도구 체인과 새 캐시로 다시 빌드한 EXE도 위 빈 프로그램과 바이트 단위로 완전히 일치했습니다. 이는 도구 체인과 재현성 확인이며 별도의 깨끗한 운영체제에서 검증한 것은 아닙니다.
 
 [Go 공식 FAQ](https://go.dev/doc/faq#virus)에서도 Go 프로그램의 오탐 가능성을 설명합니다. 그러나 정식 버전의 모든 경고가 오탐으로 확인된 것은 아닙니다. **개발자는 이러한 바이러스 경고를 해소하기 위해 계속 조사하고 개선하겠습니다.**
 
