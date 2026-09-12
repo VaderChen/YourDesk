@@ -19,8 +19,21 @@ from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parent.parent
 DIST = ROOT / 'dist'
-DEFAULT_TARGETS = 'darwin/arm64,windows/amd64,windows/arm64,winpe/amd64,linux/amd64,linux/arm64'
+DEFAULT_TARGETS = 'darwin/arm64,windows/x64,windows/arm64,winpe/x64,linux/x64,linux/arm64'
 SUPPORTED_TARGETS = {'darwin/arm64', 'windows/amd64', 'windows/arm64', 'winpe/amd64', 'linux/amd64', 'linux/arm64'}
+
+
+def internal_target(target):
+    # 對外統一 x64，編譯時仍使用 Go 要求的 amd64；相容既有建置設定。
+    return target.removesuffix('/x64') + '/amd64' if target.endswith('/x64') else target
+
+
+def public_target(target):
+    return target.removesuffix('/amd64') + '/x64' if target.endswith('/amd64') else target
+
+
+def platform_folder(target):
+    return public_target(target).replace('darwin/', 'macos/').replace('/', '-')
 
 
 def run(args, env=None, cwd=ROOT):
@@ -327,9 +340,9 @@ def reset_dist():
 def build(version, targets):
     version_name(version)  # 在清理既有產物前驗證版本格式。
     release = DIST
-    selected = list(dict.fromkeys(targets.split(',')))
+    selected = list(dict.fromkeys(internal_target(t.strip()) for t in targets.split(',')))
     if not selected or any(t not in SUPPORTED_TARGETS for t in selected):
-        raise ValueError('不支援的建置目標；macOS 僅支援 arm64，Windows 支援 amd64、arm64，WinPE 實驗版支援 amd64；Linux 命令列版支援 amd64、arm64')
+        raise ValueError('不支援的建置目標；macOS 僅支援 arm64，Windows 支援 x64、arm64，WinPE 實驗版支援 x64；Linux 命令列版支援 x64、arm64')
     # 預先確認原生 UI 工具鏈，禁止用 CGO=0 產生缺少介面的桌面版。
     for target in selected:
         if target == 'winpe/amd64':
@@ -343,9 +356,9 @@ def build(version, targets):
     with tempfile.TemporaryDirectory(prefix='.yourdesk-build-', dir=DIST) as temporary:
         stage = Path(temporary)
         for target in selected:
-            print(f'建置 {target}：{version}', flush=True)
+            print(f'建置 {public_target(target)}：{version}', flush=True)
             system, arch = target.split('/')
-            folder = stage / (('macos' if system == 'darwin' else system) + '-' + arch)
+            folder = stage / platform_folder(target)
             folder.mkdir()
             if system == 'darwin':
                 # 中間執行檔只留在暫存目錄，Apple 發行目錄僅放 App／DMG。
@@ -364,7 +377,7 @@ def build(version, targets):
                     compile_program(name, folder, target, version)
                 write_instructions(folder, system, version)
                 manifest(folder)
-        (stage / 'release.json').write_text(json.dumps(dict(version=version, targets=selected), indent=2))
+        (stage / 'release.json').write_text(json.dumps(dict(version=version, targets=[public_target(t) for t in selected]), indent=2))
         manifest(stage)
         # 平台目錄直接位於 dist；中繼資料最後發布，供 --no-build 判斷建置完成。
         for item in stage.iterdir():
@@ -373,7 +386,7 @@ def build(version, targets):
         os.rename(stage / "release.json", release / "release.json")
     native = capture(['go', 'env', 'GOHOSTOS']) + '/' + capture(['go', 'env', 'GOHOSTARCH'])
     if native in selected:
-        folder = release / native.replace('darwin/', 'macos-').replace('/', '-')
+        folder = release / platform_folder(native)
         (ROOT / 'bin').mkdir(exist_ok=True)
         if native.startswith('darwin/'):
             folder = folder / 'YourDesk.app/Contents/MacOS'
@@ -419,12 +432,15 @@ def windows_installer(folder, stem, version, arch):
 def pack(release, targets=None):
     metadata = json.loads((release / 'release.json').read_text())
     version = metadata['version']
-    selected = targets if targets is not None else metadata['targets']
+    selected = list(dict.fromkeys(internal_target(t) for t in (targets if targets is not None else metadata['targets'])))
     if not selected or any(t not in SUPPORTED_TARGETS for t in selected):
         raise ValueError('封裝目標不支援；macOS 僅支援 arm64，請重新建置')
     for target in selected:
         system, arch = target.split('/')
-        folder = release / (('macos' if system == 'darwin' else system) + '-' + arch)
+        folder = release / platform_folder(target)
+        legacy = release / target.replace('darwin/', 'macos/').replace('/', '-')
+        if not folder.exists() and legacy != folder and legacy.is_dir() and not legacy.is_symlink():
+            legacy.rename(folder)
         write_instructions(folder, system, version)
         stem = f'YourDesk-{version_name(version)}-{folder.name}'
         if system == 'darwin':
@@ -464,6 +480,8 @@ def pack(release, targets=None):
             clean_apple_output(folder)
         else:
             manifest(folder)
+    metadata['targets'] = [public_target(internal_target(t)) for t in metadata['targets']]
+    (release / 'release.json').write_text(json.dumps(metadata, indent=2))
     manifest(release)
     print(f'封裝完成：{release}')
 

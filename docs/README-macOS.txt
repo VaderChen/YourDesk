@@ -1,5 +1,7 @@
 繁體中文
 --------------------
+登入前啟動：在進階設定開啟「登入前啟動」，預設關閉。macOS 14.4 以上的已簽署 APP 經管理員授權安裝系統服務，登入前即可啟動 Host；須先允許螢幕錄製及輔助使用。此功能仍為實驗性，不支援 FileVault 開機解鎖；關閉時亦需管理員授權。
+
 DMG 內的 YourDesk.app 拖入 Applications 後啟動，依提示允許螢幕錄製與輔助使用權限。
 新增站台並輸入對方 ID，選擇桌面或命令列，再輸入對方密碼。設定 → 網路安全可修改本機密碼。
 關閉視窗後仍常駐；從選單列圖示選擇關閉程式。
@@ -14,6 +16,8 @@ CLI：-signal 指定配對伺服器；-print-uid 顯示裝置 ID；-print-secret
 
 English
 --------------------
+Start before login: enable it in Advanced Settings (off by default). A signed app on macOS 14.4 or later installs the Host system service with administrator approval. Screen Recording and Accessibility permissions are required. This feature is experimental and does not support FileVault startup unlock. Disabling it also requires administrator approval.
+
 Drag YourDesk.app from the DMG into Applications and launch it. Allow Screen Recording and Accessibility when prompted.
 Add a site with the remote ID, choose Desktop or Terminal, then enter the remote password. Change your local password in Settings → Network Security.
 Closing the window keeps the app running; quit from its menu bar icon.
@@ -28,6 +32,8 @@ Set the password for this run with -secret "your password"; no JSON input is nee
 
 日本語
 --------------------
+ログイン前の起動：詳細設定で有効にします（初期設定はオフ）。macOS 14.4 以降の署名済み APP で、管理者の許可により Host システムサービスをインストールします。画面収録とアクセシビリティの許可が必要です。実験的な機能で、FileVault の起動時解除には対応しません。無効化にも管理者の許可が必要です。
+
 DMG の YourDesk.app を Applications にドラッグして起動し、画面収録とアクセシビリティを許可します。
 相手の ID を登録し、デスクトップまたはターミナルを選んでパスワードを入力します。本機のパスワードは設定 → ネットワークセキュリティで変更できます。
 ウィンドウを閉じても常駐します。終了はメニューバーのアイコンから行います。
@@ -42,6 +48,8 @@ CLI：-signal は配対サーバー、-print-uid は装置 ID 表示、-print-se
 
 한국어
 --------------------
+로그인 전 시작: 고급 설정에서 켜세요(기본값 꺼짐). macOS 14.4 이상의 서명된 APP에서 관리자 승인으로 Host 시스템 서비스를 설치합니다. 화면 기록 및 손쉬운 사용 권한이 필요합니다. 실험적 기능이며 FileVault 부팅 잠금 해제는 지원하지 않습니다. 끌 때도 관리자 승인이 필요합니다.
+
 DMG의 YourDesk.app을 Applications로 옮겨 실행하고 화면 기록 및 손쉬운 사용 권한을 허용하세요.
 상대 ID로 연결을 추가하고 데스크톱 또는 터미널을 선택한 뒤 암호를 입력하세요. 로컬 암호는 설정 → 네트워크 보안에서 변경합니다.
 창을 닫아도 실행됩니다. 메뉴 막대 아이콘에서 종료하세요.

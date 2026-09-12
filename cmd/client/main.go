@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 	"yourdesk/internal/authlog"
+	"yourdesk/internal/autostart"
 	"yourdesk/internal/clientui"
 	"yourdesk/internal/deviceid"
 	"yourdesk/internal/hostguard"
@@ -63,6 +64,7 @@ func main() {
 	directListen := flag.String("direct-listen", "", cliText("Listen address for direct IP connections over TLS; opt-in"))
 	checkSignal := flag.Bool("check-signal", false, cliText("Check the signaling server over TLS and exit"))
 	transport := flag.String("transport", "", cliText("Transport mode: empty for native UDP, tailcat for experimental Tailcat"))
+	autostartMode := flag.String("autostart", "", cliText("Login startup: on, off or status; uses the saved password"))
 	flag.Parse()
 	secretProvided := false
 	flag.Visit(func(f *flag.Flag) {
@@ -80,6 +82,10 @@ func main() {
 		if _, err := security.DecodeSecret(*explicitSecret); err != nil {
 			fatal(err)
 		}
+	}
+	if *autostartMode != "" {
+		configureAutostart(*autostartMode, *signalURL, *room, *ui, secretProvided || *secretStdin || *parentStdin || *serviceHost)
+		return
 	}
 	headless := runtimeenv.Headless()
 	if headless {
@@ -277,3 +283,49 @@ func main() {
 }
 
 func fatal(err error) { fmt.Fprintln(os.Stderr, "yourdesk-client:", err); os.Exit(1) }
+
+// 登入啟動設定不啟動 Host，也不把單次密碼寫入啟動項目。
+func configureAutostart(mode, signalURL, room string, desktop, privateInput bool) {
+	if mode != "on" && mode != "off" && mode != "status" {
+		fatal(errors.New(cliText("Use -autostart on, off or status")))
+	}
+	desktop = desktop && !runtimeenv.Headless()
+	if mode == "status" {
+		s := autostart.Status(desktop)
+		if s.Message == autostart.Failed {
+			fatal(errors.New(cliText("Could not change login startup; check the installation path, account permissions and user session")))
+		}
+		if !s.Supported {
+			fmt.Println(cliText("Login startup is unavailable"))
+		} else if s.Enabled {
+			fmt.Println(cliText("Login startup is enabled"))
+		} else {
+			fmt.Println(cliText("Login startup is disabled"))
+		}
+		return
+	}
+	if mode == "on" && privateInput {
+		fatal(errors.New(cliText("Login startup uses the saved password; omit temporary password and parent-pipe options")))
+	}
+	var c autostart.Config
+	if mode == "on" {
+		var err error
+		c, err = autostart.ClientConfig(signalURL, room, desktop)
+		if err != nil {
+			fatal(err)
+		}
+		if _, _, err = security.LocalSecret(""); err != nil {
+			fatal(err)
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := autostart.Configure(ctx, mode == "on", c); err != nil {
+		fatal(errors.New(cliText("Could not change login startup; check the installation path, account permissions and user session")))
+	}
+	if mode == "on" {
+		fmt.Println(cliText("Login startup is enabled"))
+	} else {
+		fmt.Println(cliText("Login startup is disabled"))
+	}
+}

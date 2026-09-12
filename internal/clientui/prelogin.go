@@ -14,12 +14,22 @@ func (s *server) preloginState() prelogin.State {
 	state.Busy = s.preloginBusy
 	if s.preloginMessage != "" {
 		state.Message = s.preloginMessage
+		// 進度與一般說明不是錯誤；非忙碌時留下的操作訊息才代表失敗。
+		if !s.preloginBusy {
+			state.Error = s.preloginMessage
+		}
 	}
 	return state
 }
 func (s *server) handlePrelogin(w http.ResponseWriter, r *http.Request) bool {
 	if r.URL.Path != "/api/prelogin" {
 		return false
+	}
+	if r.Method == "GET" {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		respond(w, 200, s.preloginState())
+		return true
 	}
 	if r.Method != "POST" {
 		w.WriteHeader(http.StatusMethodNotAllowed)

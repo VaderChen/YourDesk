@@ -11,6 +11,13 @@ if [[ -z "$SIGNING_IDENTITY" || "$SIGNING_IDENTITY" == '-' ]]; then
   exit 1
 fi
 for executable in "$@"; do
-  codesign --force --sign "$SIGNING_IDENTITY" --options runtime --timestamp "$executable"
-  codesign --verify --strict "$executable"
+  # 不繼承 Go／AppleScript 工具產生的臨時識別碼；使用固定檔名或 Bundle ID。
+  if [[ -d "$executable" && "$executable" == *.app ]]; then
+    identifier="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$executable/Contents/Info.plist")"
+  else
+    identifier="$(basename "$executable")"
+  fi
+  [[ -n "$identifier" ]] || { echo '缺少固定簽章識別碼。' >&2; exit 1; }
+  codesign --force --sign "$SIGNING_IDENTITY" --identifier "$identifier" --options runtime --timestamp "$executable"
+  codesign --verify --deep --strict "$executable"
 done

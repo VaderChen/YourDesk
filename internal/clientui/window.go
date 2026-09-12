@@ -28,11 +28,15 @@ func runWindow(ctx context.Context, address string, connected <-chan struct{}, u
 		return err
 	}
 	defer removeTray()
-	// 固定專案連結交給預設瀏覽器，避免外部頁面取代 APP 的 WebView。
-	if err := window.Bind("yourdeskOpenProject", func() error {
+	// 固定的外部連結共用系統瀏覽器入口，不依賴 WebView 的新視窗支援。
+	if err := window.Bind("yourdeskOpenExternal", func(url string) error {
+		switch url {
+		case "https://github.com/VaderChen/YourDesk", "https://buymeacoffee.com/vaderchen":
+		default:
+			return errors.New("不支援的外部連結")
+		}
 		openCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
-		const url = "https://github.com/VaderChen/YourDesk"
 		switch runtime.GOOS {
 		case "darwin":
 			return childprocess.CommandContext(openCtx, "/usr/bin/open", url).Run()

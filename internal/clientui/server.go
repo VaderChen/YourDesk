@@ -364,6 +364,9 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 		s.terminalAction(w, r)
 		return
 	}
+	if s.handleAutostart(w, r) {
+		return
+	}
 	if s.handlePrelogin(w, r) {
 		return
 	}

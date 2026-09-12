@@ -42,6 +42,7 @@ type State struct {
 	Enabled   bool   `json:"enabled"`
 	Busy      bool   `json:"busy"`
 	Message   string `json:"message"`
+	Error     string `json:"error,omitempty"`
 }
 
 // Handle 在一般 APP／Host 啟動前處理專用服務入口。

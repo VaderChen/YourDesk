@@ -69,10 +69,10 @@
     "接続先をインポートしました",
     "사이트를 가져왔습니다"
   ],
-  "泡泡提示": [
-    "Bubble tips",
-    "吹き出しヒント",
-    "말풍선 도움말"
+  "顯示使用提示": [
+    "Show usage tips",
+    "操作ヒントを表示",
+    "사용 도움말 표시"
   ],
   "設定": [
     "Settings",
@@ -2498,5 +2498,85 @@
     "Support development",
     "開発を支援",
     "개발 후원"
+  ],
+  "請在目前使用中的 Mac 桌面啟用登入前連線。": [
+    "Enable pre-login access from the active Mac desktop.",
+    "現在使用中の Mac デスクトップからログイン前接続を有効にしてください。",
+    "현재 사용 중인 Mac 데스크톱에서 로그인 전 연결을 켜세요."
+  ],
+  "請先允許 YourDesk 錄製螢幕，再開啟登入前連線。": [
+    "Allow YourDesk to record the screen before enabling pre-login access.",
+    "YourDesk の画面収録を許可してから、ログイン前接続を有効にしてください。",
+    "YourDesk 화면 기록을 허용한 후 로그인 전 연결을 켜세요."
+  ],
+  "請先允許 YourDesk 使用輔助使用權限，再開啟登入前連線。": [
+    "Allow YourDesk accessibility access before enabling pre-login access.",
+    "YourDesk のアクセシビリティを許可してから、ログイン前接続を有効にしてください。",
+    "YourDesk 손쉬운 사용 권한을 허용한 후 로그인 전 연결을 켜세요."
+  ],
+  "桌面尚未就緒，登入前連線將自動重試。": [
+    "The desktop is not ready. Pre-login access will retry automatically.",
+    "デスクトップの準備ができていません。ログイン前接続を自動で再試行します。",
+    "데스크톱이 아직 준비되지 않았습니다. 로그인 전 연결을 자동으로 다시 시도합니다."
+  ],
+  "登入後自動啟動": [
+    "Start at login",
+    "ログイン時に起動",
+    "로그인 시 자동 시작"
+  ],
+  "登入系統後自動啟動 YourDesk。": [
+    "Start YourDesk automatically after you sign in.",
+    "ログイン後に YourDesk を自動で起動します。",
+    "로그인 후 YourDesk를 자동으로 시작합니다."
+  ],
+  "目前環境不支援登入後自動啟動。": [
+    "Login startup is unavailable in this environment.",
+    "この環境ではログイン時の起動を利用できません。",
+    "이 환경에서는 로그인 시 자동 시작을 사용할 수 없습니다."
+  ],
+  "無法變更自動啟動，請確認安裝位置與使用者權限。": [
+    "Could not change startup. Check the installation path and account permissions.",
+    "自動起動を変更できません。インストール先と権限を確認してください。",
+    "자동 시작을 변경할 수 없습니다. 설치 경로와 계정 권한을 확인하세요."
+  ],
+  "請先開啟登入後自動啟動，再啟用登入前連線。": [
+    "Turn on Start at login before enabling pre-login access.",
+    "ログイン時の起動を有効にしてから、ログイン前接続を有効にしてください。",
+    "로그인 시 자동 시작을 켠 후 로그인 전 연결을 켜세요."
+  ],
+  "請先關閉登入前連線，再關閉自動啟動。": [
+    "Turn off pre-login access before disabling Start at login.",
+    "ログイン前接続を無効にしてから、自動起動を無効にしてください。",
+    "로그인 전 연결을 끈 후 자동 시작을 끄세요."
+  ],
+  "進階設定": [
+    "Advanced Settings",
+    "詳細設定",
+    "고급 설정"
+  ],
+  "服務操作未完成或管理員授權已取消，請重新操作並完成授權。": [
+    "The service change was not completed or administrator approval was canceled. Please try again and approve the request.",
+    "サービスの変更が完了していないか、管理者の許可がキャンセルされました。もう一度操作して許可してください。",
+    "서비스 변경이 완료되지 않았거나 관리자 승인이 취소되었습니다. 다시 시도하고 승인해 주세요."
+  ],
+  "開機後自動啟動，登入前即可接受連線；啟用與停用需要管理員授權。": [
+    "Starts automatically at boot and accepts connections before sign-in. Administrator approval is required to enable or disable it.",
+    "起動時に自動で開始し、ログイン前から接続を受け付けます。有効化と無効化には管理者の許可が必要です。",
+    "부팅 시 자동으로 시작되어 로그인 전에도 연결을 받습니다. 켜거나 끄려면 관리자 승인이 필요합니다."
+  ],
+  "無法變更登入前啟動，請確認管理員授權後重試。": [
+    "Could not change startup before sign-in. Please approve the administrator request and try again.",
+    "ログイン前の起動を変更できません。管理者の許可を確認して再試行してください。",
+    "로그인 전 시작을 변경할 수 없습니다. 관리자 승인을 확인하고 다시 시도해 주세요."
+  ],
+  "登入前服務尚未就緒，請稍後重試。": [
+    "The pre-login service is not ready. Please try again shortly.",
+    "ログイン前サービスの準備ができていません。しばらくしてから再試行してください。",
+    "로그인 전 서비스가 아직 준비되지 않았습니다. 잠시 후 다시 시도해 주세요."
+  ],
+  "登入前啟動": [
+    "Start before login",
+    "ログイン前に自動起動",
+    "로그인 전 자동 시작"
   ]
 }

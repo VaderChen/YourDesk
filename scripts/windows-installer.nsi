@@ -39,6 +39,20 @@ LangString WrongArch ${LANG_TRADCHINESE} "此安裝程式不適用於目前的 W
 LangString WrongArch ${LANG_ENGLISH} "This installer does not match your Windows architecture."
 LangString WrongArch ${LANG_JAPANESE} "このインストーラーは Windows のアーキテクチャに対応していません。"
 LangString WrongArch ${LANG_KOREAN} "이 설치 프로그램은 Windows 아키텍처와 맞지 않습니다."
+LangString ServiceActive ${LANG_TRADCHINESE} "請先在 YourDesk 進階設定關閉「登入前啟動」，再更新或解除安裝。"
+LangString ServiceActive ${LANG_ENGLISH} "Turn off Start before login in YourDesk Advanced Settings before updating or uninstalling."
+LangString ServiceActive ${LANG_JAPANESE} "更新またはアンインストールの前に、YourDesk の詳細設定でログイン前の起動を無効にしてください。"
+LangString ServiceActive ${LANG_KOREAN} "업데이트 또는 제거 전에 YourDesk 고급 설정에서 로그인 전 시작을 꺼 주세요."
+
+!macro CheckPreloginService
+ ReadRegStr $0 HKLM "SYSTEM\CurrentControlSet\Services\YourDeskPrelogin" "ImagePath"
+ ${If} $0 != ""
+  IfSilent +2 0
+  MessageBox MB_OK|MB_ICONEXCLAMATION "$(ServiceActive)"
+  SetErrorLevel 3
+  Abort
+ ${EndIf}
+!macroend
 
 !macro CheckFileClosed FILE
 retry_${FILE}:
@@ -74,6 +88,7 @@ Function un.onInit
  !insertmacro MUI_UNGETLANGUAGE
 FunctionEnd
 Section "YourDesk"
+ !insertmacro CheckPreloginService
  !insertmacro CheckFileClosed "YourDesk.exe"
  !insertmacro CheckFileClosed "yourdesk-client.exe"
  !insertmacro CheckFileClosed "yourdesk-remote.exe"
@@ -107,6 +122,9 @@ Section "YourDesk"
  WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\YourDesk" "NoRepair" 1
 SectionEnd
 Section "Uninstall"
+ !insertmacro CheckPreloginService
+ DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "YourDesk"
+ DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run" "YourDesk"
  !insertmacro CheckFileClosed "YourDesk.exe"
  !insertmacro CheckFileClosed "yourdesk-client.exe"
  !insertmacro CheckFileClosed "yourdesk-remote.exe"

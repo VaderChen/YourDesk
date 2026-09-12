@@ -1,6 +1,10 @@
 # 跨平台建置與打包
 
+「更新三件套」代表更新文件、上傳 GitHub、發布 Release；完整步驟見 [發布流程](RELEASE-WORKFLOW.md)。
+
 buildMac.command／buildWin.command／buildLinux.command 與 pack.command 統一版本格式為 `1.YY.MMDD build HHmm`（台北時間）。
+
+對外架構名稱統一使用 `x64`（包含 Intel／AMD 64 位元平台），`arm64` 維持原名。建置目標接受 `x64` 與舊 `amd64` 名稱，發布目錄、檔名及 release.json 一律使用 `x64`；Go 的 `GOARCH=amd64` 與既有 `YOURDESK_*_AMD64` 工具鏈設定保留。更新程式優先辨識新 `x64` 套件，也相容舊 `amd64` 套件。舊版 APP 若尚未包含這項辨識修正，需手動下載新命名的安裝包。
 
 ## 使用方式
 
@@ -14,25 +18,25 @@ buildMac.command／buildWin.command／buildLinux.command 與 pack.command 統一
 ./pack.command
 ```
 
-需要 Go 1.27.1 以上、Python 3.9 以上、zsh。macOS 桌面版使用 Xcode Command Line Tools。從 macOS 建置 Windows amd64 桌面版需要 MinGW 的 gcc、g++、windres；Windows 封裝改用 NSIS 產生 Installer EXE，需要 makensis（macOS：brew install nsis）；可用 YOURDESK_MAKENSIS 指定編譯器。
+需要 Go 1.27.1 以上、Python 3.9 以上、zsh。macOS 桌面版使用 Xcode Command Line Tools。從 macOS 建置 Windows x64 桌面版需要 MinGW 的 gcc、g++、windres；Windows 封裝改用 NSIS 產生 Installer EXE，需要 makensis（macOS：brew install nsis）；可用 YOURDESK_MAKENSIS 指定編譯器。
 
-macOS 僅支援 Apple Silicon（arm64），不支援 Intel（amd64）；手動指定 darwin/amd64 也會拒絕建置與封裝。
+macOS 僅支援 Apple Silicon（arm64），不支援 Intel（x64）；手動指定 darwin/x64 也會拒絕建置與封裝。
 
 pack.command 預設目標：
 
 | 目標 | 內容 | 封裝 |
 | --- | --- | --- |
 | macOS arm64 | 原生 Client UI、遠端顯示 | YourDesk.app、DMG |
-| Windows amd64 | 原生 Client UI、遠端顯示 | Installer EXE |
+| Windows x64 | 原生 Client UI、遠端顯示 | Installer EXE |
 | Windows arm64（WOA） | 原生 ARM64 Client UI、遠端顯示 | ARM64 Installer EXE |
-| WinPE amd64（實驗性） | 原生 Win32 救援 Host | 便攜 ZIP |
+| WinPE x64（實驗性） | 原生 Win32 救援 Host | 便攜 ZIP |
 
 Linux 提供 x64／arm64 命令列 Host ZIP；圖形處理與 REMOTE 尚未提供。Windows arm64（WOA）列入預設目標，需要 LLVM-MinGW 的 aarch64 編譯器及 windres。
 
 一般桌面版的原生 Client／遠端顯示 強制使用 CGO；缺少工具鏈會明確停止，不產生無法開啟介面的替代執行檔。
 
 ```sh
-YOURDESK_BUILD_TARGETS=darwin/arm64,windows/amd64,windows/arm64 ./pack.command
+YOURDESK_BUILD_TARGETS=darwin/arm64,windows/x64,windows/arm64 ./pack.command
 YOURDESK_VERSION='1.26.0908 build 1800' ./pack.command
 # 已建置版本重新封裝
 YOURDESK_VERSION='1.26.0908 build 1800' ./pack.command --no-build
@@ -52,7 +56,7 @@ YOURDESK_VERSION='1.26.0908 build 1800' ./pack.command --no-build
 
 ## 輸出與啟動
 
-`dist/` 直接保存 `macos-arm64/`、`windows-amd64/`、`windows-arm64/`、`winpe-amd64/` 平台目錄，以及 release.json 與 SHA256SUMS，不再建立版本號子目錄。版本仍記錄於 release.json、應用程式及安裝包檔名。buildMac.command／buildWin.command／buildLinux.command 與預設 pack.command 會先清空專案的 dist，再於暫存目錄建置，成功後才發布產物。pack.command --no-build 依 dist/release.json 封裝現有產物，不清空 dist；若另指定 YOURDESK_VERSION，必須與現有版本一致。舊版版本子目錄需重新建置一次。清理會拒絕符號連結或非預期的 dist 路徑。對應本機平台的執行檔同步放入 bin。
+`dist/` 直接保存 `macos-arm64/`、`windows-x64/`、`windows-arm64/`、`winpe-x64/` 平台目錄，以及 release.json 與 SHA256SUMS，不再建立版本號子目錄。版本仍記錄於 release.json、應用程式及安裝包檔名。buildMac.command／buildWin.command／buildLinux.command 與預設 pack.command 會先清空專案的 dist，再於暫存目錄建置，成功後才發布產物。pack.command --no-build 依 dist/release.json 封裝現有產物，不清空 dist；若另指定 YOURDESK_VERSION，必須與現有版本一致。舊版版本子目錄需重新建置一次。清理會拒絕符號連結或非預期的 dist 路徑。對應本機平台的執行檔同步放入 bin。
 
 macOS 開啟 YourDesk.app；Windows 開啟 YourDesk.exe（需 WebView2 Runtime）。入口會啟動同目錄的 yourdesk-client，Client 再管理 遠端顯示；關閉視窗仍常駐 Tray，從 Tray 選單結束程式。
 
@@ -77,7 +81,7 @@ Apple 平台目錄僅輸出 YourDesk.app（build）與 DMG（pack）；獨立執
 下載依目前系統與執行檔架構選擇資產，命名與 `scripts/release.py` 一致：
 
 - `YourDesk-<版本>-macos-arm64.dmg`
-- `YourDesk-<版本>-windows-amd64-setup.exe`
+- `YourDesk-<版本>-windows-x64-setup.exe`
 - `YourDesk-<版本>-windows-arm64-setup.exe`
 
 請將安裝包作為 Release 資產提供；原始碼壓縮包不作為安裝包。缺少符合架構的資產時，程式顯示原因並停用提醒視窗的下載按鈕。下載驗證資產大小及 API 提供的 SHA-256；簽章、公證與下載完整性驗證是不同步驟。
@@ -90,15 +94,15 @@ Apple 平台目錄僅輸出 YourDesk.app（build）與 DMG（pack）；獨立執
 
 兩個 build 入口固定各自平台，不受 YOURDESK_BUILD_TARGETS 覆寫。每次 build 都會清空 dist，先後執行兩者不會合併產物；需要同時建置並打包兩平台時直接執行 pack.command。Windows 建置入口預設包含 x64、ARM64 與 WinPE x64 實驗版；若只需要 ARM64，可使用 YOURDESK_BUILD_TARGETS=windows/arm64 搭配 pack.command，或直接呼叫 scripts/release.py build。
 
-這三個 .command 入口為本機檔案，依 .gitignore 不上傳 GitHub。其他 checkout 可直接使用 `YOURDESK_BUILD_TARGETS=darwin/arm64 python3 scripts/release.py build` 或 `YOURDESK_BUILD_TARGETS=windows/amd64,windows/arm64,winpe/amd64 python3 scripts/release.py build`，打包使用 `python3 scripts/release.py pack`。
+這三個 .command 入口為本機檔案，依 .gitignore 不上傳 GitHub。其他 checkout 可直接使用 `YOURDESK_BUILD_TARGETS=darwin/arm64 python3 scripts/release.py build` 或 `YOURDESK_BUILD_TARGETS=windows/x64,windows/arm64,winpe/x64 python3 scripts/release.py build`，打包使用 `python3 scripts/release.py pack`。
 
 Windows 執行時透過 internal/childprocess 統一建立子程序，使用 CREATE_NO_WINDOW 禁止 PowerShell 等背景工具建立主控台；不設定 HideWindow，保留 Client／遠端顯示 的 GUI 顯示。裝置識別已改用 MachineGuid，必要時查詢 SMBIOS UUID，不再使用 CPU ID；詳見 [Windows 裝置 ID](WINDOWS-DEVICE-ID.md)。
 
 ## WinPE 實驗性便攜包
 
-WinPE 不使用 Installer，固定封裝為 `dist/winpe-amd64/YourDesk-<版本>-winpe-amd64-experimental.zip`；內含救援 EXE、`start-yourdesk.cmd`、說明與授權文件。解壓後執行 CMD 初始化網路並開啟 Host。尚未完成 WinPE 實機驗證。
+WinPE 不使用 Installer，固定封裝為 `dist/winpe-x64/YourDesk-<版本>-winpe-x64-experimental.zip`；內含救援 EXE、`start-yourdesk.cmd`、說明與授權文件。解壓後執行 CMD 初始化網路並開啟 Host。尚未完成 WinPE 實機驗證。
 
-預設打包與 Windows 建置入口均包含此目標；只需 WinPE 時使用 `YOURDESK_BUILD_TARGETS=winpe/amd64 python3 scripts/release.py pack`，此入口仍會清空 `dist`。WinPE 使用 Go 純交叉編譯，不需要 MinGW、NSIS 或 WebView2。
+預設打包與 Windows 建置入口均包含此目標；只需 WinPE 時使用 `YOURDESK_BUILD_TARGETS=winpe/x64 python3 scripts/release.py pack`，此入口仍會清空 `dist`。WinPE 使用 Go 純交叉編譯，不需要 MinGW、NSIS 或 WebView2。
 
 獨立入口 `./scripts/build-winpe.sh` 共用相同建置與 ZIP 邏輯，僅更新 `.local-run/winpe-dist/YourDesk-WinPE-x64-experimental.zip`，不清理 `dist`。功能及限制見 [WinPE 實作](WINPE-IMPLEMENTATION.md)。
 
@@ -110,7 +114,7 @@ WinPE 不使用 Installer，固定封裝為 `dist/winpe-amd64/YourDesk-<版本>-
 
 ## 畫面增強模型
 
-macOS 建置會透過 go:embed 同時嵌入 QuickSRNet Small 與 SESR M5 Core ML 套件，不需另外下載模型。Windows 仍提供 FSR 1；Core ML 列為不支援。模型轉換與授權見 [QUICKSRNET.md](QUICKSRNET.md)。GitHub Release 說明使用英文，專案技術文件維持繁體中文。
+macOS 建置會透過 go:embed 同時嵌入 QuickSRNet Small 與 SESR M5 Core ML 套件，不需另外下載模型。Windows 仍提供 FSR 1；Core ML 列為不支援。模型轉換與授權見 [QUICKSRNET.md](QUICKSRNET.md)。GitHub Release 說明提供繁中、英文、日文與韓文，專案技術文件維持繁體中文。
 
 ## 無終端機的本機 UI 試跑
 
@@ -128,4 +132,4 @@ RIFE 4.25 Lite 的轉換模型內嵌於 `internal/frameinterp`，來源、SHA256
 
 若程式仍在執行，請先完整結束後再開啟 `clientUI.app`。一般安裝版與直接執行 `runUITest.command` 維持正常版本判斷；後者也可用 `YOURDESK_TEST_UPDATE=1 ./runUITest.command` 啟用相同測試。
 
-Linux CLI 目標為 `linux/amd64`、`linux/arm64`，兩者均包含於預設全平台建置，輸出 `YourDesk-版本-linux-架構-cli.zip`。套件只有 Host，不包含圖形 Viewer。各平台 README 提供繁中、英、日、韓使用方式；不附重複的使用說明.txt。
+Linux CLI 目標為 `linux/x64`、`linux/arm64`，兩者均包含於預設全平台建置，輸出 `YourDesk-版本-linux-架構-cli.zip`。套件只有 Host，不包含圖形 Viewer。各平台 README 提供繁中、英、日、韓使用方式；不附重複的使用說明.txt。
