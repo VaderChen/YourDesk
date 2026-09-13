@@ -1,0 +1,25 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>YourDesk Shell</title><link rel="stylesheet" href="vendor/xterm.css"><link rel="stylesheet" href="vendor/fontawesome.min.css"><style>
+html,body{height:100%;min-height:0;margin:0;background:#142019;color:#dcebe1;font-family:sans-serif}body{display:flex;flex-direction:column}header{display:flex;align-items:center;gap:12px;padding:6px} .tools{display:flex;gap:12px;margin-left:auto;align-items:center;flex:0 0 auto}.tools button{flex:0 0 32px;width:32px!important;height:32px!important;font-size:18px!important}.tools button:last-child{margin-left:20px}.tools button{width:clamp(40px,3vw,52px);height:clamp(40px,5vh,52px);padding:0;font-size:24px}.tools #back{border-radius:50%;font-size:22px}button,input{font:inherit;padding:8px;border-radius:5px}button{background:#2e7d5b;color:white;border:0}.back-icon{position:static;z-index:10000;width:40px;height:40px;border-radius:50%;font-size:26px;line-height:1;padding:0}.back-icon span{font-family:Arial,sans-serif;font-style:normal}#status{flex:1}form{display:flex;flex-wrap:wrap;gap:8px;padding:8px}label{display:flex;flex-direction:column;font-size:12px}input{width:220px}#desktop-screen{display:none;width:100%;height:calc(100dvh - 64px);object-fit:contain;background:#000}#terminal{flex:1;min-height:0;height:calc(100dvh - 64px);overflow:hidden;padding:6px;touch-action:none}.xterm{height:100%}.xterm-helper-textarea{position:fixed!important;left:2px!important;bottom:2px!important;opacity:0.01!important;width:48px!important;height:32px!important;z-index:2!important} [hidden],dialog#connection-dialog[hidden]{display:none!important}
+dialog#connection-dialog:not([hidden]){display:block;position:fixed;z-index:9999;top:12%;left:5%;right:5%;width:auto;margin:0;padding:20px;background:#f4f7f5;color:#142019;border:2px solid #2e7d5b;border-radius:14px;box-shadow:0 12px 40px #0009}dialog#connection-dialog::backdrop{background:#0009}dialog#connection-dialog form{background:transparent;color:#142019;padding:0}dialog#connection-dialog input{box-sizing:border-box;width:100%;min-height:44px}dialog#connection-dialog label{flex:1;min-width:180px}/* 共用控制項尺寸；標籤不參與按鈕高度計算。 */
+:root{--control-height:44px;--control-radius:6px}
+button,input:not([type=checkbox]){box-sizing:border-box;height:var(--control-height);border-radius:var(--control-radius);font-size:16px}
+button{padding:0 18px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+button:disabled{opacity:.6}
+.back-icon{width:clamp(40px,3vw,52px);height:clamp(40px,5vh,52px);padding:0;border-radius:6px;flex:0 0 auto}
+header{padding-right:8px}
+dialog#connection-dialog form{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
+dialog#connection-dialog label{min-width:0;gap:5px}
+dialog#connection-dialog input:not([type=checkbox]){border:1px solid #8a9a90;background:white;padding:0 12px}
+dialog#connection-dialog .remember{display:flex;flex-direction:row;align-items:center;font-size:14px;gap:8px}
+dialog#connection-dialog input[type=checkbox]{width:20px;height:20px;min-height:0;margin:0;accent-color:#2e7d5b}
+dialog#connection-dialog #connect{justify-self:end;min-width:104px}
+dialog#connection-dialog{box-sizing:border-box;max-height:82dvh;overflow:auto}
+#progress{position:fixed;inset:0;z-index:11000;display:grid;place-items:center;background:#0008;padding:20px}
+.progress-card{box-sizing:border-box;width:min(100%,360px);padding:24px;text-align:center;background:#f4f7f5;color:#142019;border:2px solid #2e7d5b;border-radius:14px}
+.progress-card h2{font-size:18px}
+.spinner{display:inline-block;width:32px;height:32px;border:3px solid #ccdad1;border-top-color:#2e7d5b;border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#input-proxy{position:fixed;left:-100px;top:0;width:1px;height:1px;opacity:.01}#keyboard-test{max-width:100%;color:#142019;background:#fff;border:1px solid #8a9a90}
+</style></head><body><header><span id="status">請輸入 Host 連線資料</span><nav class="tools"><button id="font-down" aria-label="縮小字型">−</button><button id="font-up" aria-label="放大字型">＋</button><button id="keyboard" aria-label="呼出鍵盤">⌨</button><button id="back" aria-label="返回 YourDesk">×</button></nav></header><input id="input-proxy" type="password" autocomplete="off" aria-hidden="true">
+<div id="terminal"></div>
+<script src="vendor/xterm.js"></script><script src="vendor/addon-fit.js"></script><script src="terminal.js"></script></body></html>
