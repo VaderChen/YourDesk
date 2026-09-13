@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>YourDesk 遠端桌面</title>
+<link rel="stylesheet" href="vendor/fontawesome.min.css">
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:#111;color:#dcebe1;font-family:sans-serif}
+body{display:flex;flex-direction:column}
+header{position:relative;display:flex;align-items:center;gap:8px;height:44px;min-height:44px;padding:4px 60px 4px 8px;flex-shrink:0;flex-wrap:nowrap;box-sizing:border-box;overflow:hidden}
+#status{flex:1 1 100px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#displays{display:none;gap:4px;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2}#displays button{display:flex;align-items:center;gap:5px;margin:0;padding:5px 9px;min-height:30px;background:#245b46;color:#dcebe1;border:1px solid #4c9274;border-radius:5px}#stats{flex:none;white-space:nowrap;color:#9fb7aa;font-size:12px;font-variant-numeric:tabular-nums}
+#back{display:none}
+button{flex:none;margin-left:auto;padding:8px 12px;background:#2e7d5b;color:white;border:0;border-radius:6px}
+#screen{min-height:0;flex:1;width:100%;height:auto;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+#keyboard-proxy{position:fixed;left:0;bottom:0;width:1px;height:1px;opacity:0;border:0;padding:0;z-index:-1}
+</style>
+</head>
+<body>
+<header><span id="status">已連線</span><span id="displays" aria-label="螢幕切換" style="display:flex"><button type="button" title="目前螢幕"><i class="fa fa-desktop" aria-hidden="true"></i><span>1</span></button></span><span id="stats" aria-label="影像統計">FPS 0 · TX 0.0 KB/s · RX 0.0 KB/s</span><button id="back" aria-label="返回">×</button></header>
+<div id="screen" aria-label="遠端桌面"></div>
+<input id="keyboard-proxy" type="text" aria-hidden="true" autocomplete="off" autocorrect="off" spellcheck="false">
+<script src="desktop.js"></script>
+</body>
+</html>

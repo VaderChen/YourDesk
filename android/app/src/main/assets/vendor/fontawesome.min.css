@@ -1,0 +1,2 @@
+/* UTF-8 icon fallback; no external font required. */
+.fa{display:inline-block;font-style:normal}.fa-desktop{width:16px;height:14px;position:relative;border:2px solid currentColor;border-radius:2px}.fa-desktop:after{content:"";position:absolute;left:4px;right:4px;bottom:-5px;border-top:2px solid currentColor}
