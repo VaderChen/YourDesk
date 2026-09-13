@@ -86,24 +86,28 @@ type Control struct {
 }
 
 type Peer struct {
-	sentBytes      atomic.Uint64
-	receivedBytes  atomic.Uint64
-	transportMode  peertransport.Mode
-	commandsOnce   sync.Once
-	commands       commandState
-	pc             *webrtc.PeerConnection
-	screen         *webrtc.DataChannel
-	control        *webrtc.DataChannel
-	clipboard      *webrtc.DataChannel
-	clipboardInbox chan []byte
-	clipboardDone  chan struct{}
-	clipboardOnce  sync.Once
-	mu             sync.RWMutex
-	closed         bool
-	done           chan struct{}
-	doneOnce       sync.Once
-	controlMu      sync.Mutex
-	pendingControl [][]byte
+	clipboardSendOnce sync.Once
+	clipboardSendGate chan struct{}
+	livenessOnce      sync.Once
+	sentBytes         atomic.Uint64
+	receivedBytes     atomic.Uint64
+	transportMode     peertransport.Mode
+	commandsOnce      sync.Once
+	commands          commandState
+	pc                *webrtc.PeerConnection
+	screen            *webrtc.DataChannel
+	control           *webrtc.DataChannel
+	clipboard         *webrtc.DataChannel
+	clipboardInbox    chan []byte
+	clipboardDone     chan struct{}
+	clipboardOnce     sync.Once
+	mu                sync.RWMutex
+	closed            bool
+	done              chan struct{}
+	doneOnce          sync.Once
+	controlMu         sync.Mutex
+	pendingControl    [][]byte
+	controlCongested  atomic.Bool
 }
 
 func config() webrtc.Configuration {
@@ -151,7 +155,7 @@ func NewHostWithTransport(ctx context.Context, signal *signaling.Client, mode pe
 			p.mu.Lock()
 			p.control = dc
 			p.mu.Unlock()
-			dc.OnOpen(func() { p.flushControl(); p.announceCommands() })
+			dc.OnOpen(func() { p.flushControl(); p.announceCommands(); p.startLiveness() })
 			p.onMessage(dc, func(m webrtc.DataChannelMessage) {
 				var c Control
 				if decodeControl(m.Data, &c) == nil && !p.handleCommand(c) && onControl != nil {
@@ -184,7 +188,7 @@ func NewHostWithTransport(ctx context.Context, signal *signaling.Client, mode pe
 			onControl(c)
 		}
 	})
-	p.control.OnOpen(func() { p.flushControl(); p.announceCommands() })
+	p.control.OnOpen(func() { p.flushControl(); p.announceCommands(); p.startLiveness() })
 	offer, err := pc.CreateOffer(nil)
 	if err != nil {
 		_ = pc.Close()
@@ -297,7 +301,7 @@ func NewViewerWithTransport(ctx context.Context, signal *signaling.Client, mode 
 			p.mu.Lock()
 			p.control = dc
 			p.mu.Unlock()
-			dc.OnOpen(func() { p.flushControl(); p.announceCommands() })
+			dc.OnOpen(func() { p.flushControl(); p.announceCommands(); p.startLiveness() })
 			p.onMessage(dc, func(m webrtc.DataChannelMessage) {
 				var c Control
 				if decodeControl(m.Data, &c) == nil && !p.handleCommand(c) {
@@ -401,7 +405,7 @@ func (p *Peer) sendFrame(f Frame, beforeSend func(int) error) error {
 	if len(f.JPEG) == 0 {
 		return errors.New("空白影格")
 	}
-	if dc.ReadyState() != webrtc.DataChannelStateOpen || dc.BufferedAmount() > maxScreenBuffer {
+	if p.controlBackpressure() || dc.ReadyState() != webrtc.DataChannelStateOpen || dc.BufferedAmount() > maxScreenBuffer {
 		return ErrFrameDropped
 	}
 	total := (len(f.JPEG) + chunkSize - 1) / chunkSize
@@ -419,7 +423,7 @@ func (p *Peer) sendFrame(f Frame, beforeSend func(int) error) error {
 				return err
 			}
 		}
-		if dc.ReadyState() != webrtc.DataChannelStateOpen || dc.BufferedAmount() > maxScreenBuffer {
+		if p.controlBackpressure() || dc.ReadyState() != webrtc.DataChannelStateOpen || dc.BufferedAmount() > maxScreenBuffer {
 			return ErrFrameDropped
 		}
 		msg := make([]byte, headerSize+end-start)
@@ -455,6 +459,10 @@ func (p *Peer) SendControl(c Control) error {
 	p.mu.RUnlock()
 	if closed || dc == nil {
 		return errors.New("control channel 尚未連線")
+	}
+	// 壅塞時移動事件已過時；按鍵、按鈕與可靠命令仍保留。
+	if p.controlBackpressure() && c.Type == "move" {
+		return nil
 	}
 	b, err := encodeControl(c)
 	if err != nil {

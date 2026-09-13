@@ -105,6 +105,8 @@ def compile_program(name, folder, target, version):
     gui = system != 'linux' and name in ('client', 'remote')
     output = ('YourDesk' if name == 'desktop' else 'yourdesk-' + name) + ('.exe' if system == 'windows' else '')
     flags = f"-s -w -X 'yourdesk/internal/clientui.Version={version}'"
+    if os.environ.get('YOURDESK_DIAGNOSTIC') == '1':
+        flags += ' -X yourdesk/internal/authlog.Enabled=1'
     if system == 'windows':
         flags += ' -H=windowsgui'
     resource = None

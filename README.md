@@ -10,7 +10,7 @@ YourDesk 是支援 macOS 與 Windows 的遠端桌面工具。從連線、站台�
 
 ## 特色與功能
 
-本版加入 Agent 按需截圖與區域串流、MCP 畫面契約 v1、AV1 軟體編碼及 macOS 支援、heartbeat-v2 協商與實驗性 Siri／捷徑整合。保留舊 Host 全螢幕相容。詳見 [發行說明](docs/RELEASE-1.26.0913-build-1512.md) 與 [MCP 畫面契約](docs/MCP-VIDEO.md)。
+目前回報的停滯／斷線問題只發生在 macOS 對 macOS；其他平台尚未觀察到相同問題。build 2323 升級 Pion WebRTC／SCTP 傳輸套件，調整壅塞與連線存活判斷，並加入可選的網路 Debug 與雙向封包測試。目前使用者回報單一連線與同時兩個遠端比先前版本穩定；**尚未完全確認 Mac 對 Mac 停滯／斷線問題已解決**，長時間傳檔仍待驗證。本版未加入背景自動重連／斷線續傳。詳見 [發行說明](docs/RELEASE-1.26.0913-build-2323.md)、[網路 Debug](docs/NETWORK-DEBUG.md) 與 [存活判斷](docs/STREAM-RECOVERY.md)。
 
 - **GUI 與 CMD 雙模式**：支援遠端桌面與互動命令列，可依工作選擇模式；命令列使用獨立視窗，亦可連入 Linux CLI Host。
 - **MCP AI Agent 遠端操控**：AI Agent 可透過 MCP 連線遠端、操作桌面或命令列、查詢站台能力，完成工作後斷線。

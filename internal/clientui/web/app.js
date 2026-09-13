@@ -252,6 +252,7 @@ function siteIconButton(icon, label, onClick, active = false) {
   for (const [key, value] of Object.entries({ viewBox: '0 0 24 24', width: '18', height: '18', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.8', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' })) svg.setAttribute(key, value);
   const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
   path.setAttribute('d', {
+    packets: 'M3 7h17l-4-4M21 17H4l4 4',
     speed: 'M4 18a9 9 0 1 1 16 0M12 13l5-5M5 13h2M12 5v2M17 13h2M10 18h4',
     delete: 'M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7',
     edit: 'M14 5l5 5M4 20l5-1L21 7l-5-5L4 14z',
@@ -310,6 +311,7 @@ function renderSites() {
     );
     const note = text('p', site.note || '', 'card-note'); note.dataset.tooltip = site.note;
     const identity = text('div', '', 'card-id');
+    if (typeof networkDebugEnabled !== 'undefined' && networkDebugEnabled) identity.append(siteIconButton('packets', i18n.t('雙向封包測試'), () => openPacketTest(site)));
     identity.append(siteIconButton('speed', i18n.t('連線測速與分析'), () => openDiagnostics(site)), text('code', site.room));
     card.append(header, identity, note, footer);
     applySiteCapabilities(card,site);

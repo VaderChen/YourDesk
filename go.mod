@@ -3,13 +3,16 @@ module yourdesk
 go 1.27.1
 
 require (
-	github.com/creack/pty v1.1.24
 	github.com/coder/websocket v1.8.14
+	github.com/creack/pty v1.1.24
 	github.com/hajimehoshi/ebiten/v2 v2.9.3
 	github.com/kbinani/screenshot v0.0.0-20250624051815-089614a94018
+	github.com/lxn/win v0.0.0-20210218163916-a377121e959e
 	github.com/modelcontextprotocol/go-sdk v1.4.0
-	github.com/pion/ice/v4 v4.0.10
-	github.com/pion/webrtc/v4 v4.1.6
+	github.com/pion/ice/v4 v4.4.2
+	github.com/pion/transport/v4 v4.1.0
+	github.com/pion/webrtc/v4 v4.2.20
+	github.com/tailscale/go-winio v0.0.0-20231025203758-c4f33415bf55
 	github.com/tailscale/tailcat v0.6.1-0.20260909154426-91dc4979bd4a
 	github.com/webview/webview_go v0.0.0-20240831120633-6173450d4dd6
 	golang.org/x/image v0.41.0
@@ -41,24 +44,22 @@ require (
 	github.com/jsimonetti/rtnetlink v1.4.1 // indirect
 	github.com/klauspost/compress v1.19.1 // indirect
 	github.com/kr/fs v0.1.0 // indirect
-	github.com/lxn/win v0.0.0-20210218163916-a377121e959e // indirect
 	github.com/mdlayher/netlink v1.7.3-0.20250113171957-fbb4dce95f42 // indirect
 	github.com/mdlayher/socket v0.5.1 // indirect
 	github.com/mitchellh/go-ps v1.0.0 // indirect
-	github.com/pion/datachannel v1.5.10 // indirect
-	github.com/pion/dtls/v3 v3.0.7 // indirect
-	github.com/pion/interceptor v0.1.41 // indirect
+	github.com/pion/datachannel v1.6.2 // indirect
+	github.com/pion/dtls/v3 v3.1.8 // indirect
+	github.com/pion/interceptor v0.1.48 // indirect
 	github.com/pion/logging v0.2.4 // indirect
-	github.com/pion/mdns/v2 v2.0.7 // indirect
+	github.com/pion/mdns/v2 v2.2.0 // indirect
 	github.com/pion/randutil v0.1.0 // indirect
-	github.com/pion/rtcp v1.2.15 // indirect
-	github.com/pion/rtp v1.8.23 // indirect
-	github.com/pion/sctp v1.8.40 // indirect
-	github.com/pion/sdp/v3 v3.0.16 // indirect
-	github.com/pion/srtp/v3 v3.0.8 // indirect
-	github.com/pion/stun/v3 v3.0.0 // indirect
-	github.com/pion/transport/v3 v3.0.8 // indirect
-	github.com/pion/turn/v4 v4.1.1 // indirect
+	github.com/pion/rtcp v1.2.17 // indirect
+	github.com/pion/rtp v1.10.5 // indirect
+	github.com/pion/sctp v1.11.1 // indirect
+	github.com/pion/sdp/v3 v3.0.19 // indirect
+	github.com/pion/srtp/v3 v3.0.13 // indirect
+	github.com/pion/stun/v4 v4.0.0 // indirect
+	github.com/pion/turn/v5 v5.1.0 // indirect
 	github.com/pires/go-proxyproto v0.8.1 // indirect
 	github.com/pkg/sftp v1.13.6 // indirect
 	github.com/safchain/ethtool v0.3.0 // indirect
@@ -66,7 +67,6 @@ require (
 	github.com/segmentio/encoding v0.5.3 // indirect
 	github.com/tailscale/certstore v0.1.1-0.20260409135935-3638fb84b77d // indirect
 	github.com/tailscale/gliderssh v0.3.4-0.20260716005906-1a0f895faf28 // indirect
-	github.com/tailscale/go-winio v0.0.0-20231025203758-c4f33415bf55 // indirect
 	github.com/tailscale/hujson v0.0.0-20260302212456-ecc657c15afd // indirect
 	github.com/tailscale/peercred v0.0.0-20250107143737-35a0c7bd7edc // indirect
 	github.com/tailscale/web-client-prebuilt v0.0.0-20250124233751-d4cd19a26976 // indirect

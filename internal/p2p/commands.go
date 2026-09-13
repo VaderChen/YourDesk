@@ -54,7 +54,7 @@ func (p *Peer) localCommands() CommandCapabilities {
 	p.commandsInit()
 	p.commands.mu.Lock()
 	defer p.commands.mu.Unlock()
-	methods := []string{"capabilities.get", "ping", "session.status", "session.disconnect"}
+	methods := []string{"capabilities.get", "ping", "session.status", "session.disconnect", "network.probe"}
 	for name := range p.commands.handlers {
 		methods = append(methods, name)
 	}
@@ -83,7 +83,7 @@ func (p *Peer) RegisterCommandParams(name string, handler func(context.Context, 
 		return errors.New("無效的 P2P 指令")
 	}
 	switch name {
-	case "capabilities.get", "ping", "session.status", "session.disconnect":
+	case "capabilities.get", "ping", "session.status", "session.disconnect", "network.probe":
 		return errors.New("不可覆寫內建指令")
 	}
 	p.commandsInit()
@@ -259,6 +259,8 @@ func (p *Peer) handleCommand(c Control) bool {
 				switch request.Method {
 				case "capabilities.get":
 					result = p.localCommands()
+				case "network.probe":
+					result, err = answerProbe(request.Params)
 				case "ping":
 					result = map[string]int64{"remoteTime": time.Now().UnixMilli()}
 				case "session.status":
