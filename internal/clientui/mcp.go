@@ -202,7 +202,7 @@ func (s *server) callRemoteAgent(ctx context.Context, in mcpAction) (agentremote
 		s.mu.Unlock()
 		return agentremote.Response{}, fmt.Errorf("操作佇列已滿")
 	}
-	if !p.mcpOwned && !p.terminalConnection {
+	if !p.mcpOwned && !p.terminalConnection && in.Action != "network.test" {
 		p.mcpOwned = true
 		// 接管使用者已開啟的視窗，不因背景 MCP 偏好而自動隱藏。
 		p.mcpVisible = true

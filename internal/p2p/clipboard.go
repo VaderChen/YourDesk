@@ -43,11 +43,15 @@ func (p *Peer) ClipboardReady() bool {
 	return !closed && dc != nil && dc.ReadyState() == webrtc.DataChannelStateOpen
 }
 
-// 依待送緩衝調節，不對檔案固定限速；畫面有積壓時縮小檔案緩衝。
+// 多個檔案讀取工作者共用送出門檻，檢查與送出須序列化。
 func (p *Peer) SendClipboard(ctx context.Context, data []byte) error {
 	if len(data) > MaxClipboardMessage {
 		return errors.New("剪貼簿訊息過大")
 	}
+	if err := p.acquireClipboardSend(ctx); err != nil {
+		return err
+	}
+	defer func() { <-p.clipboardSendGate }()
 	ticker := time.NewTicker(2 * time.Millisecond)
 	defer ticker.Stop()
 	for {
@@ -64,9 +68,9 @@ func (p *Peer) SendClipboard(ctx context.Context, data []byte) error {
 		if screen != nil {
 			screenBuffered = screen.BufferedAmount()
 		}
-		bufferLimit := uint64(256 * 1024)
+		bufferLimit := uint64(64 * 1024)
 		if screenBuffered > 0 {
-			bufferLimit = 64 * 1024
+			bufferLimit = MaxClipboardMessage
 		}
 		if dc != nil && dc.ReadyState() == webrtc.DataChannelStateOpen && dc.BufferedAmount()+uint64(len(data)) <= bufferLimit &&
 			(control == nil || control.BufferedAmount() == 0) && screenBuffered < 256*1024 {
@@ -81,5 +85,23 @@ func (p *Peer) SendClipboard(ctx context.Context, data []byte) error {
 			return errors.New("剪貼簿通道已結束")
 		case <-ticker.C:
 		}
+	}
+}
+
+// 等待送出資格也必須能被取消，不能在 mutex 上無限等待。
+func (p *Peer) acquireClipboardSend(ctx context.Context) error {
+	p.clipboardSendOnce.Do(func() { p.clipboardSendGate = make(chan struct{}, 1) })
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	select {
+	case p.clipboardSendGate <- struct{}{}:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-p.done:
+		return errors.New("連線已結束")
+	case <-p.clipboardDone:
+		return errors.New("剪貼簿通道已結束")
 	}
 }

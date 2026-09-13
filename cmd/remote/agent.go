@@ -210,7 +210,7 @@ func (g *game) runAgentHidden(ctx context.Context) bool {
 // P2P 資料操作使用背景工作，不阻塞畫面或輸入主迴圈。
 func (g *game) dispatchAgentCommand(r agentremote.Request) bool {
 	switch r.Action {
-	case "files.roots", "files.search", "files.read", "shell.run":
+	case "network.test", "files.roots", "files.search", "files.read", "shell.run":
 	default:
 		return false
 	}
@@ -248,6 +248,12 @@ func (g *game) dispatchAgentCommand(r agentremote.Request) bool {
 		}
 		ctx, cancel := context.WithDeadline(context.Background(), deadline)
 		defer cancel()
+		if r.Action == "network.test" {
+			report := peer.RunPacketTest(ctx)
+			out.Result, _ = json.Marshal(report)
+			reply(out)
+			return
+		}
 		result, err := peer.CallCommandParams(ctx, r.Action, r.Params)
 		if err != nil {
 			out.Error = err.Error()

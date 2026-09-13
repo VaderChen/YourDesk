@@ -32,7 +32,16 @@ func newTransportPC(ctx context.Context, signal *signaling.Client, mode peertran
 		return nil, nil, err
 	}
 	if link == nil {
-		pc, err := webrtc.NewPeerConnection(connectionConfig(signal))
+		var pc *webrtc.PeerConnection
+		{
+			network, e := newDiagnosticNet()
+			if e != nil {
+				return nil, nil, e
+			}
+			settings := webrtc.SettingEngine{}
+			settings.SetNet(network)
+			pc, err = webrtc.NewAPI(webrtc.WithSettingEngine(settings)).NewPeerConnection(connectionConfig(signal))
+		}
 		return pc, nil, err
 	}
 	settings := webrtc.SettingEngine{}

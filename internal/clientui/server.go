@@ -380,6 +380,14 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 		s.openTerminalWindow(w, r)
 		return
 	}
+	if r.URL.Path == "/api/network-debug" && (r.Method == "GET" || r.Method == "POST") {
+		s.networkDebug(w, r)
+		return
+	}
+	if r.URL.Path == "/api/packet-test" && r.Method == "POST" {
+		s.packetTest(w, r)
+		return
+	}
 	if r.URL.Path == "/api/terminal" && r.Method == "POST" {
 		s.terminalAction(w, r)
 		return
@@ -1067,7 +1075,7 @@ func sendProcessSecret(p *process, secret string) error {
 		return errors.New("子程序的密碼通道尚未就緒")
 	}
 	payload := map[string]string{"secret": secret}
-	if p.kind == "host" && authlog.Enabled == "1" {
+	if p.kind == "host" && authlog.IsEnabled() {
 		nonce := make([]byte, 32)
 		if _, err := rand.Read(nonce); err != nil {
 			return errors.New("無法建立程序驗證資料")

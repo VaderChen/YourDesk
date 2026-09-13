@@ -107,7 +107,7 @@
           <section id="settings-panel-about" role="tabpanel" aria-labelledby="settings-tab-about" tabindex="0" hidden>
 
             <h3 class="settings-panel-title">關於</h3><div class="settings-about-heading"><div class="settings-about-brand" data-tooltip="P2P 遠端桌面" tabindex="0"><img src="app-icon.png" alt="" width="40" height="40">YourDesk</div><button id="check-update" class="button" type="button">檢查更新</button></div>
-            <dl class="settings-details"><div><dt>版本</dt><dd id="settings-version">—</dd></div><div><dt>系統 / 架構</dt><dd id="settings-platform">—</dd></div><div><dt>GitHub</dt><dd><a id="project-github" href="https://github.com/VaderChen/YourDesk" target="_blank" rel="noopener noreferrer" data-no-i18n>https://github.com/VaderChen/YourDesk ↗</a></dd></div><div><dt>支持開發</dt><dd><a href="https://buymeacoffee.com/vaderchen" target="_blank" rel="noopener noreferrer" data-no-i18n>https://buymeacoffee.com/vaderchen ↗</a></dd></div></dl><div class="preference-row" data-tooltip="即使版本相同或較新，也可下載最新發布的版本。"><label for="force-update">強制更新</label><input id="force-update" class="preference-switch" type="checkbox" role="switch"></div><div class="settings-update-area"><button id="download-update" class="button primary" type="button" hidden>下載更新</button><p id="update-status" class="form-note" role="status"></p></div>
+            <dl class="settings-details"><div><dt>版本</dt><dd id="settings-version">—</dd></div><div><dt>系統 / 架構</dt><dd id="settings-platform">—</dd></div><div><dt>GitHub</dt><dd><a id="project-github" href="https://github.com/VaderChen/YourDesk" target="_blank" rel="noopener noreferrer" data-no-i18n>https://github.com/VaderChen/YourDesk ↗</a></dd></div><div><dt>支持開發</dt><dd><a href="https://buymeacoffee.com/vaderchen" target="_blank" rel="noopener noreferrer" data-no-i18n>https://buymeacoffee.com/vaderchen ↗</a></dd></div></dl><div class="preference-row" data-tooltip="即使版本相同或較新，也可下載最新發布的版本。"><label for="force-update">強制更新</label><input id="force-update" class="preference-switch" type="checkbox" role="switch"></div><div class="preference-row"><label for="network-debug">網路 Debug</label><input id="network-debug" class="preference-switch" type="checkbox" role="switch"></div><div class="settings-update-area"><button id="download-update" class="button primary" type="button" hidden>下載更新</button><p id="update-status" class="form-note" role="status"></p></div>
           </section>
         </div>
       </div>
@@ -135,6 +135,15 @@
  <div id="release-progress-area" hidden><progress id="release-progress" max="100" value="0" aria-label="下載進度"></progress><p id="release-progress-label" data-no-i18n></p></div>
  <p id="release-path" data-no-i18n></p>
  <div class="modal-actions"><button type="button" class="button" id="release-later">稍後</button><button type="button" class="button primary" id="release-download">下載更新</button></div>
+</dialog>
+<dialog id="packet-test-dialog" aria-labelledby="packet-test-title">
+ <div class="modal-heading"><h2 id="packet-test-title">雙向封包測試</h2><button type="button" class="close icon-button" aria-label="關閉">×</button></div>
+ <p id="packet-test-site"></p>
+ <p style="font-size:12px">透過目前 WebRTC 可靠通道連續互傳資料並驗證完整性，共 60 秒。測試會使用頻寬；逾時不等於 UDP 丟包率。</p>
+ <label id="packet-test-secret-row" hidden>遠端密碼<input id="packet-test-secret" type="password" autocomplete="off"></label>
+ <p id="packet-test-status" style="font-size:12px" role="status" aria-live="polite"></p>
+ <pre id="packet-test-report" style="white-space:pre-wrap;font-size:11px"></pre>
+ <div class="modal-actions"><button type="button" class="button" id="packet-test-start">開始測試</button><button type="button" class="button close">停止／關閉</button></div>
 </dialog>
 <dialog id="diagnostic-dialog" aria-labelledby="diagnostic-title">
  <form method="dialog">
@@ -164,6 +173,7 @@
   <script src="tooltips.js"></script>
   <script src="app.js"></script>
   <script src="diagnostics.js"></script>
+  <script src="packet-test.js"></script>
 
 
   <script src="terminal.js"></script>
