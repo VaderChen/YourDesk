@@ -30,6 +30,9 @@ IP 白名單預設開啟，初始只有 `127.0.0.1`。在「MCP 設定」可切�
 | `get_preferences` | 讀取 APP 設定 |
 | `set_preferences` | 修改提供的設定欄位，其餘保留；修改影像傳輸或 IP 直連設定會重新啟動 Host |
 | `connection_diagnostics` | 讀取已連線站台的串流取樣；`start=true` 開始新一輪取樣 |
+| `get_video_state` | 唯讀查詢串流模式、視野、輸入就緒及對端畫面能力 |
+| `set_video_mode` | 暫停／恢復串流，設定全螢幕或區域；保留連線 |
+| `snapshot` | 按需取得 PNG 與結構化視野資訊；舊 Host 全螢幕改用最近影格並明確標記 |
 | `remote_action` | 取得遠端畫面、移動／按下／放開滑鼠、鍵盤輸入、捲動、貼上文字及切換螢幕 |
 
 新增 `get_remote_filesystem`、`search_remote_files`、`read_remote_file` 與 `run_remote_shell`，經已授權的 P2P 工作階段查詢遠端檔案與執行短時間 Shell。兩端皆須更新；參數、權限及限制見 [遠端資料與 Shell](MCP-REMOTE-DATA.md)。不提供 signaling Server 停止 Host 的管理入口。
@@ -42,12 +45,12 @@ Tray 選單會出現「開啟 MCP 遠端畫面」，開啟後切換為「隱藏 
 
 ## 遠端操作順序
 
-`remote_action` 的 `show`／`hide` 是本機 Viewer 視窗操作，不等待首張影格或下一次影像更新；其餘截圖、輸入與資料操作仍須符合連線／畫面就緒檢查。背景 Viewer 收到 show 後先建立視窗，再持續接收影像。
+`remote_action` 的 `show`／`hide` 是本機 Viewer 視窗操作，不等待首張影格或下一次影像更新；其餘截圖、輸入與資料操作仍須符合連線／畫面就緒檢查。背景 Viewer 收到 show 後先建立視窗；show／hide 不會暫停或恢復串流。暫停連線的 connected 表示控制通道及模式確認完成，不代表已有畫面；請先呼叫 snapshot。
 
 1. 呼叫 `list_sites`，再以 `connect` 建立連線。回應成功代表「已啟動」，不代表驗證已完成。
 2. 呼叫 `get_status`，等待目標 `session` 的 `stage` 為 `connected`。
-3. 呼叫 `remote_action`，例如 `{"session":"viewer:站台ID","action":"screenshot"}`。回傳 PNG 最長邊為 1280 像素，內容是最新收到的解碼畫面。
-4. 滑鼠使用畫面相對座標（0～1）：`move` 移動；`button` 的 `button=0/1/2` 代表左／右／中鍵，`down=true/false` 代表按下／放開。按下後必須放開。
+3. 呼叫 `get_video_state` 判斷能力，再呼叫 `snapshot`，例如 `{"session":"viewer:站台ID"}`。新版 Host 重新擷取 PNG，舊版全螢幕使用最近收到的影格並回報 `legacy=true`、`fresh=false`；最長邊均為 1280 像素。`remote_action.screenshot` 保留作為相容入口。
+4. 滑鼠使用回傳圖片的相對座標（0～1），區域偏移由 Host 換算，Agent 不得重複加上偏移：`move` 移動；`button` 的 `button=0/1/2` 代表左／右／中鍵，`down=true/false` 代表按下／放開。按下後必須放開。
 5. 鍵盤用 `key`、`key="a"` 等名稱與 `down`，組合鍵依序按下，再反向放開。文字用 `text` 與 `text` 欄位，最多 16 KB；此操作會取代本機與遠端剪貼簿文字並貼上。
 6. 捲動用 `scroll`、`delta`（-100～100）；切換螢幕用 `display`、`display` 索引（從 0 開始），切換後重新取得畫面。
 7. 完成後用 `disconnect` 結束遠端顯示。
@@ -63,3 +66,9 @@ Tray 選單會出現「開啟 MCP 遠端畫面」，開啟後切換為「隱藏 
 先用 `get_site_capabilities` 查詢站台能力。兩種模式皆可用時，Shell 指令與系統工作優先使用 `connect` 的 `terminal=true`；GUI 操作與截圖使用預設桌面模式。同一站台切換模式前先斷線。既有檔案資料工具目前需要桌面連線，命令列使用 `remote_terminal`。
 
 等待 `get_status` 顯示 connected，取得 session 與 instance，使用 `remote_terminal` 的 open／read／write／resize／close 操作。已通過本機 MCP HTTP → Remote → P2P → PTY Smoke Test，涵蓋輸入輸出、尺寸、過期 instance 拒絕及關閉清理；不代表所有跨機／平台組合皆已驗證。
+
+## 畫面契約
+
+桌面 connect 可指定 `videoMode: "paused"`，完成協商後停止串流；省略為 streaming。舊 Host 會保留連線並退回全螢幕串流，不能據 connect 的請求值推定實際模式。等待 connected 後查詢 get_video_state。
+
+完整輸入、回傳欄位、能力判斷、座標、新舊相容及錯誤語義見 [MCP 畫面契約 v1](MCP-VIDEO.md)。實作與 P2P 分塊限制見 [Agent 按需畫面](AGENT-VIDEO.md)。

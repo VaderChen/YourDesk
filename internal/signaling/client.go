@@ -18,11 +18,12 @@ import (
 var ErrHostOccupied = errors.New("此裝置已有另一個 Host 連線")
 
 type Client struct {
-	binding string
-	conn    clientConnection
-	room    string
-	role    Role
-	secret  []byte
+	heartbeat heartbeatSettings
+	binding   string
+	conn      clientConnection
+	room      string
+	role      Role
+	secret    []byte
 	// 驗證失敗時由呼叫端取得密碼，保留同一份 offer 與 WebSocket。
 	ResolveSecret func(context.Context) ([]byte, error)
 }
@@ -49,7 +50,7 @@ func Dial(ctx context.Context, url, room string, role Role, secret []byte) (*Cli
 	transport.ForceAttemptHTTP2 = false
 	transport.TLSNextProto = map[string]func(string, *tls.Conn) http.RoundTripper{}
 	dialCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	conn, resp, err := websocket.Dial(dialCtx, secureURL, &websocket.DialOptions{HTTPClient: client, HTTPHeader: http.Header{"Origin": []string{"https://yourdesk.local"}}})
+	conn, resp, err := websocket.Dial(dialCtx, secureURL, &websocket.DialOptions{HTTPClient: client, HTTPHeader: http.Header{"Origin": []string{"https://yourdesk.local"}, heartbeatProtocolHeader: []string{heartbeatV2}}})
 	cancel()
 	if err != nil {
 		client.CloseIdleConnections()
@@ -69,15 +70,20 @@ func Dial(ctx context.Context, url, room string, role Role, secret []byte) (*Cli
 		}
 		return nil, fmt.Errorf("連接 signaling: %w", err)
 	}
-	authlog.Event("signaling-connected", map[string]any{"role": role, "transport": "wss"})
-	c := &Client{conn: conn, room: room, role: role, secret: secret}
+	settings := acceptedHeartbeat(resp.Header, "wss")
+	var wire clientConnection = conn
+	if settings.Protocol == heartbeatV2 {
+		wire = newHeartbeatWebSocket(conn)
+	}
+	authlog.Event("signaling-connected", map[string]any{"role": role, "transport": "wss", "heartbeatProtocol": settings.Protocol})
+	c := &Client{conn: wire, room: room, role: role, secret: secret, heartbeat: settings}
 	join, err := NewEnvelope(room, role, KindJoin, joinPayload(ctx, role), secret)
 	if err != nil {
-		_ = conn.Close(websocket.StatusInternalError, "join failed")
+		_ = wire.Close(websocket.StatusInternalError, "join failed")
 		return nil, err
 	}
 	if err := c.write(ctx, join); err != nil {
-		_ = conn.Close(websocket.StatusInternalError, "join failed")
+		_ = wire.Close(websocket.StatusInternalError, "join failed")
 		return nil, err
 	}
 	return c, nil

@@ -27,7 +27,7 @@ func probeDecodeCapabilities() {
 	defer close(decodeReady)
 	p := optimization.Snapshot()
 	codecs := []Codec{CodecHardwareH264, CodecHardwareHEVC}
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
 		codecs = append(codecs, CodecHardwareAV1)
 	}
 	for _, codec := range codecs {

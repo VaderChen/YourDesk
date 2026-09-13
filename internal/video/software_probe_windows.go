@@ -22,6 +22,9 @@ var softwareAV11080 []byte
 
 // ProbeSoftwareCodec 每次只測一個方向；解碼僅讀取固定樣本。
 func ProbeSoftwareCodec(codec string, width, height int, phase string) map[string]any {
+	if codec == "av1" {
+		return ProbeSoftwareAV1(width, height, phase)
+	}
 	start := time.Now()
 	r := map[string]any{"probeKind": "windows-software", "codec": codec, "input": "software", "width": width, "height": height, "phase": phase}
 	defer func() { r["durationMS"] = float64(time.Since(start).Microseconds()) / 1000 }()
@@ -42,10 +45,7 @@ func ProbeSoftwareCodec(codec string, width, height int, phase string) map[strin
 			r["encodeOK"] = e == nil && len(encoded) > 0
 			r["hardwareEncoder"] = false
 			r["encoderBackend"] = enc.Backend()
-		} else if codec == "av1" {
-			r["encodeOK"] = false
-			r["hardwareEncoder"] = false
-			r["encodeError"] = "未提供 AV1 軟體編碼器"
+
 		} else {
 			for k, v := range winmedia.ProbeSoftware(codec, "NV12-video", width, height) {
 				r[k] = v

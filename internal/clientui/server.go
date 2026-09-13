@@ -119,6 +119,7 @@ type Preferences struct {
 }
 
 type server struct {
+	automationShow  chan string
 	incomingActive  bool
 	preloginBusy    bool
 	preloginMessage string
@@ -237,8 +238,15 @@ func Run(ctx context.Context, options Options) error {
 		return err
 	}
 	s.origin = "http://" + listener.Addr().String()
+	s.automationShow = make(chan string, 1)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/", s.api)
+	stopAutomation, err := s.installAutomation(mux)
+	if err != nil {
+		listener.Close()
+		return err
+	}
+	defer stopAutomation()
 	web, _ := fs.Sub(assets, "web")
 	mux.Handle("/", http.FileServer(http.FS(web)))
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -583,10 +591,11 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 		respond(w, 200, map[string]bool{"remembered": remembered})
 	case r.URL.Path == "/api/quick/start" && r.Method == "POST":
 		var request struct {
-			Terminal bool   `json:"terminal"`
-			Room     string `json:"room"`
-			Secret   string `json:"secret"`
-			Remember bool   `json:"remember"`
+			VideoMode string `json:"videoMode"`
+			Terminal  bool   `json:"terminal"`
+			Room      string `json:"room"`
+			Secret    string `json:"secret"`
+			Remember  bool   `json:"remember"`
 		}
 		if err := decode(w, r, &request); err != nil {
 			fail(w, err)
@@ -619,6 +628,9 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 		}
 		if r.Context().Value(mcpConnectContextKey{}) == true {
 			args = append(args, "-mcp-managed")
+			if request.VideoMode == "paused" {
+				args = append(args, "-mcp-paused")
+			}
 			if !s.preferences.MCPOpenDisplay {
 				args = append(args, "-mcp-hidden")
 			}
@@ -680,6 +692,7 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 		respond(w, 200, map[string]bool{"ok": true})
 	case r.URL.Path == "/api/viewer/start" && r.Method == "POST":
 		var request struct {
+			VideoMode   string `json:"videoMode"`
 			Diagnostics bool   `json:"diagnostics"`
 			Terminal    bool   `json:"terminal"`
 			ID          string `json:"id"`
@@ -720,6 +733,9 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 		}
 		if r.Context().Value(mcpConnectContextKey{}) == true && !request.Diagnostics {
 			args = append(args, "-mcp-managed")
+			if request.VideoMode == "paused" {
+				args = append(args, "-mcp-paused")
+			}
 			if !s.preferences.MCPOpenDisplay {
 				args = append(args, "-mcp-hidden")
 			}
@@ -959,6 +975,13 @@ func (s *server) start(kind, siteID, binary string, args []string) error {
 							p.authRequired = true
 							p.authMessage = event.Message
 							p.stage = "password"
+						case "video-compatibility":
+							s.notice = event.Message
+						case "agent-ready":
+							if p.mcpOwned {
+								p.stage = "connected"
+								p.authRequired = false
+							}
 						case "frame":
 							// 首張畫面準備好才隱藏主介面，密碼驗證成功不代表視窗已開啟。
 							if p.stage != "connected" && !p.mcpOwned && !p.diagnosticConnection && !p.terminalConnection {
@@ -1213,7 +1236,7 @@ func (p Preferences) validate() error {
 		return errors.New("不支援的串流偏好")
 	}
 	switch p.Codec {
-	case "", "auto", "software-jpeg", "hardware-h264", "hardware-hevc", "hardware-av1", "hardware-jpeg":
+	case "", "auto", "software-jpeg", "hardware-h264", "hardware-hevc", "hardware-av1", "software-av1", "hardware-jpeg":
 	default:
 		return errors.New("不支援此影像傳輸方式")
 	}

@@ -7,6 +7,7 @@ import (
 type Codec string
 
 const (
+	CodecSoftwareAV1  Codec = "software-av1"
 	CodecHardwareAV1  Codec = "hardware-av1"
 	CodecAuto         Codec = "auto"
 	CodecHardwareH264 Codec = "hardware-h264"
@@ -28,11 +29,19 @@ func Select(requested Codec) (Selection, error) {
 	if requested == "" {
 		requested = CodecAuto
 	}
-	if requested != CodecHardwareAV1 && requested != CodecAuto && requested != CodecHardwareH264 && requested != CodecHardwareHEVC && requested != CodecSoftwareH264 && requested != CodecHardwareJPEG && requested != CodecSoftwareJPEG {
+	if requested != CodecSoftwareAV1 && requested != CodecHardwareAV1 && requested != CodecAuto && requested != CodecHardwareH264 && requested != CodecHardwareHEVC && requested != CodecSoftwareH264 && requested != CodecHardwareJPEG && requested != CodecSoftwareJPEG {
 		return Selection{}, fmt.Errorf("不支援 codec %q", requested)
 	}
 	if requested == CodecSoftwareJPEG {
 		return Selection{requested, CodecSoftwareJPEG, "Go image/jpeg", false, "明確指定軟體編碼"}, nil
+	}
+	if requested == CodecSoftwareAV1 {
+		e, err := newSoftwareAV1Encoder()
+		if err != nil {
+			return Selection{}, err
+		}
+		e.Close()
+		return Selection{requested, CodecSoftwareAV1, "FFmpeg / libaom AV1 CPU", false, "AV1 軟體編碼"}, nil
 	}
 	caps := detectCapabilities()
 	if requested == CodecHardwareJPEG {

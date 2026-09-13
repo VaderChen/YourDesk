@@ -70,8 +70,8 @@ echo "日誌：$CLIENT_LOG"
 
 run_client() {
   echo "重新編譯 YourDesk Client……"
-  (cd "$ROOT" && go build -o "$BIN/yourdesk-client" ./cmd/client) || return $?
-  "$ROOT/scripts/sign-local.sh" "$BIN/yourdesk-client" || return $?
+  (cd "$ROOT" && python3 scripts/ffmpeg.py darwin/arm64 go build -o "$BIN/yourdesk-client" ./cmd/client) || return $?
+  "$ROOT/scripts/sign-local.sh" "$BIN/"*.dylib "$BIN/yourdesk-client" || return $?
   if [[ -z "$ROOM" ]]; then
     ROOM="$("$BIN/yourdesk-client" -print-uid)" || return $?
   fi

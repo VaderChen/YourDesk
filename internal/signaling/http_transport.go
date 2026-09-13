@@ -17,6 +17,7 @@ import (
 )
 
 type httpConnection struct {
+	heartbeat     heartbeatSettings
 	client        *http.Client
 	base, token   string
 	ack, sequence uint64
@@ -68,28 +69,13 @@ func dialHTTPS(ctx context.Context, address, room string, role Role, secret []by
 		return nil, fmt.Errorf("HTTPS 工作階段回應無效")
 	}
 	h.token = session.Token
+	h.heartbeat = acceptedHeartbeat(response.Header, "https")
 	heartbeat, cancel := context.WithCancel(context.Background())
 	h.cancel = cancel
 	h.lifetime = heartbeat
-	go func() {
-		ticker := time.NewTicker(15 * time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-heartbeat.Done():
-				return
-			case <-ticker.C:
-				pingCtx, end := context.WithTimeout(heartbeat, 5*time.Second)
-				r, err := h.request(pingCtx, "POST", "/signal/heartbeat", nil, 0)
-				if err == nil {
-					r.Body.Close()
-				}
-				end()
-			}
-		}
-	}()
-	authlog.Event("signaling-connected", map[string]any{"role": role, "transport": "https"})
-	return &Client{conn: h, room: room, role: role, secret: secret}, nil
+	go h.runHeartbeat(heartbeat)
+	authlog.Event("signaling-connected", map[string]any{"role": role, "transport": "https", "heartbeatProtocol": h.heartbeat.Protocol, "heartbeatIntervalSeconds": int(h.heartbeat.Interval / time.Second)})
+	return &Client{conn: h, room: room, role: role, secret: secret, heartbeat: h.heartbeat}, nil
 }
 
 func (h *httpConnection) request(ctx context.Context, method, path string, b []byte, sequence uint64) (*http.Response, error) {
@@ -98,6 +84,9 @@ func (h *httpConnection) request(ctx context.Context, method, path string, b []b
 		return nil, err
 	}
 	r.Header.Set("Content-Type", "application/json")
+	if method == "POST" && path == "/signal/session" {
+		r.Header.Set(heartbeatProtocolHeader, heartbeatV2)
+	}
 	if h.token != "" {
 		r.Header.Set("Authorization", "Bearer "+h.token)
 	}

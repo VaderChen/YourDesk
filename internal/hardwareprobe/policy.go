@@ -47,6 +47,13 @@ func policyFromState(s State) *optimization.Policy {
 		if codec != "h264" && codec != "hevc" && codec != "av1" {
 			continue
 		}
+		if codec == "av1" && m["probeKind"] == "software" {
+			if ok, present := m["encodeOK"].(bool); present {
+				w, _ := m["width"].(float64)
+				h, _ := m["height"].(float64)
+				p.Encoders = append(p.Encoders, optimization.Encoder{Codec: "software-av1", Width: int(w), Height: int(h), Usable: ok})
+			}
+		}
 		format, _ := m["input"].(string)
 		if format != "BGRA" && format != "RGBA" {
 			continue
@@ -99,7 +106,7 @@ func policyFromState(s State) *optimization.Policy {
 			continue
 		}
 		var m map[string]any
-		if json.Unmarshal(r.Data, &m) != nil || m["probeKind"] != "windows-software" || !truth(m["decodeOK"]) {
+		if json.Unmarshal(r.Data, &m) != nil || (m["probeKind"] != "windows-software" && m["probeKind"] != "software") || !truth(m["decodeOK"]) {
 			continue
 		}
 		codec, _ := m["codec"].(string)

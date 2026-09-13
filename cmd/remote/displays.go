@@ -63,7 +63,7 @@ func (g *game) changeDisplay(index int) {
 func (g *game) displayInputReady() bool {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
-	return !g.displayKnown || (!g.displayPending && g.displayCount > 0 && g.displayedDisplay == g.display)
+	return !g.agentViewChanging && (g.agentViewID == 0 || g.displayedViewID == g.agentViewID) && (!g.displayKnown || (!g.displayPending && g.displayCount > 0 && g.displayedDisplay == g.display))
 }
 
 func (g *game) sendControl(c p2p.Control) error {
@@ -76,6 +76,7 @@ func (g *game) sendControl(c p2p.Control) error {
 	}
 	g.mu.RLock()
 	selected, known := g.displayedDisplay, g.displayKnown
+	c.ViewID = g.agentViewID
 	g.mu.RUnlock()
 	if known {
 		c.Display = &selected

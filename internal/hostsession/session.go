@@ -14,6 +14,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"yourdesk/internal/agentvideo"
 	"yourdesk/internal/clipboard"
 	"yourdesk/internal/desktop"
 	"yourdesk/internal/input"
@@ -51,7 +52,7 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 		return commandSession(ctx, sig, options)
 	}
 	switch video.Codec(options.Codec) {
-	case video.CodecHardwareAV1, video.CodecAuto, video.CodecHardwareH264, video.CodecHardwareHEVC, video.CodecSoftwareH264, video.CodecHardwareJPEG, video.CodecSoftwareJPEG:
+	case video.CodecSoftwareAV1, video.CodecHardwareAV1, video.CodecAuto, video.CodecHardwareH264, video.CodecHardwareHEVC, video.CodecSoftwareH264, video.CodecHardwareJPEG, video.CodecSoftwareJPEG:
 	default:
 		return fmt.Errorf("不支援的影像編碼：%s", options.Codec)
 	}
@@ -63,6 +64,7 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 	var remoteHardwareCodecs atomic.Uint32
 	var hardwareEncoder video.IntraEncoder
 	var activeCodec video.WireCodec
+	var activeEncoderCodec video.Codec
 	failedCodecs := make(map[codecAttempt]bool)
 	defer func() {
 		if hardwareEncoder != nil {
@@ -73,6 +75,8 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 	defer capturer.Close()
 	selected := options.Display
 	var displayMu sync.Mutex
+	agentView := newAgentVideo()
+	var captureEpoch atomic.Uint64
 	var inputBounds image.Rectangle
 	buttons := make(map[int]bool)
 	keys := make(map[string]bool)
@@ -222,6 +226,9 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 		displayMu.Lock()
 		defer displayMu.Unlock()
 		// 舊畫面送出的輸入不可落到剛切換的新螢幕。
+		if (c.Type == "move" || c.Type == "button") && c.ViewID != agentView.view.ViewID {
+			return
+		}
 		if inputBounds.Empty() || (c.Display != nil && *c.Display != selected) {
 			return
 		}
@@ -354,6 +361,49 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 		recovery.Add(1)
 		return map[string]bool{"accepted": true}, nil
 	})
+
+	agentView.register(peer, func(commandCtx context.Context, request agentvideo.Request) (agentvideo.State, error) {
+		displayMu.Lock()
+		defer displayMu.Unlock()
+		if err := commandCtx.Err(); err != nil {
+			return agentvideo.State{}, err
+		}
+		count := capturer.Count()
+		if options.PrimaryDisplayOnly {
+			count = min(count, 1)
+		}
+		if selected < 0 || selected >= count {
+			return agentvideo.State{}, fmt.Errorf("目前沒有可擷取的螢幕")
+		}
+		releaseInput()
+		if request.Mode != "" {
+			agentView.view.Mode = request.Mode
+		}
+		if request.FullScreen {
+			agentView.view.Region = agentvideo.Full()
+		}
+		if request.Region != nil {
+			agentView.view.Region = *request.Region
+		}
+		agentView.view.ViewID++
+		agentView.view.Display, agentView.view.DisplayCount = selected, count
+		inputBounds = agentView.view.Region.Bounds(capturer.Bounds(selected))
+		captureEpoch.Add(1)
+		recovery.Add(1)
+		fullFrameRequested.Store(true)
+		return agentView.view, nil
+	}, func(commandCtx context.Context, state agentvideo.State) (image.Image, error) {
+		if err := commandCtx.Err(); err != nil {
+			return nil, err
+		}
+		displayMu.Lock()
+		defer displayMu.Unlock()
+		if selected != state.Display || agentView.view.ViewID != state.ViewID {
+			return nil, fmt.Errorf("擷取期間視野已變更，請重試")
+		}
+		// 一律向 OS 取得新畫面，不使用串流快取。
+		return (desktop.ScreenshotCapturer{}).Capture(state.Display)
+	}, authorized.Load)
 	if !options.DisableClipboard {
 		go clipboardSync.Run(ctx, peer)
 	}
@@ -438,7 +488,6 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 	var captureFPS atomic.Int32
 	captureFPS.Store(int32(streamFPS))
 	captureUnavailable := false
-	var captureEpoch atomic.Uint64
 	var encodedEpoch, encodedRecovery uint64
 	captureStage := func(stageCtx context.Context) (capturedFrame, error) {
 		if terminalActive.Load() {
@@ -487,7 +536,7 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 			}
 		default:
 		}
-		bounds := capturer.Bounds(selected)
+		bounds := agentView.view.Region.Bounds(capturer.Bounds(selected))
 		if bounds != inputBounds || count != lastCount {
 			changed = true
 		}
@@ -497,6 +546,8 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 			captureEpoch.Add(1)
 		}
 		current := selected
+		view := agentView.view
+		epoch := captureEpoch.Load()
 		displayMu.Unlock()
 		if changed || time.Since(lastDisplayReport) >= time.Second {
 			_ = peer.SendControl(p2p.Control{Type: "keyboard-capabilities", AppVersion: options.Version, EnhancementSupported: true, StreamCapabilities: streamconfig.Advertise(configSession)})
@@ -509,6 +560,9 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 				options.OnState("capture-unavailable")
 			}
 			captureUnavailable = true
+			return capturedFrame{}, streampipeline.Skip
+		}
+		if view.Mode == "paused" {
 			return capturedFrame{}, streampipeline.Skip
 		}
 		img, err := capturer.Capture(current)
@@ -531,11 +585,20 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 			options.OnState("capture-restored")
 		}
 		captureUnavailable = false
-		return capturedFrame{Image: img, Display: current, Epoch: captureEpoch.Load()}, nil
+		if view.Region != agentvideo.Full() {
+			img = view.Region.Crop(img)
+		}
+		return capturedFrame{Image: img, Display: current, Epoch: epoch, ViewID: view.ViewID}, nil
 	}
 	encodeStage := func(stageCtx context.Context, raw capturedFrame) (encodedFrames, error) {
 		if err := stageCtx.Err(); err != nil {
 			return encodedFrames{}, err
+		}
+		displayMu.Lock()
+		skip := agentView.view.Mode == "paused" || raw.ViewID != agentView.view.ViewID
+		displayMu.Unlock()
+		if skip {
+			return encodedFrames{}, streampipeline.Skip
 		}
 		img, current := raw.Image, raw.Display
 		var err error
@@ -593,25 +656,21 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 		}
 		// 未收到新協定能力前維持 JPEG，避免舊版 遠端顯示 黑畫面。
 		plan := codecPlan(policy, video.Codec(options.Codec), size.X, size.Y, remoteCodecs.Load(), remoteHardwareCodecs.Load(), failedCodecs, video.SupportsIntra, options.CodecGoal)
-		desired := plan[0]
+		desiredEncoder := plan[0]
+		desired := video.WireForCodec(desiredEncoder)
 
-		if desired != activeCodec {
+		if desired != activeCodec || (desired != video.WireJPEG && desiredEncoder != activeEncoderCodec) {
 			if hardwareEncoder != nil {
 				hardwareEncoder.Close()
 				hardwareEncoder = nil
 			}
 			activeCodec = desired
 			if desired != video.WireJPEG {
-				chosen := video.CodecHardwareH264
-				if desired == video.WireAV1 {
-					chosen = video.CodecHardwareAV1
-				}
-				if desired == video.WireHEVC {
-					chosen = video.CodecHardwareHEVC
-				}
+				chosen := desiredEncoder
+				activeEncoderCodec = chosen
 				hardwareEncoder, err = video.NewIntraEncoder(chosen)
 				if err != nil {
-					failedCodecs[codecAttempt{activeCodec, (size.X + 1) &^ 1, (size.Y + 1) &^ 1}] = true
+					failedCodecs[codecAttempt{activeEncoderCodec, (size.X + 1) &^ 1, (size.Y + 1) &^ 1}] = true
 					activeCodec = video.WireJPEG
 				}
 				slog.Info("影像編碼協商", "codec", activeCodec)
@@ -633,7 +692,7 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 				keyframe, encodeErr = video.IsKeyframe(activeCodec, payload)
 			}
 			if encodeErr == nil {
-				reportEncoding(activeCodec, true)
+				reportEncoding(activeCodec, activeEncoderCodec != video.CodecSoftwareAV1)
 				if reporter, ok := hardwareEncoder.(video.BackendReporter); ok {
 					backend := reporter.Backend()
 					if backend != lastEncoderBackend {
@@ -643,12 +702,12 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 				}
 				seq++
 				b := img.Bounds()
-				return encodedFrames{Frames: []p2p.Frame{{Display: current, Codec: byte(activeCodec), Sequence: seq, Width: uint32(b.Dx()), Height: uint32(b.Dy()), Keyframe: keyframe, JPEG: payload}}, Epoch: raw.Epoch, Recovery: recoveryGeneration, BitrateLimit: transmissionLimit()}, nil
+				return encodedFrames{ViewID: raw.ViewID, Frames: []p2p.Frame{{Display: current, Codec: byte(activeCodec), Sequence: seq, Width: uint32(b.Dx()), Height: uint32(b.Dy()), Keyframe: keyframe, JPEG: payload}}, Epoch: raw.Epoch, Recovery: recoveryGeneration, BitrateLimit: transmissionLimit()}, nil
 			}
 			slog.Warn("此編碼配置失敗，本張退回 JPEG，後續嘗試下一候選", "error", encodeErr)
 			hardwareEncoder.Close()
 			hardwareEncoder = nil
-			failedCodecs[codecAttempt{activeCodec, (size.X + 1) &^ 1, (size.Y + 1) &^ 1}] = true
+			failedCodecs[codecAttempt{activeEncoderCodec, (size.X + 1) &^ 1, (size.Y + 1) &^ 1}] = true
 			activeCodec = video.WireJPEG
 			lastKeyframe = time.Time{}
 		}
@@ -661,7 +720,7 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 		}
 		reportEncoding(video.WireJPEG, jpegEncoder.Hardware())
 		b := img.Bounds()
-		batch := encodedFrames{Epoch: raw.Epoch, Recovery: recoveryGeneration, BitrateLimit: transmissionLimit()}
+		batch := encodedFrames{ViewID: raw.ViewID, Epoch: raw.Epoch, Recovery: recoveryGeneration, BitrateLimit: transmissionLimit()}
 		for _, patch := range patches {
 			seq++
 			batch.Frames = append(batch.Frames, p2p.Frame{Display: current, Sequence: seq, Width: uint32(b.Dx()), Height: uint32(b.Dy()), X: uint32(patch.X), Y: uint32(patch.Y), Keyframe: patch.Keyframe, JPEG: patch.JPEG})
@@ -675,10 +734,19 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 		return batch, nil
 	}
 	sendStage := func(stageCtx context.Context, batch encodedFrames) error {
+		agentView.gate.Lock()
+		defer agentView.gate.Unlock()
+		displayMu.Lock()
+		paused := agentView.view.Mode == "paused"
+		displayMu.Unlock()
+		if paused {
+			return nil
+		}
 		if batch.Epoch != captureEpoch.Load() || batch.Recovery != recovery.Load() {
 			return nil
 		}
 		for _, frame := range batch.Frames {
+			frame.ViewID = batch.ViewID
 			if err := stageCtx.Err(); err != nil {
 				return err
 			}

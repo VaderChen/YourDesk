@@ -188,10 +188,12 @@ dialog input:focus, dialog select:focus, dialog textarea:focus { outline: 2px so
 #hardware-analysis-results > h4 { margin: 18px 0 8px; padding: 2px 0; font-size: 13px; font-weight: 600; line-height: 1.6; height: auto; overflow: visible; overflow-wrap: anywhere; }
 #hardware-analysis-results > h4:first-child { margin-top: 8px; }
 .hardware-table-wrap { overflow-x: auto; }
-.hardware-table { width: 100%; border-collapse: collapse; font-size: 11px; user-select: text; }
+.hardware-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 11px; user-select: text; }
 .hardware-table th, .hardware-table td { padding: 9px 6px; border-bottom: 1px solid var(--line); text-align: left; overflow-wrap: anywhere; }
 .hardware-table th { color: var(--muted); }
-.hardware-table th:nth-child(2), .hardware-table td:nth-child(2) { min-width: 8em; white-space: nowrap; overflow-wrap: normal; }
+.hardware-table th:nth-child(1), .hardware-table td:nth-child(1) { width: 26%; }
+.hardware-table th:nth-child(2), .hardware-table td:nth-child(2) { width: 9em; white-space: nowrap; overflow-wrap: normal; }
+.hardware-table th:nth-child(4), .hardware-table td:nth-child(4) { width: 5em; white-space: nowrap; overflow-wrap: normal; }
 .settings-about-brand { display: flex; align-items: center; gap: 10px; font-size: 23px; font-weight: 700; color: #246445; margin: 21px 0 5px; }
 .settings-shell > .modal-actions { margin: 0; padding: 10px 18px; flex-shrink: 0; }
 @media (max-width: 600px) { .settings-layout { grid-template-columns: 120px minmax(0, 1fr); } .settings-content { padding: 15px; } }

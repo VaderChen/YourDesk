@@ -17,7 +17,7 @@ func TestEncoderFirstWithHardwareDecodePreference(t *testing.T) {
 		{1 << WireHEVC, []Codec{CodecHardwareHEVC, CodecHardwareH264}},
 		{1<<WireHEVC | 1<<WireH264, []Codec{CodecHardwareHEVC, CodecHardwareH264}},
 	} {
-		if runtime.GOOS == "windows" {
+		if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
 			tc.want = append(tc.want, CodecHardwareAV1)
 		}
 		if got := PreferredHardwareEncoders(tc.mask); !reflect.DeepEqual(got, tc.want) {

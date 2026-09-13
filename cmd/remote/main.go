@@ -19,6 +19,7 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"yourdesk/internal/agentremote"
+	"yourdesk/internal/agentvideo"
 	"yourdesk/internal/branding"
 	"yourdesk/internal/clipboard"
 	"yourdesk/internal/p2p"
@@ -32,33 +33,38 @@ import (
 )
 
 type game struct {
-	disconnected              bool
-	disconnectedChecked       time.Time
-	windowTitle               string
-	agentHeadless             bool
-	agentShow                 bool
-	agentDeadline             time.Time
-	agentButtons              map[int]p2p.Control
-	agentRequests             <-chan agentremote.Request
-	agentCommands             chan struct{}
-	remoteVersion             atomic.Value
-	windowFit                 windowFitState
-	localShortcut             int
-	enhancementIndicatorUntil time.Time
-	renderedFrames            atomic.Uint64
-	lastRenderFrame           *image.RGBA
-	interpolationUsesML       bool
-	lastInputMLRevision       uint64
-	interpolation             frameInterpolator
-	streamCapabilities        atomic.Pointer[streamconfig.Capabilities]
-	streamResult              atomic.Pointer[streamconfig.Result]
-	streamRequest             streamconfig.Request
-	streamRevision            uint64
-	ml                        *mlWorker
-	superResolution           int32
-	mlApplied                 bool
-	remoteEnhancement         atomic.Pointer[p2p.EnhancementReport]
-	lastEnhancementStatus     enhancementDisplayStatus
+	agentRegion                               agentvideo.Region // mu 保護
+	agentViewID, frameViewID, displayedViewID uint64            // mu 保護
+	agentPaused, agentViewChanging            bool              // mu 保護
+	agentVideoBusy                            bool
+	agentVideoResults                         chan agentVideoResult
+	disconnected                              bool
+	disconnectedChecked                       time.Time
+	windowTitle                               string
+	agentHeadless                             bool
+	agentShow                                 bool
+	agentDeadline                             time.Time
+	agentButtons                              map[int]p2p.Control
+	agentRequests                             <-chan agentremote.Request
+	agentCommands                             chan struct{}
+	remoteVersion                             atomic.Value
+	windowFit                                 windowFitState
+	localShortcut                             int
+	enhancementIndicatorUntil                 time.Time
+	renderedFrames                            atomic.Uint64
+	lastRenderFrame                           *image.RGBA
+	interpolationUsesML                       bool
+	lastInputMLRevision                       uint64
+	interpolation                             frameInterpolator
+	streamCapabilities                        atomic.Pointer[streamconfig.Capabilities]
+	streamResult                              atomic.Pointer[streamconfig.Result]
+	streamRequest                             streamconfig.Request
+	streamRevision                            uint64
+	ml                                        *mlWorker
+	superResolution                           int32
+	mlApplied                                 bool
+	remoteEnhancement                         atomic.Pointer[p2p.EnhancementReport]
+	lastEnhancementStatus                     enhancementDisplayStatus
 
 	disableKeyMapping               bool
 	preferences                     *viewerPreferenceStore
@@ -375,6 +381,7 @@ func (g *game) drawFrame(screen viewerCanvas) {
 		}
 		g.texture.WritePixels(renderFrame.Pix)
 		g.displayedDisplay = g.frameDisplay
+		g.displayedViewID = g.frameViewID
 	}
 	g.dirty = false
 	img := g.texture
@@ -452,6 +459,7 @@ func main() {
 	interactiveAuth := flag.Bool("interactive-auth", false, "透過 Client UI 輸入配對密碼")
 	flag.IntVar(&sourceFPSLimit, "source-fps", 20, "來源串流 FPS 上限（5～60）")
 	flag.Bool("mcp-managed", false, "由 MCP 管理的遠端連線")
+	mcpPaused := flag.Bool("mcp-paused", false, "MCP 連線建立後立即暫停串流")
 	mcpHidden := flag.Bool("mcp-hidden", false, "MCP 背景操作，直到使用者開啟遠端畫面")
 	backgroundDiagnostic := flag.Bool("diagnostic", false, "背景串流診斷，不開啟 遠端顯示")
 	transport := flag.String("transport", "", "虛擬傳輸模式：空白為原生 UDP，tailcat 為實驗性 Tailcat")
@@ -532,7 +540,7 @@ func main() {
 	if enhancer != nil {
 		defer enhancer.Close()
 	}
-	g := &game{agentHeadless: *mcpHidden, agentRequests: passwords.agent, rawHeld: make(map[int]rawkey.Event), quality: 1, qualitySent: -1, uiEvents: *interactiveAuth, clipboard: clipboard.New(), scaler: scaler, ml: ml, enhancer: enhancer, lastButtons: make(map[ebiten.MouseButton]bool), lastKeys: make(map[ebiten.Key]bool), controlEnabled: true}
+	g := &game{agentViewChanging: *mcpPaused, agentHeadless: *mcpHidden, agentRequests: passwords.agent, rawHeld: make(map[int]rawkey.Event), quality: 1, qualitySent: -1, uiEvents: *interactiveAuth, clipboard: clipboard.New(), scaler: scaler, ml: ml, enhancer: enhancer, lastButtons: make(map[ebiten.MouseButton]bool), lastKeys: make(map[ebiten.Key]bool), controlEnabled: true}
 	defer g.interpolation.reset()
 	handshakeCtx, cancelHandshake := context.WithTimeout(ctx, 90*time.Second)
 	defer cancelHandshake()
@@ -548,6 +556,12 @@ func main() {
 	var lastVideoSequence uint64
 	var lastVideoDisplay int
 	decodeFrames := streampipeline.NewConsumer(ctx, func(f p2p.Frame) {
+		g.mu.RLock()
+		ignore := g.agentViewChanging || g.agentPaused || f.ViewID != g.agentViewID
+		g.mu.RUnlock()
+		if ignore {
+			return
+		}
 		decodeStarted := time.Now()
 		defer func() { stats.decodeNanos.Add(uint64(time.Since(decodeStarted))); stats.attempts.Add(1) }()
 		var img image.Image
@@ -615,6 +629,10 @@ func main() {
 		receivedMode = mode
 		codecStatusMu.Unlock()
 		g.mu.Lock()
+		if g.agentViewChanging || g.agentPaused || f.ViewID != g.agentViewID {
+			g.mu.Unlock()
+			return
+		}
 		if !f.Keyframe && (g.frame == nil || g.frame.Bounds().Dx() != int(f.Width) || g.frame.Bounds().Dy() != int(f.Height)) {
 			g.mu.Unlock()
 			return
@@ -628,7 +646,8 @@ func main() {
 		}
 		var changed bool
 		g.frame, changed = compositeDecodedFrame(g.frame, img, image.Rect(0, 0, int(f.Width), int(f.Height)), int(f.X), int(f.Y), f.Keyframe)
-		g.dirty = g.dirty || changed || g.frameDisplay != f.Display
+		g.dirty = g.dirty || changed || g.frameDisplay != f.Display || g.frameViewID != f.ViewID
+		g.frameViewID = f.ViewID
 		g.frameDisplay = f.Display
 		g.width, g.height = int(f.Width), int(f.Height)
 		g.mu.Unlock()
@@ -746,6 +765,15 @@ func main() {
 		}
 		peer.Close()
 	}()
+	if *mcpPaused {
+		if err := g.initializePausedVideo(ctx); err != nil {
+			fatal(err)
+			return
+		}
+		if g.agentPaused {
+			emitUIEvent("agent-ready", "")
+		}
+	}
 	if *mcpHidden && !g.runAgentHidden(ctx) {
 		return
 	}

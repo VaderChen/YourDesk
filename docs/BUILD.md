@@ -1,5 +1,7 @@
 # 跨平台建置與打包
 
+AV1 更新：已補上 Windows／macOS 軟體編碼、macOS VideoToolbox 硬解與軟解備援；編解碼分析頁面隱藏 128×128，但保留內部快速探測。最新支援範圍、建置與驗證限制見 [AV1 編解碼](AV1.md)。
+
 「更新三件套」代表更新文件、上傳 GitHub、發布 Release；完整步驟見 [發布流程](RELEASE-WORKFLOW.md)。
 
 buildMac.command／buildWin.command／buildLinux.command 與 pack.command 統一版本格式為 `1.YY.MMDD build HHmm`（台北時間）。
@@ -134,8 +136,12 @@ RIFE 4.25 Lite 的轉換模型內嵌於 `internal/frameinterp`，來源、SHA256
 
 Linux CLI 目標為 `linux/x64`、`linux/arm64`，兩者均包含於預設全平台建置，輸出 `YourDesk-版本-linux-架構-cli.zip`。套件只有 Host，不包含圖形 Viewer。各平台 README 提供繁中、英、日、韓使用方式；不附重複的使用說明.txt。
 
-## Windows FFmpeg LGPL
+## Windows／macOS FFmpeg LGPL
 
-Windows 桌面 Client／Viewer 正式建置使用 `turbojpeg,ffmpeg` tags，附帶三個 FFmpeg 動態庫、授權與來源封存。快取以來源版本、編譯器與組態識別；命中有效快取便不重新編譯。DLL 相依閉包檢查會阻止缺檔套件發布。macOS 沿用原生 VideoToolbox，不加入 FFmpeg。詳見 [編解碼分析](HARDWARE-DETECTION.md)。
+Windows 桌面 Client／Viewer 正式建置使用 `turbojpeg,ffmpeg` tags，附帶三個 FFmpeg 動態庫、授權與來源封存。快取以來源版本、編譯器與組態識別；命中有效快取便不重新編譯。DLL 相依閉包檢查會阻止缺檔套件發布。macOS 的 AV1 透過 FFmpeg 接入 VideoToolbox 硬解與 libaom 軟體編解碼，隨附三個 dylib；H.264／HEVC 保留原生 VideoToolbox。詳見 [編解碼分析](HARDWARE-DETECTION.md)。
 
 目前發布排除 `android/`、`androidcore/` 與本機編譯輸出；預設六個平台維持不變。
+
+## Siri 擴充
+
+macOS 正式 App 封裝現在需要完整 Xcode 27 SDK，用於編譯 App Intents Extension 與新版 Siri AI schema。Go 裸執行檔建置不包含 Siri 系統索引。擴充會在外層簽署與公證前完成建置、metadata 檢查及簽署，不能只複製 Go 執行檔作為 Siri 發行包。支援範圍與驗證限制見 [SIRI.md](SIRI.md)。

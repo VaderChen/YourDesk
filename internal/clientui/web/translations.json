@@ -9,6 +9,8 @@
   "耗時": ["Elapsed", "所要時間", "소요 시간"],
   "編碼實測": ["Encoding test", "エンコードテスト", "인코딩 테스트"],
   "解碼實測": ["Decoding test", "デコードテスト", "디코딩 테스트"],
+  "格式 / 輸出": ["Format / Output", "形式 / 出力", "형식 / 출력"],
+  "格式 / 輸入": ["Format / Input", "形式 / 入力", "형식 / 입력"],
   "格式 / 輸出 / 尺寸": ["Format / Output / Size", "形式 / 出力 / サイズ", "형식 / 출력 / 크기"],
   "格式 / 輸入 / 尺寸": ["Format / Input / Size", "形式 / 入力 / サイズ", "형식 / 입력 / 크기"],
   "Windows 原生格式": ["Windows native format", "Windows ネイティブ形式", "Windows 네이티브 형식"],

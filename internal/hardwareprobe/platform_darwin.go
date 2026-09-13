@@ -10,6 +10,7 @@ char *yd_hardware_probe(const char *,const char *,int,int,int,const unsigned cha
 */
 import "C"
 import (
+	"encoding/json"
 	"errors"
 	"unsafe"
 	"yourdesk/internal/video"
@@ -24,9 +25,18 @@ func platformJobs() []job {
 			}
 		}
 	}
+	for _, size := range [][2]int{{128, 128}, {1920, 1080}} {
+		jobs = append(jobs, job{"", "av1", "software", size[0], size[1]}, job{"", "av1", "RGBA", size[0], size[1]})
+	}
 	return splitJobs(jobs)
 }
 func platformProbe(j job) ([]byte, error) {
+	if j.Codec == "av1" && j.Format == "RGBA" {
+		return json.Marshal(video.ProbeHardwareAV1(j.Width, j.Height, j.Phase))
+	}
+	if j.Codec == "av1" && j.Format == "software" {
+		return json.Marshal(video.ProbeSoftwareAV1(j.Width, j.Height, j.Phase))
+	}
 	var codec, format *C.char
 	if j.Codec != "" {
 		codec = C.CString(j.Codec)

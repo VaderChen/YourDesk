@@ -4,9 +4,11 @@ package clientui
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	webview "github.com/webview/webview_go"
 	"runtime"
+	"sync"
 	"time"
 	"yourdesk/internal/childprocess"
 )
@@ -68,6 +70,11 @@ func runWindow(ctx context.Context, address string, connected <-chan struct{}, u
  if(!mac&&e.altKey&&!e.ctrlKey&&!e.metaKey&&e.key==='F4')action='close';
  if(action){e.preventDefault();e.stopImmediatePropagation();window.yourdeskWindowAction(action);}
  },true);`)
+	interfaceReady := make(chan struct{})
+	var readyOnce sync.Once
+	if err := window.Bind("yourdeskInterfaceReady", func() { readyOnce.Do(func() { close(interfaceReady) }) }); err != nil {
+		return err
+	}
 	window.Navigate(address)
 	finished := make(chan struct{})
 	watcherDone := make(chan struct{})
@@ -106,6 +113,21 @@ func runWindow(ctx context.Context, address string, connected <-chan struct{}, u
 				return
 			case <-finished:
 				return
+			case query := <-app.automationShow:
+				select {
+				case <-interfaceReady:
+				case <-ctx.Done():
+					return
+				case <-finished:
+					return
+				}
+				window.Dispatch(func() {
+					showUpdateWindow(window.Window())
+					if query != "" {
+						b, _ := json.Marshal(query)
+						window.Eval("window.dispatchEvent(new CustomEvent('yourdesk-siri-site',{detail:" + string(b) + "}))")
+					}
+				})
 			case <-transfers:
 				window.Dispatch(func() {
 					showTransferWindow(window.Window())

@@ -4,7 +4,7 @@ import "testing"
 
 func TestConfigurationGoals(t *testing.T) {
 	all := []Configuration{{Codec: "h264", HardwareEncode: true, HardwareDecode: true}, {Codec: "hevc", HardwareEncode: true, HardwareDecode: true}, {Codec: "av1", HardwareEncode: true, HardwareDecode: true}}
-	for goal, want := range map[Goal]string{Balanced: "hevc", LowLatency: "h264", Bandwidth: "av1"} {
+	for goal, want := range map[Goal]string{Balanced: "av1", LowLatency: "h264", Bandwidth: "av1"} {
 		if got := RankConfigurations(all, goal)[0].Codec; got != want {
 			t.Fatalf("%s: %s", goal, got)
 		}

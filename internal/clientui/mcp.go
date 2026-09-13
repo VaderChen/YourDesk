@@ -42,6 +42,7 @@ func (s *server) mcpAPI(ctx context.Context, method, path string, input any) (ma
 }
 
 type mcpConnect struct {
+	VideoMode   string `json:"videoMode,omitempty" jsonschema:"桌面連線：streaming（預設）或 paused（連線建立後立即暫停畫面；舊 Host 退回全螢幕串流並提示），暫停時可使用 snapshot 及 set_video_mode"`
 	Terminal    bool   `json:"terminal,omitempty" jsonschema:"true 使用互動命令列，可連線無桌面系統；不可與 diagnostics 同時啟用"`
 	ID          string `json:"id,omitempty" jsonschema:"已儲存站台 ID；與 room 擇一"`
 	Room        string `json:"room,omitempty" jsonschema:"遠端裝置 ID；與 id 擇一"`
@@ -96,6 +97,12 @@ func (s *server) mcpServer() *mcp.Server {
 		return nil, map[string]any{"sites": sites}, nil
 	})
 	mcp.AddTool(srv, &mcp.Tool{Name: "connect", Description: "使用正常密碼驗證建立遠端連線。兩種模式都支援時，執行指令、查詢系統與透過 Shell 處理資料優先使用命令列；操作 GUI、截圖或確認畫面使用桌面。既有檔案搜尋／讀取與 run_remote_shell 工具目前需要桌面連線；命令列請使用 remote_terminal。同一站台切換模式須先斷線。terminal=true 使用命令列，預設使用桌面。回傳僅代表開始連線，請用 get_status 確認 connected 並取得 instance。"}, func(ctx context.Context, r *mcp.CallToolRequest, in mcpConnect) (*mcp.CallToolResult, any, error) {
+		if in.VideoMode != "" && in.VideoMode != "paused" && in.VideoMode != "streaming" {
+			return nil, nil, fmt.Errorf("videoMode 須為 paused 或 streaming")
+		}
+		if in.VideoMode != "" && (in.Terminal || in.Diagnostics) {
+			return nil, nil, fmt.Errorf("videoMode 僅適用桌面連線")
+		}
 		if (in.ID == "") == (in.Room == "") {
 			return nil, nil, fmt.Errorf("id 與 room 必須擇一")
 		}
@@ -151,19 +158,24 @@ func (s *server) mcpServer() *mcp.Server {
 		}
 		return nil, result, nil
 	})
+	s.registerVideoTools(srv)
 	s.registerRemoteDataTools(srv)
 	s.registerTerminalTools(srv)
 	return srv
 }
 func (s *server) callRemoteAgent(ctx context.Context, in mcpAction) (agentremote.Response, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	timeout := 10 * time.Second
+	if in.Action == "video.snapshot" || in.Action == "screenshot" {
+		timeout = 35 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	idBytes := make([]byte, 16)
 	if _, err := rand.Read(idBytes); err != nil {
 		return agentremote.Response{}, err
 	}
 	id := hex.EncodeToString(idBytes)
-	req := agentremote.Request{ID: id, Params: in.Params, Action: in.Action, X: in.X, Y: in.Y, Button: in.Button, Down: in.Down, Key: in.Key, Text: in.Text, Delta: in.Delta, Display: in.Display, Expires: time.Now().Add(8 * time.Second).UnixMilli()}
+	req := agentremote.Request{ID: id, Params: in.Params, Action: in.Action, X: in.X, Y: in.Y, Button: in.Button, Down: in.Down, Key: in.Key, Text: in.Text, Delta: in.Delta, Display: in.Display, Expires: time.Now().Add(timeout - 2*time.Second).UnixMilli()}
 	data, err := json.Marshal(map[string]any{"agent": req})
 	if err != nil {
 		return agentremote.Response{}, err

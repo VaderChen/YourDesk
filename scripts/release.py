@@ -131,13 +131,13 @@ def compile_program(name, folder, target, version):
             env, source = turbojpeg.prepare(target, env)
             tags = ['-tags', 'turbojpeg']
             turbojpeg.copy_licenses(source, folder)
-            if system == 'windows':
+            if system in ('windows', 'darwin'):
                 env, ffmpeg_prefix = ffmpeg.prepare(target, env)
                 tags = ['-tags', 'turbojpeg,ffmpeg']
                 ffmpeg.copy_runtime(ffmpeg_prefix, folder)
         run(['go', 'build', *tags, '-buildvcs=false', '-trimpath', '-ldflags', flags, '-o', folder / output, './cmd/' + name], env)
         if system == 'darwin':
-            run([ROOT / 'scripts/sign-local.sh', folder / output])
+            run([ROOT / 'scripts/sign-local.sh', *sorted(folder.glob('*.dylib')), folder / output])
     finally:
         if resource is not None:
             resource.unlink(missing_ok=True)
@@ -202,6 +202,10 @@ def mac_bundle(folder, version):
     resources.mkdir()
     for name in ('YourDesk', 'yourdesk-client', 'yourdesk-remote'):
         shutil.copy2(folder / name, mac / name)
+    frameworks = app / 'Contents/Frameworks'
+    frameworks.mkdir()
+    for name in ('libavcodec.62.dylib','libavutil.60.dylib','libswscale.9.dylib'):
+        shutil.copy2(folder / name, frameworks / name)
     numeric = version.split(' build ')[0]
     info = dict(CFBundleIdentifier='com.yourdesk.desktop', CFBundleName='YourDesk',
                 CFBundleDisplayName='YourDesk', CFBundleExecutable='YourDesk', CFBundlePackageType='APPL',
@@ -227,10 +231,16 @@ def mac_bundle(folder, version):
     copy_project_licenses(resources)
     if (folder / 'ThirdPartyLicenses' / 'libjpeg-turbo').is_dir():
         shutil.copytree(folder / 'ThirdPartyLicenses' / 'libjpeg-turbo', resources / 'ThirdPartyLicenses' / 'libjpeg-turbo', dirs_exist_ok=True)
+    if (folder / 'ThirdPartyLicenses/FFmpeg').is_dir():
+        shutil.copytree(folder / 'ThirdPartyLicenses/FFmpeg', resources / 'ThirdPartyLicenses/FFmpeg', dirs_exist_ok=True)
     copy_model_licenses(resources)
     (app / 'Contents/Info.plist').write_bytes(plistlib.dumps(info))
     identity = signing_identity()
+    import siri
+    siri.build(app, numeric + '.' + version[-4:], identity)
     signing = ['--timestamp', '--options', 'runtime'] if identity != '-' else []
+    for library in frameworks.iterdir():
+        run(['codesign', '--force', '--sign', identity, *signing, library])
     for executable in mac.iterdir():
         run(['codesign', '--force', '--sign', identity, *signing, executable])
     run(['codesign', '--force', '--sign', identity, *signing, app])
@@ -405,8 +415,11 @@ def build(version, targets):
         (ROOT / 'bin').mkdir(exist_ok=True)
         if native.startswith('darwin/'):
             folder = folder / 'YourDesk.app/Contents/MacOS'
-        for binary in folder.iterdir():
-            if binary.is_file() and (binary.name.startswith('yourdesk-') or binary.name in ('YourDesk', 'YourDesk.exe')):
+        binaries = list(folder.iterdir())
+        if native.startswith('darwin/'):
+            binaries += list((folder.parent / 'Frameworks').glob('*.dylib'))
+        for binary in binaries:
+            if binary.is_file() and (binary.name.startswith('yourdesk-') or binary.name in ('YourDesk', 'YourDesk.exe') or binary.suffix == '.dylib'):
                 # 不覆寫執行中程序映射的 inode，避免 macOS 簽章頁面失效。
                 # 暫存檔與目的檔位於同一檔案系統，以原子替換發布完整檔案。
                 with tempfile.TemporaryDirectory(prefix='.release-', dir=ROOT / 'bin') as temporary:

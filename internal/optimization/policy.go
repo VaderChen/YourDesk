@@ -37,7 +37,7 @@ func Apply(p Policy) bool {
 		return false
 	}
 	for _, e := range p.Encoders {
-		if (e.Codec != "h264" && e.Codec != "hevc" && e.Codec != "av1") || e.Width < 1 || e.Height < 1 || e.Width > 8192 || e.Height > 8192 {
+		if (e.Codec != "h264" && e.Codec != "hevc" && e.Codec != "av1" && e.Codec != "software-av1") || e.Width < 1 || e.Height < 1 || e.Width > 8192 || e.Height > 8192 {
 			return false
 		}
 	}

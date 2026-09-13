@@ -24,6 +24,9 @@ type windowsEncoder struct {
 }
 
 func NewIntraEncoder(codec Codec) (IntraEncoder, error) {
+	if codec == CodecSoftwareAV1 {
+		return newSoftwareAV1Encoder()
+	}
 	if codec != CodecHardwareH264 && codec != CodecHardwareAV1 {
 		return nil, ErrVideoUnavailable
 	}
