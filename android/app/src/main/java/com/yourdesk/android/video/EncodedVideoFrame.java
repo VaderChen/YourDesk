@@ -9,6 +9,10 @@ import java.nio.ByteOrder;
  * 傳送，每筆影格都帶參數集，讓 decoder 在遺失影格後可以從下一個 keyframe 恢復。
  */
 public final class EncodedVideoFrame {
+  private static void appendBytes(ByteArrayOutputStream out, byte[] bytes) {
+    out.write(bytes, 0, bytes.length);
+  }
+
   public final int codec;
   public final int width;
   public final int height;
@@ -54,8 +58,8 @@ public final class EncodedVideoFrame {
         if (index < parameterCount) {
           parameters[index++] = nal;
         } else {
-          access.writeBytes(new byte[]{0, 0, 0, 1});
-          access.writeBytes(nal);
+          appendBytes(access, new byte[]{0, 0, 0, 1});
+          appendBytes(access, nal);
           int type = codec == 1 ? (nal[0] & 0x1f) : ((nal[0] & 0x7e) >> 1);
           picture |= codec == 1 ? (type == 1 || type == 5) : (type >= 0 && type <= 31);
         }
@@ -69,10 +73,10 @@ public final class EncodedVideoFrame {
     // 將 SPS/PPS（及 HEVC VPS）放在每個 access unit 前，確保遺失影格後可恢復。
     ByteArrayOutputStream withParameters = new ByteArrayOutputStream(payload.length);
     for (byte[] p : parameters) {
-      withParameters.writeBytes(new byte[]{0, 0, 0, 1});
-      withParameters.writeBytes(p);
+      appendBytes(withParameters, new byte[]{0, 0, 0, 1});
+      appendBytes(withParameters, p);
     }
-    withParameters.writeBytes(access.toByteArray());
+    appendBytes(withParameters, access.toByteArray());
     boolean keyframe = keyframeHint || containsKeyframe(codec, access.toByteArray());
     return new EncodedVideoFrame(codec, width, height, parameters[0], parameters[1],
         parameterCount == 3 ? parameters[2] : null, withParameters.toByteArray(), keyframe);

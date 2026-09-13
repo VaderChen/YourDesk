@@ -868,8 +868,8 @@ public final class MainActivity extends Activity {
       ks.load(null);
       if (!ks.containsAlias("shell")) {
         javax.crypto.KeyGenerator g = javax.crypto.KeyGenerator.getInstance("AES", "AndroidKeyStore");
-        g.init(new android.security.keystore.KeyGenParameterSpec.Builder("shell", 3)
-            .setBlockModes("GCM").setEncryptionPaddings("NoPadding").build());
+        g.init(new android.security.keystore.KeyGenParameterSpec.Builder("shell", android.security.keystore.KeyProperties.PURPOSE_ENCRYPT | android.security.keystore.KeyProperties.PURPOSE_DECRYPT)
+            .setBlockModes(android.security.keystore.KeyProperties.BLOCK_MODE_GCM).setEncryptionPaddings(android.security.keystore.KeyProperties.ENCRYPTION_PADDING_NONE).build());
         g.generateKey();
       }
       return (javax.crypto.SecretKey) ks.getKey("shell", null);
@@ -914,7 +914,7 @@ public final class MainActivity extends Activity {
           boolean committed = getPreferences(0).edit().remove("room").putString("credentials", encrypted).commit();
           return committed && getPreferences(0).contains("credentials");
         } catch (Exception e) {
-          runOnUiThread(() -> android.widget.Toast.makeText(MainActivity.this, "密碼保存失敗", 1).show());
+          runOnUiThread(() -> android.widget.Toast.makeText(MainActivity.this, "密碼保存失敗", android.widget.Toast.LENGTH_SHORT).show());
           return false;
         }
       }
