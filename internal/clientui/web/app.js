@@ -593,11 +593,11 @@ function renderHardwareAnalysis() {
   const wrap=document.createElement('div');wrap.className='hardware-table-wrap';
   const table=document.createElement('table');table.className='hardware-table';
   const head=table.createTHead().insertRow();
-  for(const label of [decode?'格式 / 輸出 / 尺寸':'格式 / 輸入 / 尺寸','結果','後端','耗時']){const th=text('th',t(label));th.scope='col';head.append(th);}
+  for(const label of [decode?'格式 / 輸出':'格式 / 輸入','結果','後端','耗時']){const th=text('th',t(label));th.scope='col';head.append(th);}
   const body=table.createTBody();
-  for(const result of results.filter(r=>r.key!=='inventory'&&(!separated||r.key.endsWith(decode?'/decode':'/encode')))){
-   const data=result.data||{};const tr=body.insertRow();const base=result.key.replace(/\/(encode|decode)$/,'');
-   tr.append(text('td',data.probeKind==='windows-software'?`${data.codec} / ${t('軟體獨立測試')} / ${data.width}×${data.height}`:data.probeKind==='windows-native'?`${t('Windows 原生格式')} / ${base}`:base));
+  for(const result of results.filter(r=>r.key!=='inventory'&&!(r.data?.width===128&&r.data?.height===128)&&!/(?:^|\/)128x128(?:\/|$)/.test(r.key)&&(!separated||r.key.endsWith(decode?'/decode':'/encode')))){
+   const data=result.data||{};const tr=body.insertRow();const base=result.key.replace(/\/(encode|decode)$/,'').replace(/\/1920x1080$/,'');
+   tr.append(text('td',(data.probeKind==='windows-software'||data.probeKind==='software')?`${data.codec} / ${t('軟體獨立測試')}${data.width===1920&&data.height===1080?'':` / ${data.width}×${data.height}`}`:data.probeKind==='windows-native'?`${t('Windows 原生格式')} / ${base}`:base));
    tr.append(text('td',result.state==='complete'?outcome(data,decode):t(states[result.state]||'偵測未完成')));
    tr.append(text('td',(decode?data.decoderBackend:(data.encoderBackend||data.backend))||'—'));
    tr.append(text('td',separated&&Number.isFinite(result.durationMS)&&result.state!=='pending'?`${Math.round(result.durationMS)} ms`:'—'));
@@ -811,6 +811,7 @@ function refreshCodecOptions(selected) {
     ['auto', '自動 (按排列順序優先)', true],
     ['hardware-hevc', 'HEVC (H.265) 硬體', !!state?.videoCapabilities?.some(cap => cap.codec === 'hardware-hevc' && cap.encode)],
     ['hardware-h264', 'H.264 硬體', !!state?.videoCapabilities?.some(cap => cap.codec === 'hardware-h264' && cap.encode)],
+    ['software-av1', 'AV1 軟體', !!state?.videoCapabilities?.some(cap => cap.codec === 'software-av1' && cap.encode)],
     ['hardware-av1', 'AV1 硬體', !!state?.videoCapabilities?.some(cap => cap.codec === 'hardware-av1' && cap.encode)],
     ['hardware-jpeg', 'JPEG 硬體', !!state?.hardwareJPEG],
     ['software-jpeg', 'JPEG 軟體', true]
@@ -899,6 +900,7 @@ async function initialize() {
       startupMainReady = true;
       renderStartupOptimization();
     }));
+    window.yourdeskInterfaceReady?.();
     refreshPresence();
   } catch (error) {
     $('#connection-error').textContent = i18n.t(`無法載入介面：${error.message}。請重新執行 runUITest.command。`);
@@ -1417,3 +1419,8 @@ $('#stop-incoming').addEventListener('click',()=>action(async()=>{
 }));
 
 $('#tailcat-mode').addEventListener('change',savePreferences);
+
+window.addEventListener("yourdesk-siri-site", event => {
+ if(typeof event.detail!=="string"||!state)return;
+ selectedGroup="*"; $("#search").value=event.detail; renderLibrary();
+});

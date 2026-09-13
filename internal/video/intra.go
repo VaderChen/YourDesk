@@ -83,9 +83,16 @@ func probeIntraCapabilities() {
 	startDecodeProbe()
 	<-decodeReady
 	policy := optimization.Snapshot()
+	caps := append([]IntraCapability(nil), decodeCaps...)
 	for _, cap := range decodeCaps {
+		if cap.Codec == CodecHardwareAV1 {
+			cap.Codec = CodecSoftwareAV1
+			caps = append(caps, cap)
+		}
+	}
+	for _, cap := range caps {
 		codec := cap.Codec
-		if usable, known := policy.EncoderDecision(decodePolicyCodec(WireForCodec(codec)), 128, 128); known {
+		if usable, known := policy.EncoderDecision(decodePolicyCodec(WireForCodec(codec)), 128, 128); known && codec != CodecSoftwareAV1 {
 			cap.Encode = usable
 			if !usable {
 				cap.EncodeError = "本機偵測已確認此尺寸編碼不可用"
@@ -128,7 +135,7 @@ func probeIntraCapabilities() {
 	}
 }
 func WireForCodec(codec Codec) WireCodec {
-	if codec == CodecHardwareAV1 {
+	if codec == CodecHardwareAV1 || codec == CodecSoftwareAV1 {
 		return WireAV1
 	}
 	if codec == CodecHardwareH264 {

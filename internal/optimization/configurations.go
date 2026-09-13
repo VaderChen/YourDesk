@@ -23,7 +23,7 @@ type Configuration struct {
 // RankConfigurations 以離散優先序排序，避免任意加權抵消硬體優先規則。
 // 同級先採用實測尺寸，再依用途偏好；不以 helper 耗時推論吞吐量。
 func RankConfigurations(candidates []Configuration, goal Goal) []Configuration {
-	order := []string{"hevc", "h264", "av1", "jpeg"}
+	order := []string{"av1", "hevc", "h264", "jpeg"}
 	switch goal {
 	case LowLatency:
 		order = []string{"h264", "hevc", "av1", "jpeg"}

@@ -10,7 +10,7 @@ YourDesk 是支援 macOS 與 Windows 的遠端桌面工具。從連線、站台�
 
 ## 特色與功能
 
-本版新增編解碼分析、獨立深度測試與自動傳輸策略，Windows 加入 FFmpeg LGPL 的 H.264／HEVC／AV1 軟解，並修正 DLL 缺漏造成的啟動失敗。詳見 [發行說明](docs/RELEASE-1.26.0913-build-0058.md)。
+本版加入 Agent 按需截圖與區域串流、MCP 畫面契約 v1、AV1 軟體編碼及 macOS 支援、heartbeat-v2 協商與實驗性 Siri／捷徑整合。保留舊 Host 全螢幕相容。詳見 [發行說明](docs/RELEASE-1.26.0913-build-1512.md) 與 [MCP 畫面契約](docs/MCP-VIDEO.md)。
 
 - **GUI 與 CMD 雙模式**：支援遠端桌面與互動命令列，可依工作選擇模式；命令列使用獨立視窗，亦可連入 Linux CLI Host。
 - **MCP AI Agent 遠端操控**：AI Agent 可透過 MCP 連線遠端、操作桌面或命令列、查詢站台能力，完成工作後斷線。

@@ -27,8 +27,9 @@ const (
 )
 
 type Frame struct {
-	Display  int  // -1 表示舊版未提供螢幕資訊。
-	Codec    byte // 0=JPEG、1=H.264、2=HEVC；沿用保留的標頭位元組。
+	ViewID   uint64 // 只在對端主動啟用 Agent 視野協定後使用。
+	Display  int    // -1 表示舊版未提供螢幕資訊。
+	Codec    byte   // 0=JPEG、1=H.264、2=HEVC；沿用保留的標頭位元組。
 	Sequence uint64
 	Width    uint32
 	Height   uint32
@@ -49,6 +50,7 @@ type EnhancementReport struct {
 	Bitrate        int    `json:"bitrate"`
 }
 type Control struct {
+	ViewID               uint64                     `json:"viewID,omitempty"`
 	CommandCapabilities  *CommandCapabilities       `json:"commandCapabilities,omitempty"`
 	CommandRequest       *CommandRequest            `json:"commandRequest,omitempty"`
 	CommandResponse      *CommandResponse           `json:"commandResponse,omitempty"`
@@ -408,15 +410,19 @@ func (p *Peer) sendFrame(f Frame, beforeSend func(int) error) error {
 		if end > len(f.JPEG) {
 			end = len(f.JPEG)
 		}
+		headerSize := frameHeaderSize
+		if f.ViewID != 0 {
+			headerSize += 8
+		}
 		if beforeSend != nil {
-			if err := beforeSend(frameHeaderSize + end - start); err != nil {
+			if err := beforeSend(headerSize + end - start); err != nil {
 				return err
 			}
 		}
 		if dc.ReadyState() != webrtc.DataChannelStateOpen || dc.BufferedAmount() > maxScreenBuffer {
 			return ErrFrameDropped
 		}
-		msg := make([]byte, frameHeaderSize+end-start)
+		msg := make([]byte, headerSize+end-start)
 		binary.BigEndian.PutUint64(msg[0:8], f.Sequence)
 		binary.BigEndian.PutUint32(msg[8:12], f.Width)
 		binary.BigEndian.PutUint32(msg[12:16], f.Height)
@@ -430,7 +436,11 @@ func (p *Peer) sendFrame(f Frame, beforeSend func(int) error) error {
 		}
 		msg[41] = f.Codec
 		binary.BigEndian.PutUint16(msg[42:44], uint16(f.Display+1))
-		copy(msg[frameHeaderSize:], f.JPEG[start:end])
+		if f.ViewID != 0 {
+			msg[40] |= 2
+			binary.BigEndian.PutUint64(msg[44:52], f.ViewID)
+		}
+		copy(msg[headerSize:], f.JPEG[start:end])
 		if err := p.sendData(dc, msg); err != nil {
 			return err
 		}

@@ -1,5 +1,7 @@
 # 編解碼分析與背景偵測
 
+AV1 更新：已補上 Windows／macOS 軟體編碼、macOS VideoToolbox 硬解與軟解備援；編解碼分析頁面隱藏 128×128，但保留內部快速探測。最新支援範圍、建置與驗證限制見 [AV1 編解碼](AV1.md)。
+
 APP 取得單一執行個體鎖後，啟動獨立背景協調工作；不等待偵測完成才開啟視窗。偵測結果可提供新連線的能力篩選與差分記憶體策略，不改寫使用者偏好，不切換現有連線的編解碼器。
 
 ## 執行與生命週期
@@ -20,7 +22,7 @@ APP 取得單一執行個體鎖後，啟動獨立背景協調工作；不等待�
 
 基本資訊：CPU／OS、公開 SIMD 能力、核心／記憶體、電源／熱狀態、Metal 裝置、VideoToolbox 編碼器清單，以及 JPEG／H.264／HEVC／AV1 硬解 API 宣告。
 
-實際驗證 JPEG／H.264／HEVC × BGRA／NV12 full range／NV12 video range × 128×128／1920×1080，共 18 組，每組拆成編碼與解碼，加上基本查詢共 37 項。編碼使用合成影像；解碼使用內嵌固定樣本，驗證指定輸出格式與尺寸，兩個方向各有獨立 helper 與逾時。
+實際驗證 JPEG／H.264／HEVC × BGRA／NV12 full range／NV12 video range × 128×128／1920×1080，共 18 組，每組拆成編碼與解碼，加上基本查詢共 45 項（含新增的 AV1 硬體／軟體各兩種尺寸、兩個方向，共 8 項）。編碼使用合成影像；解碼使用內嵌固定樣本，驗證指定輸出格式與尺寸，兩個方向各有獨立 helper 與逾時。
 
 CPU 查詢不存在、硬體狀態屬性不支援等情況保留 `null` 與 OSStatus，不能當作 false。例如目前實驗機 JPEG 的硬體使用狀態屬性不支援；編解碼可完成，不代表硬體狀態已取得確認。
 
@@ -98,21 +100,21 @@ D3D 裝置可用僅代表圖形 API 能力；D3D12 尚未作為影片編解碼�
 
 協商依序選擇：本機可硬體編碼且接收端已確認硬解的格式，接著本機可硬體編碼且接收端可軟解／加速未知的格式；同級優先 HEVC，再 H.264。接收端新增 hardwareDecodeCodecs 公告欄位，並保持原本 Codecs 為所有可解碼格式，舊端未提供硬解欄位仍可協商。
 
-Windows 正式接收路徑先使用 Media Foundation／D3D11 硬解，H.264／HEVC 轉為 Annex B，AV1 使用附長度的 low-overhead OBU。硬解建立或取回影格失敗才切換 FFmpeg CPU 工作階段；GOP 中途切換先要求 key frame，避免缺少參考影格。Windows 使用 FFmpeg 8.1.1 的 H.264／HEVC decoder，以及 libaom 3.13.1 AV1 decoder，不依賴 Windows HEVC／AV1 codec extension。macOS 維持 VideoToolbox 與原本 19 項測試。
+Windows 正式接收路徑先使用 Media Foundation／D3D11 硬解，H.264／HEVC 轉為 Annex B，AV1 使用附長度的 low-overhead OBU。硬解建立或取回影格失敗才切換 FFmpeg CPU 工作階段；GOP 中途切換先要求 key frame，避免缺少參考影格。Windows 使用 FFmpeg 8.1.1 的 H.264／HEVC decoder，以及 libaom 3.13.1 AV1 decoder，不依賴 Windows HEVC／AV1 codec extension。macOS AV1 硬解採 VideoToolbox，軟體編解碼採 libaom，兩方向分開測試。
 
 Windows AV1 已接入原生 MFT 編碼、OBU 封包、能力公告及協商。只在實際編碼成功後提供 AV1 硬體選項；同硬解等級內保留 HEVC、H.264、AV1 順序，避免只因新格式就改變既有預設。指定 AV1 時仍要求接收端公告支援，舊版不會收到 AV1。
 
 ## 獨立軟體測試
 
-Windows CGO 包含 JPEG／H.264／HEVC／AV1 各 128×128、1920×1080 十六個 software 工作（各自編碼、解碼）。前端以「軟體獨立測試」另列，即使硬解成功仍執行。H.264／HEVC 軟編仍測試系統 MFT；AV1 未提供軟編，不能將軟解成功宣告為軟編成功。三種影片的解碼使用內嵌獨立影格強制 FFmpeg CPU，與編碼測試結果分開。JPEG 沿用既有軟體編解碼。
+Windows CGO 包含 JPEG／H.264／HEVC／AV1 各 128×128、1920×1080 十六個 software 工作（各自編碼、解碼）。前端以「軟體獨立測試」另列，即使硬解成功仍執行。H.264／HEVC 軟編仍測試系統 MFT；AV1 軟編改用 FFmpeg／libaom，與軟解各自實測。三種影片的解碼使用內嵌獨立影格強制 FFmpeg CPU，與編碼測試結果分開。JPEG 沿用既有軟體編解碼。
 
 每項依方向回報 encodeOK 或 decodeOK、實際 backend；解碼工作另回報 decoderSource=independent-fixture。CPU 解碼成功證據可補足未執行解碼的正式路徑，不能覆蓋已驗證的硬解。仍沿用每項 8 秒、最多 4 路的 helper 管理。
 
 ## Windows FFmpeg LGPL 建置
 
-正式 Windows Client／Viewer 啟用 `ffmpeg,turbojpeg` build tags。`scripts/ffmpeg.py` 驗證固定來源 SHA-256，建置只包含 H.264／HEVC／libaom AV1 解碼器、必要 parser 及色彩轉換的 FFmpeg 動態庫；明確檢查 GPL=0、nonfree=0。不啟動 ffmpeg.exe，不每張重建 decoder。libaom 使用內建 Win32 執行緒，不額外依賴 winpthreads DLL。
+正式 Windows Client／Viewer 啟用 `ffmpeg,turbojpeg` build tags。`scripts/ffmpeg.py` 驗證固定來源 SHA-256，建置包含 H.264／HEVC／libaom AV1 解碼器、libaom AV1 編碼器、必要 parser 及色彩轉換的 FFmpeg 動態庫；明確檢查 GPL=0、nonfree=0。不啟動 ffmpeg.exe，不每張重建 decoder。libaom 使用內建 Win32 執行緒，不額外依賴 winpthreads DLL。
 
-安裝包包含 `avcodec-62.dll`、`avutil-60.dll`、`swscale-9.dll`，以及 LGPL/BSD 授權、完整來源封存和重建腳本。DLL 可替換。macOS 產品不加入 FFmpeg。一般未帶 `ffmpeg` tag 的開發建置會明確回報未包含此 decoder，不能當作正式 Windows 支援測試。
+安裝包包含 `avcodec-62.dll`、`avutil-60.dll`、`swscale-9.dll`，以及 LGPL/BSD 授權、完整來源封存和重建腳本。DLL 可替換。macOS 同樣加入 FFmpeg 的 AV1 編解碼，硬解使用其 VideoToolbox 後端。一般未帶 `ffmpeg` tag 的開發建置會明確回報未包含此 decoder，不能當作正式 Windows 支援測試。
 
 已在本機執行相同來源 CPU 函式庫的 H.264／HEVC／AV1 固定影格、尺寸、黑色像素、I/P/P 參考影格及損毀輸入 Smoke。Windows x64 Client／Viewer，以及 x64／ARM64 原生測試已交叉編譯，DLL 打包通過；Windows 實機的驅動與 GPU→CPU 切換仍待實測，不將交叉編譯當成實機通過。
 
@@ -134,6 +136,6 @@ Windows 全部正式 RGBA、原生 BGRA／NV12 及軟體項目都拆成 `/encode
 
 ## macOS 編碼與解碼分離（2026-09-13）
 
-macOS 統一採用 `/encode`、`/decode` 獨立 helper；JPEG、H.264、HEVC × BGRA、NV12-full、NV12-video × 兩種尺寸，各自測兩個方向，加上硬體概況，共 37 項。沿用每項 8 秒、最多 4 路的排程與兩張結果表。
+macOS 統一採用 `/encode`、`/decode` 獨立 helper；JPEG、H.264、HEVC × BGRA、NV12-full、NV12-video × 兩種尺寸，各自測兩個方向，加上硬體概況，共 45 項（含新增的 AV1 硬體／軟體各兩種尺寸、兩個方向，共 8 項）。沿用每項 8 秒、最多 4 路的排程與兩張結果表。
 
 解碼由內嵌 JPEG 或 H.264／HEVC 參數集與壓縮影格直接建立 CoreMedia sample，不建立編碼器，也不依賴編碼結果。保留 VideoToolbox 硬體要求，未加入 FFmpeg。解碼格式欄現在確實驗證該輸出格式及尺寸；原流程所有格式都解成 BGRA，因此部分 NV12 結果可能與舊版不同。各方向只回報自己的狀態、後端與耗時。

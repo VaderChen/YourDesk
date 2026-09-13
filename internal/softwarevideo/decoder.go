@@ -1,6 +1,6 @@
 //go:build cgo && ffmpeg
 
-// Package softwarevideo 提供隨程式發行、不啟動外部程序的 CPU 解碼器。
+// Package softwarevideo 提供隨程式發行、不啟動外部程序的 FFmpeg 編解碼器。
 package softwarevideo
 
 /*
@@ -8,6 +8,7 @@ package softwarevideo
 #cgo windows LDFLAGS: -l:libavcodec.dll.a -l:libswscale.dll.a -l:libavutil.dll.a
 #include <libavcodec/avcodec.h>
 #include <libavutil/imgutils.h>
+#include <libavutil/hwcontext.h>
 #include <libswscale/swscale.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,9 +17,13 @@ static void yd_sw_close(yd_sw_decoder *d) {
  if (!d) return;
  avcodec_free_context(&d->codec); av_frame_free(&d->frame); sws_freeContext(d->scale); free(d);
 }
+static enum AVPixelFormat yd_av1_hw_format(AVCodecContext *ctx,const enum AVPixelFormat *formats) {
+ for (const enum AVPixelFormat *p=formats;*p!=AV_PIX_FMT_NONE;p++) if(*p==AV_PIX_FMT_VIDEOTOOLBOX)return *p;
+ return AV_PIX_FMT_NONE;
+}
 static yd_sw_decoder *yd_sw_open(int kind) {
  // 按名稱指定純 CPU 實作，不能由系統硬體 decoder 代替。
- const char *name = kind==1 ? "h264" : kind==2 ? "hevc" : kind==3 ? "libaom-av1" : NULL;
+ const char *name = kind==1 ? "h264" : kind==2 ? "hevc" : kind==3 ? "libaom-av1" : kind==4 ? "av1" : NULL;
  const AVCodec *codec = name ? avcodec_find_decoder_by_name(name) : NULL;
  if (!codec) return NULL;
  yd_sw_decoder *d = calloc(1, sizeof(*d));
@@ -31,6 +36,10 @@ static yd_sw_decoder *yd_sw_open(int kind) {
  d->codec->flags |= AV_CODEC_FLAG_LOW_DELAY;
  d->codec->max_pixels = 32LL << 20;
  d->codec->err_recognition = AV_EF_CAREFUL | AV_EF_EXPLODE;
+ if (kind==4) {
+  d->codec->get_format=yd_av1_hw_format;
+  if(av_hwdevice_ctx_create(&d->codec->hw_device_ctx,AV_HWDEVICE_TYPE_VIDEOTOOLBOX,NULL,NULL,0)<0){yd_sw_close(d);return NULL;}
+ }
  if (avcodec_open2(d->codec, codec, NULL) < 0) { yd_sw_close(d); return NULL; }
  return d;
 }
@@ -48,6 +57,13 @@ static int yd_sw_decode(yd_sw_decoder *d, const unsigned char *data, int size, u
  av_frame_unref(d->frame);
  status=avcodec_receive_frame(d->codec,d->frame);
  if (status<0) return status;
+ if(d->frame->format==AV_PIX_FMT_VIDEOTOOLBOX) {
+  AVFrame *cpu=av_frame_alloc();if(!cpu)return AVERROR(ENOMEM);
+  status=av_hwframe_transfer_data(cpu,d->frame,0);
+  if(status>=0)status=av_frame_copy_props(cpu,d->frame);
+  if(status<0){av_frame_free(&cpu);return status;}
+  av_frame_unref(d->frame);av_frame_move_ref(d->frame,cpu);av_frame_free(&cpu);
+ }
  AVFrame *f=d->frame;
  if (f->width<=0 || f->height<=0 || f->width>8192 || f->height>8192 || (int64_t)f->width*f->height>(32LL<<20)) return AVERROR(EINVAL);
  d->scale=sws_getCachedContext(d->scale,f->width,f->height,f->format,f->width,f->height,AV_PIX_FMT_RGBA,SWS_BILINEAR,NULL,NULL,NULL);
@@ -112,6 +128,11 @@ func (d *Decoder) Close() error {
 	return nil
 }
 func (d *Decoder) Backend() string {
-	return map[int]string{1: "FFmpeg H.264 CPU", 2: "FFmpeg HEVC CPU", 3: "FFmpeg / libaom AV1 CPU"}[d.codec]
+	return map[int]string{1: "FFmpeg H.264 CPU", 2: "FFmpeg HEVC CPU", 3: "FFmpeg / libaom AV1 CPU", 4: "VideoToolbox AV1 / FFmpeg"}[d.codec]
 }
-func (d *Decoder) DecodingMode() string { return "software" }
+func (d *Decoder) DecodingMode() string {
+	if d.codec == 4 {
+		return "hardware"
+	}
+	return "software"
+}

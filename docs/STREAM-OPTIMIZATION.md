@@ -1,5 +1,7 @@
 # 偵測驅動影像路徑最佳化
 
+AV1 更新：已補上 Windows／macOS 軟體編碼、macOS VideoToolbox 硬解與軟解備援；編解碼分析頁面隱藏 128×128，但保留內部快速探測。最新支援範圍、建置與驗證限制見 [AV1 編解碼](AV1.md)。
+
 ## 已接上正式流程
 
 1. **能力策略**：detector 完成後，APP 經既有私有 stdin 管道把小型策略送給常駐 Host。Host 在通道配對後取快照；既有連線不被新的偵測結果改動。不等待偵測才開始接受連線。
@@ -84,7 +86,7 @@ This software is based in part on the work of the Independent JPEG Group.
 
 1. 雙端硬體、編碼端硬體、解碼端硬體、全軟體。
 2. 同級優先採用目前尺寸已實測成功的配置。
-3. 同級且證據相同：均衡為 HEVC → H.264 → AV1；低延遲為 H.264 → HEVC → AV1；省頻寬為 AV1 → HEVC → H.264。
+3. 同級且證據相同：均衡（常規）為 AV1 → HEVC → H.264 → JPEG；低延遲為 H.264 → HEVC → AV1 → JPEG；省頻寬為 AV1 → HEVC → H.264 → JPEG。
 
 這些是用途偏好，不是持續效能測量結果；不拿 helper 啟動耗時估計 FPS，不依 D3D 版號或 SIMD 清單推論某個 codec 可用。對端硬解公告目前仍是格式能力，並不保證目前尺寸。原有 FPS、碼率、GOP 上限照使用者設定，不因選擇偏好擅自改值。
 

@@ -154,7 +154,7 @@ func PreferredHardwareEncoders(remoteHardware uint32) []Codec {
 	result := make([]Codec, 0, 2)
 	for _, hardware := range []bool{true, false} {
 		candidates := []Codec{CodecHardwareHEVC, CodecHardwareH264}
-		if runtime.GOOS == "windows" {
+		if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
 			candidates = append(candidates, CodecHardwareAV1)
 		}
 		for _, codec := range candidates {
@@ -168,7 +168,7 @@ func PreferredHardwareEncoders(remoteHardware uint32) []Codec {
 
 func receiverWireCodecs() []WireCodec {
 	codecs := []WireCodec{WireH264, WireHEVC}
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
 		codecs = append(codecs, WireAV1)
 	}
 	return codecs

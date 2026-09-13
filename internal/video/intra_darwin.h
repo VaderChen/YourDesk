@@ -21,6 +21,18 @@ static void yd_intra_callback(void *ref,void *source,OSStatus status,VTEncodeInf
  if(!format||!block) {r->status=-1;return;}
  const uint8_t *params[3];size_t lengths[3],count=0;int nalu=0;
  CMVideoCodecType codec=CMFormatDescriptionGetMediaSubType(format);
+ if(codec==kCMVideoCodecType_AV1) {
+  size_t bytes=CMBlockBufferGetDataLength(block),extra=0;const unsigned char *config=NULL;
+  CFDictionaryRef atoms=CMFormatDescriptionGetExtension(format,kCMFormatDescriptionExtension_SampleDescriptionExtensionAtoms);
+  CFDataRef av1c=atoms?CFDictionaryGetValue(atoms,CFSTR("av1C")):NULL;
+  if(av1c && CFGetTypeID(av1c)==CFDataGetTypeID() && CFDataGetLength(av1c)>4){extra=CFDataGetLength(av1c)-4;config=CFDataGetBytePtr(av1c)+4;}
+  if(!bytes || bytes>32*1024*1024 || extra>32*1024*1024-bytes){r->status=-1;return;}
+  unsigned char *data=malloc(bytes+extra);if(!data){r->status=-1;return;}
+  if(extra)memcpy(data,config,extra);
+  status=CMBlockBufferCopyDataBytes(block,0,bytes,data+extra);
+  if(status){free(data);r->status=status;return;}
+  r->data=data;r->size=bytes+extra;return;
+ }
  for(size_t i=0;i<(codec==kCMVideoCodecType_HEVC?3:2);i++) {
   status=codec==kCMVideoCodecType_HEVC ? CMVideoFormatDescriptionGetHEVCParameterSetAtIndex(format,i,&params[i],&lengths[i],&count,&nalu) : CMVideoFormatDescriptionGetH264ParameterSetAtIndex(format,i,&params[i],&lengths[i],&count,&nalu);
   if(status) {r->status=status;return;}

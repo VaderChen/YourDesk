@@ -16,6 +16,7 @@ import (
 
 // 操作僅在遠端顯示主迴圈執行，避免與滑鼠、螢幕切換狀態競爭。
 func (g *game) updateAgent() {
+	g.applyAgentVideo()
 	if !g.agentDeadline.IsZero() && (!g.controlEnabled || time.Now().After(g.agentDeadline)) {
 		g.clipboard.CancelKeys("Agent 操作逾時或停用")
 		for _, c := range g.agentButtons {
@@ -30,7 +31,11 @@ func (g *game) updateAgent() {
 	}
 	select {
 	case req := <-g.agentRequests:
-		if g.dispatchAgentCommand(req) {
+		if req.Action == "screenshot" && g.peer != nil && g.peer.SupportsCommand("video.snapshot") {
+			req.Action = "video.snapshot"
+			req.Params = json.RawMessage(`{}`)
+		}
+		if g.dispatchAgentVideo(req) || g.dispatchAgentCommand(req) {
 			return
 		}
 		res := g.agentAction(req)
@@ -44,6 +49,9 @@ func (g *game) agentAction(r agentremote.Request) (out agentremote.Response) {
 	if time.Now().UnixMilli() > r.Expires {
 		out.Error = "操作已逾時，未執行"
 		return
+	}
+	if r.Action == "video.status" {
+		return g.agentVideoStatus(r)
 	}
 	if r.Action == "hide" {
 		g.agentShow = false
@@ -184,6 +192,7 @@ func (g *game) runAgentHidden(ctx context.Context) bool {
 		ready := g.frame != nil && !g.displayPending
 		if ready {
 			g.displayedDisplay = g.frameDisplay
+			g.displayedViewID = g.frameViewID
 			g.finalWidth = g.width
 			g.finalHeight = g.height + g.toolbarHeight()
 		}

@@ -49,9 +49,9 @@ done
 
 mkdir -p "$BIN" "$RUN_DIR"
 echo "重新 BUILD YourDesk Client / Remote..."
-(cd "$ROOT" && go build -o "$BIN/yourdesk-client" ./cmd/client && \
-  go build -o "$BIN/yourdesk-remote" ./cmd/remote)
-"$ROOT/scripts/sign-local.sh" "$BIN/yourdesk-client" "$BIN/yourdesk-remote"
+(cd "$ROOT" && python3 scripts/ffmpeg.py darwin/arm64 go build -o "$BIN/yourdesk-client" ./cmd/client && \
+  python3 scripts/ffmpeg.py darwin/arm64 go build -o "$BIN/yourdesk-remote" ./cmd/remote)
+"$ROOT/scripts/sign-local.sh" "$BIN/"*.dylib "$BIN/yourdesk-client" "$BIN/yourdesk-remote"
 echo "BUILD 完成。"
 
 # Keep pairing convenient: use the same stable hardware-derived UID as the

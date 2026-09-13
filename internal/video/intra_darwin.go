@@ -21,6 +21,7 @@ import (
 type nativeIntraEncoder struct {
 	mu                         sync.Mutex
 	session                    C.VTCompressionSessionRef
+	av1Sequence                []byte
 	codec                      C.CMVideoCodecType
 	width, height              int
 	pixels                     *image.RGBA
@@ -33,8 +34,13 @@ type nativeIntraEncoder struct {
 }
 
 func NewIntraEncoder(codec Codec) (IntraEncoder, error) {
+	if codec == CodecSoftwareAV1 {
+		return newSoftwareAV1Encoder()
+	}
 	var kind C.CMVideoCodecType
 	switch codec {
+	case CodecHardwareAV1:
+		kind = C.kCMVideoCodecType_AV1
 	case CodecHardwareH264:
 		kind = C.kCMVideoCodecType_H264
 	case CodecHardwareHEVC:
@@ -146,10 +152,17 @@ func (e *nativeIntraEncoder) Encode(src image.Image, quality int) ([]byte, error
 	if status != 0 || output == nil || size == 0 || uint64(size) > 32*1024*1024 {
 		return nil, fmt.Errorf("VideoToolbox 硬體編碼失敗：%d", status)
 	}
-	return C.GoBytes(unsafe.Pointer(output), C.int(size)), nil
+	data := C.GoBytes(unsafe.Pointer(output), C.int(size))
+	if e.codec == C.kCMVideoCodecType_AV1 {
+		return packAV1(data, nil, &e.av1Sequence)
+	}
+	return data, nil
 }
 func DecodeIntra(codec WireCodec, payload []byte) (image.Image, error) {
-	d, _ := newIntraDecoder(codec)
+	d, err := newIntraDecoder(codec)
+	if err != nil {
+		return nil, err
+	}
 	defer d.Close()
 	img, err := d.Decode(payload)
 	return img, err
@@ -182,6 +195,9 @@ func (d *platformDecoder) SetDecodePolicy(p optimization.Policy) {
 }
 
 func newIntraDecoder(codec WireCodec) (IntraDecoder, error) {
+	if codec == WireAV1 {
+		return &macAV1Decoder{}, nil
+	}
 	return &platformDecoder{codec: codec}, nil
 }
 func (d *platformDecoder) Close() error         { C.yd_decoder_close(&d.native); return nil }
@@ -193,6 +209,15 @@ func (d *platformDecoder) Decode(payload []byte) (image.Image, error) {
 	return im, err
 }
 func decodeIntraStatus(codec WireCodec, payload []byte) (image.Image, string, error) {
+	if codec == WireAV1 {
+		d, err := newIntraDecoder(codec)
+		if err != nil {
+			return nil, "unknown", err
+		}
+		defer d.Close()
+		im, err := d.Decode(payload)
+		return im, "software", err
+	}
 	d := &platformDecoder{codec: codec}
 	defer d.Close()
 	return d.decode(payload)

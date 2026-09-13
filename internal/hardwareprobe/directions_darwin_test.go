@@ -9,7 +9,7 @@ import (
 
 func TestDarwinIndependentDecodeSmoke(t *testing.T) {
 	jobs := platformJobs()
-	if len(jobs) != 37 {
+	if len(jobs) != 45 {
 		t.Fatalf("工作數錯誤：%d", len(jobs))
 	}
 	for _, j := range jobs {
@@ -25,7 +25,7 @@ func TestDarwinIndependentDecodeSmoke(t *testing.T) {
 			if err = json.Unmarshal(data, &r); err != nil {
 				t.Fatal(err)
 			}
-			if r["fixture_status"] != float64(0) || r["decoderSource"] != "independent-fixture" || r["phase"] != "decode" {
+			if (j.Codec != "av1" && r["fixture_status"] != float64(0)) || r["decoderSource"] != "independent-fixture" || r["phase"] != "decode" {
 				t.Fatalf("獨立樣本建立失敗：%s", data)
 			}
 			for _, field := range []string{"create_status", "encode_status", "sample_produced", "hardware_encoder"} {

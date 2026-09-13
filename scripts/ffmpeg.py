@@ -70,7 +70,7 @@ def prepare(target, env):
     cc, cxx = env.get('CC', 'cc'), env.get('CXX', 'c++')
     if len(shlex.split(cc)) != 1 or len(shlex.split(cxx)) != 1:
         raise RuntimeError('CC／CXX 必須是單一編譯器路徑')
-    build_key = repr((SOURCES, target, cc, cxx, 'shared-v3-w32threads-native-time', tuple((k, env.get(k, '')) for k in ('CFLAGS', 'CXXFLAGS', 'LDFLAGS'))))
+    build_key = repr((SOURCES, target, cc, cxx, ('shared-v5-av1-videotoolbox' if system=='darwin' else 'shared-v4-av1-encoder'), tuple((k, env.get(k, '')) for k in ('CFLAGS', 'CXXFLAGS', 'LDFLAGS'))))
     signature = hashlib.sha256(build_key.encode()).hexdigest()[:12]
     build = CACHE / f'{system}-{arch}-{signature}'
     prefix = build / 'install'
@@ -79,7 +79,7 @@ def prepare(target, env):
         build.mkdir(parents=True, exist_ok=True)
         args = ['cmake', '-S', str(aom), '-B', str(build / 'aom'), '-DCMAKE_BUILD_TYPE=Release',
                 '-DBUILD_SHARED_LIBS=OFF', '-DENABLE_DOCS=OFF', '-DENABLE_TESTS=OFF', '-DENABLE_EXAMPLES=OFF',
-                '-DENABLE_TOOLS=OFF', '-DCONFIG_AV1_ENCODER=0', '-DCMAKE_POSITION_INDEPENDENT_CODE=ON',
+                '-DENABLE_TOOLS=OFF', '-DCONFIG_AV1_ENCODER=1', '-DCMAKE_POSITION_INDEPENDENT_CODE=ON',
                 f'-DCMAKE_INSTALL_PREFIX={prefix}', '-DCMAKE_INSTALL_LIBDIR=lib',
                 f'-DCMAKE_C_COMPILER={cc}', f'-DCMAKE_CXX_COMPILER={cxx}']
         if system == 'windows':
@@ -87,7 +87,7 @@ def prepare(target, env):
         else:
             args += [f'-DCMAKE_OSX_ARCHITECTURES={"arm64" if arch == "arm64" else "x86_64"}']
         subprocess.run(args, env=env, check=True)
-        subprocess.run(['cmake', '--build', str(build / 'aom'), '--parallel', '6'], env=env, check=True)
+        subprocess.run(['cmake', '--build', str(build / 'aom'), '--target', 'aom', 'aom_pc', '--parallel', '6'], env=env, check=True)
         subprocess.run(['cmake', '--install', str(build / 'aom')], env=env, check=True)
         work = build / 'ffmpeg'
         work.mkdir(exist_ok=True)
@@ -96,9 +96,11 @@ def prepare(target, env):
                 '--disable-everything', '--disable-autodetect', '--disable-programs', '--disable-doc',
                 '--disable-avdevice', '--disable-avformat', '--disable-avfilter', '--disable-swresample',
                 '--enable-avcodec', '--enable-avutil', '--enable-swscale', '--enable-shared', '--disable-static',
-                '--enable-libaom', '--enable-decoder=h264,hevc,libaom_av1',
+                '--enable-libaom', '--enable-decoder=h264,hevc,libaom_av1', '--enable-encoder=libaom_av1',
                 '--enable-parser=h264,hevc,av1', '--enable-pic', '--disable-debug',
                 '--pkg-config-flags=--static', f'--pkg-config={shutil.which("pkg-config")}']
+        if system == 'darwin':
+            args += ['--enable-videotoolbox', '--enable-hwaccel=av1_videotoolbox', '--install-name-dir=@rpath']
         if system == 'windows':
             toolprefix = str(Path(cc).parent / ('aarch64-w64-mingw32-' if arch == 'arm64' else 'x86_64-w64-mingw32-'))
             args += ['--enable-cross-compile', '--target-os=mingw32', '--disable-pthreads', '--enable-w32threads', f'--arch={"aarch64" if arch == "arm64" else "x86_64"}',
@@ -121,6 +123,11 @@ def prepare(target, env):
         subprocess.run(['make', 'install'], cwd=work, env=buildenv, check=True)
 
     configuration = (build / 'ffmpeg/config.h').read_text()
+    components = (build / 'ffmpeg/config_components.h').read_text()
+    if '#define CONFIG_LIBAOM_AV1_ENCODER 1' not in components:
+        raise RuntimeError('FFmpeg 快取未包含 AV1 軟體編碼器')
+    if system == 'darwin' and '#define CONFIG_AV1_VIDEOTOOLBOX_HWACCEL 1' not in components:
+        raise RuntimeError('FFmpeg 快取未包含 VideoToolbox AV1 硬解')
     if '#define CONFIG_GPL 0' not in configuration or '#define CONFIG_NONFREE 0' not in configuration:
         raise RuntimeError('拒絕非 LGPL 的 FFmpeg 組態')
     if system == 'windows':
@@ -131,13 +138,20 @@ def prepare(target, env):
     result = dict(env)
     result['CGO_CFLAGS'] = (result.get('CGO_CFLAGS', '') + f' -I{shlex.quote(str(prefix / "include"))}').strip()
     result['CGO_LDFLAGS'] = (result.get('CGO_LDFLAGS', '') + f' -L{shlex.quote(str(prefix / "lib"))}').strip()
+    if system == 'darwin':
+        result['CGO_LDFLAGS'] += ' -Wl,-rpath,@loader_path -Wl,-rpath,@loader_path/../Frameworks'
     return result, prefix
 
 
 def copy_runtime(prefix, folder):
     folder = Path(folder)
-    windows_runtime.validate(prefix / 'bin')
-    dlls = list((prefix / 'bin').glob('*.dll'))
+    if (prefix / 'bin/avcodec-62.dll').exists():
+        windows_runtime.validate(prefix / 'bin')
+        dlls = list((prefix / 'bin').glob('*.dll'))
+    else:
+        dlls = [prefix / 'lib' / name for name in ('libavcodec.62.dylib','libavutil.60.dylib','libswscale.9.dylib')]
+        if not all(p.is_file() for p in dlls):
+            raise RuntimeError('缺少 macOS FFmpeg 動態庫')
     if len(dlls) != 3:
         raise RuntimeError(f'FFmpeg 動態庫數量不符：{dlls}')
     for dll in dlls:
@@ -155,14 +169,22 @@ def copy_runtime(prefix, folder):
     shutil.copy2(__file__, dest / 'ffmpeg.py')
     shutil.copy2(Path(__file__).with_name('windows_runtime.py'), dest / 'windows_runtime.py')
     (dest / 'README.txt').write_text('YourDesk 使用 FFmpeg 8.1.1（LGPL 2.1 或更新）及 libaom 3.13.1（BSD）。\n'
-        'FFmpeg 未啟用 GPL 或 nonfree 元件。可替換程式旁的三個 DLL；不限制為除錯修改函式庫所需的逆向工程。\n'
+        'FFmpeg 未啟用 GPL 或 nonfree 元件。可替換 Windows 程式旁的 DLL 或 macOS App/Contents/Frameworks 內的 dylib；不限制為除錯修改函式庫所需的逆向工程。\n'
         '完整來源封存與重建腳本隨附。於 YourDesk 原始碼執行 scripts/ffmpeg.py 可重建。\n', encoding='utf-8')
 
 
 if __name__ == '__main__':
     if len(sys.argv) < 4 or sys.argv[2:4] not in (['go', 'test'], ['go', 'build']):
-        raise SystemExit('用法：python3 scripts/ffmpeg.py windows/amd64 go test|build [參數]')
+        raise SystemExit('用法：python3 scripts/ffmpeg.py 平台/架構 go test|build [參數]')
+    import release
+    import turbojpeg
     target = sys.argv[1]
-    system, arch = target.split('/')
-    env, _ = prepare(target, dict(os.environ, GOOS=system, GOARCH=arch, CGO_ENABLED='1'))
-    subprocess.run(sys.argv[2:4] + ['-tags', 'ffmpeg'] + sys.argv[4:], env=env, check=True)
+    env, prefix = prepare(target, release.environment(target, True))
+    env, jpeg_source = turbojpeg.prepare(target, env)
+    if sys.argv[3] == 'test' and target.startswith('darwin/'):
+        env['CGO_LDFLAGS'] += ' -Wl,-rpath,' + shlex.quote(str(prefix / 'lib'))
+    subprocess.run(sys.argv[2:4] + ['-tags', 'turbojpeg,ffmpeg'] + sys.argv[4:], env=env, check=True)
+    if sys.argv[3] == 'build' and '-o' in sys.argv[4:]:
+        output = Path(sys.argv[sys.argv.index('-o') + 1]).resolve().parent
+        copy_runtime(prefix, output)
+        turbojpeg.copy_licenses(jpeg_source, output)
