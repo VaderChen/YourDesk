@@ -62,6 +62,8 @@ public final class MainActivity extends Activity {
   private int videoWidth;
   private int videoHeight;
   private boolean videoMode;
+  private boolean videoKeyframeRequested;
+  private long videoSequence;
   private Button nativeBack;
   private LinearLayout desktopTools;
   private Button scaleButton;
@@ -188,6 +190,7 @@ public final class MainActivity extends Activity {
 
       @Override public boolean onSurfaceTextureDestroyed(android.graphics.SurfaceTexture texture) {
         videoDecoder.reset();
+        videoKeyframeRequested = false;
         if (videoSurface != null) {
           videoSurface.release();
           videoSurface = null;
@@ -510,6 +513,8 @@ public final class MainActivity extends Activity {
     pendingVideoFrame = null;
     videoWidth = videoHeight = 0;
     videoMode = false;
+    videoKeyframeRequested = false;
+    videoSequence = 0;
     videoDecoder.reset();
     if (nativeVideo != null) nativeVideo.setVisibility(View.GONE);
   }
@@ -552,13 +557,28 @@ public final class MainActivity extends Activity {
     int rendered = videoDecoder.queue(frame, videoSurface);
     if (rendered < 0) {
       Log.w("YourDeskVideo", "MediaCodec 無法解碼 " + frame.codec + "，等待下一個 keyframe");
+      requestVideoKeyframe();
       return false;
     }
     if (rendered > 0 && web != null) {
       String label = frame.codec == 1 ? "H.264" : "HEVC";
       web.evaluateJavascript("window.desktopFrameStatus&&window.desktopFrameStatus(" + frame.width + "," + frame.height + ",false,'" + label + "'," + 0 + ")", null);
     }
+    if (rendered > 0) videoKeyframeRequested = false;
     return rendered > 0;
+  }
+
+  /** 解碼器重建或 Surface 回來後，請 Host 優先送出新的 IDR。 */
+  private void requestVideoKeyframe() {
+    if (videoKeyframeRequested || viewer == null || !inDesktop) return;
+    videoKeyframeRequested = true;
+    io.execute(() -> {
+      try {
+        viewer.callCommand("video.keyframe");
+      } catch (Exception ignored) {
+        // 舊版 Host 沒有此指令時，仍等待週期性 keyframe。
+      }
+    });
   }
 
   private void resetStats() {
@@ -592,6 +612,7 @@ public final class MainActivity extends Activity {
     uiHandler.post(new Runnable() {
       @Override public void run() {
         if (epoch != generation || !inDesktop || session != viewer) return;
+        if (videoMode && videoDecoder.drainOutput() < 0) requestVideoKeyframe();
         // 一次排空佇列，避免一個輪詢週期只取一塊而造成差分延遲。
         boolean presented = false;
         for (int i = 0; i < 32; i++) {
@@ -688,7 +709,9 @@ public final class MainActivity extends Activity {
           if (!composedFrame.isRecycled()) composedFrame.recycle();
           composedFrame = null;
         }
+        if (videoSequence > 0 && sequence <= videoSequence) return false;
         composedSequence = sequence;
+        videoSequence = sequence;
         boolean rendered = presentVideoFrame(frame);
         if (desktopPageReady) {
           nativeScreen.setVisibility(View.GONE);
