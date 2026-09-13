@@ -43,7 +43,42 @@ public final class DecoderSupport {
 
   /** 回傳第一個非 software decoder 的名稱；null 表示沒有候選。 */
   public static String findHardwareDecoder(String mime) {
-    return findDecoder(mime, true);
+    String[] candidates = hardwareDecoders(mime);
+    return candidates.length == 0 ? null : candidates[0];
+  }
+
+  /**
+   * 回傳所有硬體候選，讓 runtime configure 失敗時能嘗試下一個實際 codec。
+   * MediaCodecList 的順序不是所有裝置都可靠，因此保留完整清單而不只取第一個。
+   */
+  public static String[] hardwareDecoders(String mime) {
+    java.util.ArrayList<String> result = new java.util.ArrayList<>();
+    try {
+      MediaCodecList list = new MediaCodecList(MediaCodecList.REGULAR_CODECS);
+      for (MediaCodecInfo info : list.getCodecInfos()) {
+        if (info.isEncoder()) continue;
+        boolean supports = false;
+        for (String type : info.getSupportedTypes()) {
+          if (mime.equalsIgnoreCase(type)) {
+            supports = true;
+            break;
+          }
+        }
+        if (!supports || !isHardware(info)) continue;
+        if (!result.contains(info.getName())) result.add(info.getName());
+      }
+    } catch (RuntimeException ignored) {
+      // codec 清單不是所有裝置都能在背景啟動階段讀取。
+    }
+    return result.toArray(new String[0]);
+  }
+
+  private static boolean isHardware(MediaCodecInfo info) {
+    if (Build.VERSION.SDK_INT >= 29) {
+      return !info.isSoftwareOnly() && info.isHardwareAccelerated();
+    }
+    String name = info.getName().toLowerCase(Locale.ROOT);
+    return !name.contains("google") && !name.contains("software") && !name.contains("sw.");
   }
 
   private static String findDecoder(String mime, boolean hardwareOnly) {
@@ -59,14 +94,7 @@ public final class DecoderSupport {
           }
         }
         if (!supports) continue;
-        if (hardwareOnly) {
-          if (Build.VERSION.SDK_INT >= 29) {
-            if (info.isSoftwareOnly() || !info.isHardwareAccelerated()) continue;
-          } else if (info.getName().toLowerCase(Locale.ROOT).contains("google")
-              || info.getName().toLowerCase(Locale.ROOT).contains("software")) {
-            continue;
-          }
-        }
+        if (hardwareOnly && !isHardware(info)) continue;
         return info.getName();
       }
     } catch (RuntimeException ignored) {

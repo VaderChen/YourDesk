@@ -205,6 +205,28 @@ func (v *Viewer) TrafficJSON() string {
 	return string(b)
 }
 
+// SupportsCommand 與 CallCommand 供 Android 在硬體解碼器重建後要求 Host
+// 立即送出 IDR；舊版 Host 不支援時由呼叫端忽略錯誤並等待週期性 keyframe。
+func (v *Viewer) SupportsCommand(method string) bool {
+	v.mu.Lock()
+	p := v.peer
+	v.mu.Unlock()
+	return p != nil && p.SupportsCommand(method)
+}
+
+func (v *Viewer) CallCommand(method string) error {
+	v.mu.Lock()
+	p := v.peer
+	v.mu.Unlock()
+	if p == nil {
+		return fmt.Errorf("遠端尚未連線")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := p.CallCommand(ctx, method)
+	return err
+}
+
 type TerminalSession struct {
 	viewer   *Viewer
 	mu       sync.Mutex
