@@ -644,7 +644,7 @@ public final class MainActivity extends Activity {
           if (json == null || json.isEmpty()) break;
           presented |= applyFrameJSON(json);
         }
-        if (presented && inDesktop && !desktopPageReady) showDesktopPage(session, epoch);
+        if ((presented || videoMode || composedFrame != null) && inDesktop && !desktopPageReady) showDesktopPage(session, epoch);
         updateDesktopStats(session, presented);
         uiHandler.postDelayed(this, 50);
       }
