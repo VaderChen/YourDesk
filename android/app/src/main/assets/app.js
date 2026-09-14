@@ -25,7 +25,7 @@ function render(){
  const filtered=sites.filter(site=>[site.name,site.note,site.id].join(' ').toLocaleLowerCase().includes(query));
  document.getElementById('count').textContent=t('count').replace('{n}',filtered.length);
  document.getElementById('empty').hidden=filtered.length!==0;
- const list=document.getElementById('sites');list.replaceChildren();
+ const list=document.getElementById('sites');while(list.firstChild)list.removeChild(list.firstChild);
  for(const site of filtered){
   const card=document.createElement('article');card.className='site'+(site.online?' online':'');
   card.innerHTML=`<div class="identity"><span class="device">${icon('desktop')}</span><div><div class="name"></div><div class="note"></div></div></div><div class="identifier"></div><div class="actions"></div>`;
