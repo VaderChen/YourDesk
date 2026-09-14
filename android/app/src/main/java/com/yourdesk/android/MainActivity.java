@@ -31,6 +31,14 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.webkit.WebChromeClient;
 import android.webkit.PermissionRequest;
+import androidx.camera.core.CameraSelector;
+import androidx.camera.core.ImageAnalysis;
+import androidx.camera.core.ImageProxy;
+import androidx.camera.lifecycle.ProcessCameraProvider;
+import androidx.core.content.ContextCompat;
+import com.google.mlkit.vision.barcode.BarcodeScanning;
+import com.google.mlkit.vision.barcode.BarcodeScanner;
+import com.google.mlkit.vision.common.InputImage;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.Button;
@@ -45,6 +53,7 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
+import androidx.lifecycle.ProcessLifecycleOwner;
 
 import com.yourdesk.androidcore.core.TerminalSession;
 import com.yourdesk.androidcore.core.Viewer;
@@ -87,6 +96,9 @@ public final class MainActivity extends Activity {
   private TerminalSession terminal;
   private boolean inTerminal;
   private boolean inDesktop;
+  private ProcessCameraProvider qrCameraProvider;
+  private BarcodeScanner qrScanner;
+  private boolean qrScanning;
   private boolean desktopPageReady;
   // 返回鍵位於所有 WebView/影像層之上；記住按下狀態，避免子 View 在 DOWN/UP
   // 之間切換時吞掉事件，造成需要連按多次才返回。
@@ -868,6 +880,30 @@ public final class MainActivity extends Activity {
   }
 
   final class Bridge {
+    @JavascriptInterface public void startQrScanner() {
+      if (qrScanning) return;
+      qrScanning = true;
+      runOnUiThread(() -> {
+        try {
+          qrScanner = BarcodeScanning.getClient();
+          ProcessCameraProvider.getInstance(MainActivity.this).addListener(() -> {
+            try {
+              qrCameraProvider = ProcessCameraProvider.getInstance(MainActivity.this).get();
+              ImageAnalysis analysis = new ImageAnalysis.Builder().setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST).build();
+              analysis.setAnalyzer(ContextCompat.getMainExecutor(MainActivity.this), image -> analyzeQr(image));
+              qrCameraProvider.unbindAll();
+              qrCameraProvider.bindToLifecycle(ProcessLifecycleOwner.get(), CameraSelector.DEFAULT_BACK_CAMERA, analysis);
+            } catch (Exception e) { qrScanning = false; }
+          }, ContextCompat.getMainExecutor(MainActivity.this));
+        } catch (Exception e) { qrScanning = false; }
+      });
+    }
+    private void analyzeQr(ImageProxy proxy) {
+      if (!qrScanning || qrScanner == null || proxy.getImage() == null) { proxy.close(); return; }
+      InputImage image = InputImage.fromMediaImage(proxy.getImage(), proxy.getImageInfo().getRotationDegrees());
+      qrScanner.process(image).addOnSuccessListener(codes -> { for (com.google.mlkit.vision.barcode.common.Barcode code : codes) { String value = code.getRawValue(); if (value != null && value.startsWith("yourdesk://")) { qrScanning = false; web.evaluateJavascript("window.qrCodeDetected&&window.qrCodeDetected(" + org.json.JSONObject.quote(value) + ")", null); stopQrScanner(); break; } } }).addOnCompleteListener(t -> proxy.close());
+    }
+    @JavascriptInterface public void stopQrScanner() { qrScanning = false; if (qrCameraProvider != null) { qrCameraProvider.unbindAll(); qrCameraProvider = null; } if (qrScanner != null) { qrScanner.close(); qrScanner = null; } }
     @JavascriptInterface public void setSiteDialogVisible(boolean visible) {
       if (nativeScreen == null || nativeVideo == null) return;
       if (visible) { nativeScreen.setVisibility(View.GONE); nativeVideo.setVisibility(View.GONE); }

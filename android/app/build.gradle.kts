@@ -20,8 +20,13 @@ dependencies {
     implementation("androidx.core:core-ktx:1.16.0")
     implementation("androidx.activity:activity:1.10.1")
     implementation("androidx.lifecycle:lifecycle-runtime:2.9.2")
+    implementation("androidx.lifecycle:lifecycle-process:2.9.2")
     implementation("androidx.webkit:webkit:1.14.0")
     // 預編譯 FFmpeg 共享庫；APK 僅輸出目前支援的 arm64-v8a。
     // 先作 fallback runtime 與能力探測，實際即時影格仍優先使用 Android 硬解。
     implementation("com.mrljdx:ffmpeg-kit-full:6.1.4")
+    implementation("androidx.camera:camera-camera2:1.4.2")
+    implementation("androidx.camera:camera-lifecycle:1.4.2")
+    implementation("androidx.camera:camera-view:1.4.2")
+    implementation("com.google.mlkit:barcode-scanning:17.3.0")
 }
