@@ -1,8 +1,8 @@
 ## 繁體中文
 
-- 新增 Viewer 裁切串流：預設裁切框置中、寬高各半並對齊 8 像素。拖曳框內移動、邊角調整，再按裁切套用；Host 只串流選取區域。按復原會先顯示 WebView 確認對話框，確認後恢復全畫面。Host 須支援區域串流。
+- 新增 顯示區域 裁切串流：預設裁切框置中、寬高各半並對齊 8 像素。拖曳框內移動、邊角調整，再按裁切套用；Host 只串流選取區域。按復原會先顯示 WebView 確認對話框，確認後恢復全畫面。Host 須支援區域串流。
 - 修正 macOS 調整裁切框時背景變黑；裁切與 Retina／縮放畫面的滑鼠座標沿用同一區域換算。
-- 修正 Shift／Ctrl 等修飾鍵與滑鼠事件的送出順序，macOS 點擊、拖曳及滾輪套用修飾鍵。Viewer 與 macOS Host 都需更新。
+- 修正 Shift／Ctrl 等修飾鍵與滑鼠事件的送出順序，macOS 點擊、拖曳及滾輪套用修飾鍵。顯示區域 與 macOS Host 都需更新。
 - 本機 ID 旁新增站台 QR Code，可分享名稱、ID 與伺服器位址，不包含密碼。此版僅提供桌面端產生功能，不包含手機 App 更新。
 - 工具列僅保留 FPS，泡泡顯示畫面增強、策略、演算法、尺寸及碼率；增強生效時 FPS 呈綠色。TX／RX 上下排列，分別使用暗紅／暗綠；設備 ID 縮小。修正 Windows 圖示靠右排列，裁切旁加入分隔線。
 - 站台已連線時圖示顯示綠色，建立連線中為琥珀色；不因 Presence 查詢失敗而把已連線設備顯示為灰色。
@@ -15,9 +15,9 @@
 
 ## English
 
-- Adds Viewer region streaming with a centered half-width/half-height crop aligned to 8 pixels. Drag the box or handles, then press Crop to apply. Restore asks for confirmation in a WebView before returning to the full screen. The Host must support region streaming.
+- Adds display area region streaming with a centered half-width/half-height crop aligned to 8 pixels. Drag the box or handles, then press Crop to apply. Restore asks for confirmation in a WebView before returning to the full screen. The Host must support region streaming.
 - Fixes the black background while adjusting a crop on macOS; pointer mapping accounts for the selected region, Retina and display scaling.
-- Preserves modifier-key/mouse ordering and applies modifiers to macOS clicks, drags and scrolling. Update both the Viewer and macOS Host.
+- Preserves modifier-key/mouse ordering and applies modifiers to macOS clicks, drags and scrolling. Update both the display area and macOS Host.
 - Adds desktop site QR codes containing the name, ID and signaling address, without passwords. No mobile app update is included.
 - Consolidates enhancement details into the FPS tooltip; FPS turns green when enhancement is active. Stacks dark-red TX and dark-green RX, reduces the ID font, fixes Windows toolbar alignment and adds a crop separator.
 - Connected sites stay green even when presence lookup fails; connecting sites use amber.
@@ -30,9 +30,9 @@ An empty Go project also triggered antivirus detections; this is not a scan of t
 
 ## 日本語
 
-- Viewer に領域ストリーミングを追加。初期枠は中央・幅と高さが各半分で、8 ピクセル単位に調整します。枠やハンドルをドラッグし、再度切り抜きを押して適用します。復元は WebView の確認後に画面全体へ戻ります。Host の領域配信対応が必要です。
+- 表示領域 に領域ストリーミングを追加。初期枠は中央・幅と高さが各半分で、8 ピクセル単位に調整します。枠やハンドルをドラッグし、再度切り抜きを押して適用します。復元は WebView の確認後に画面全体へ戻ります。Host の領域配信対応が必要です。
 - macOS の切り抜き編集中に背景が黒くなる問題を修正。領域、Retina、表示倍率に合わせてマウス座標を変換します。
-- 修飾キーとマウスの送信順序を修正し、macOS のクリック、ドラッグ、スクロールに適用します。Viewer と macOS Host の両方を更新してください。
+- 修飾キーとマウスの送信順序を修正し、macOS のクリック、ドラッグ、スクロールに適用します。表示領域 と macOS Host の両方を更新してください。
 - 名前、ID、サーバー情報を含むパスワードなしのデスクトップ用 QR コードを追加。モバイルアプリ更新は含みません。
 - 増強情報を FPS の吹き出しへ統合し、有効時は緑色に表示。TX／RX を上下に配置し暗赤／暗緑に変更。ID の文字を縮小し、Windows の右寄せと切り抜きの区切り線を調整しました。
 - 接続済みは緑、接続中は琥珀色。オンライン確認に失敗しても接続済みを灰色にしません。
@@ -45,7 +45,7 @@ macOS arm64 署名／公証 DMG、Windows x64／arm64 インストーラー、Wi
 
 ## 한국어
 
-- Viewer 영역 스트리밍을 추가했습니다. 기본 자르기 상자는 화면 중앙에 가로·세로 절반 크기로 배치하며 8픽셀 단위로 맞춥니다. 상자와 핸들을 드래그하고 자르기를 다시 눌러 적용합니다. 복원은 WebView 확인 후 전체 화면으로 돌아갑니다. Host의 영역 스트리밍 지원이 필요합니다.
+- 표시 영역 영역 스트리밍을 추가했습니다. 기본 자르기 상자는 화면 중앙에 가로·세로 절반 크기로 배치하며 8픽셀 단위로 맞춥니다. 상자와 핸들을 드래그하고 자르기를 다시 눌러 적용합니다. 복원은 WebView 확인 후 전체 화면으로 돌아갑니다. Host의 영역 스트리밍 지원이 필요합니다.
 - macOS 자르기 편집 중 검은 배경을 수정했습니다. 영역, Retina 및 화면 배율에 맞춰 마우스 좌표를 변환합니다.
 - 보조 키와 마우스의 전송 순서를 수정하고 macOS 클릭·드래그·스크롤에 보조 키를 적용합니다. Viewer와 macOS Host 모두 업데이트해야 합니다.
 - 이름, ID, 서버 정보를 담고 비밀번호는 제외하는 데스크톱 QR 코드를 추가했습니다. 모바일 앱 업데이트는 포함하지 않습니다.

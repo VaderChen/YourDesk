@@ -12,7 +12,7 @@ HTTPS 傳輸使用建立工作階段的 POST、POST 傳訊、GET 長輪詢與心
 
 ## Client 接入範圍
 
-一般 Client Host、Remote Viewer、未登入 Host 與 WinPE 共用 `signaling.Dial`，均適用此備援；Tailcat 與原生 P2P 的協商也沿用相同訊號通道。WSS 建立失敗才改用 HTTPS；既有連線中斷後由呼叫端重連，並非將進行中的握手無縫搬移。
+一般 Client Host、Remote 顯示區域、未登入 Host 與 WinPE 共用 `signaling.Dial`，均適用此備援；Tailcat 與原生 P2P 的協商也沿用相同訊號通道。WSS 建立失敗才改用 HTTPS；既有連線中斷後由呼叫端重連，並非將進行中的握手無縫搬移。
 
 HTTPS 工作階段建立上限 10 秒，長輪詢上限由 Server 設為 20 秒，Client 每 15 秒送出心跳。關閉會取消待處理的輪詢、傳訊及心跳，另以最多 3 秒的 DELETE 回收工作階段；重複關閉不重複送出。POST 使用相同序號重試，GET 使用接收確認，保留原封包與簽章。診斷事件記錄所選通道，不記錄工作階段 Token。
 
@@ -23,8 +23,8 @@ HTTPS 工作階段建立上限 10 秒，長輪詢上限由 Server 設為 20 秒�
 使用正式主機 `desktop.mars-cloud.com:8081` 與獨立隨機測試房間，未連接或操作使用者桌面：
 
 - HTTPS 健康檢查回傳 204，TLS 1.3 與憑證驗證成功。
-- HTTPS Host／Viewer 雙向 Offer、Answer 及 HMAC 驗證成功，特殊字元與繁中 payload 保持一致。
-- HTTPS Host 搭配 WSS Viewer、WSS Host 搭配 HTTPS Viewer 均成功。
+- HTTPS Host／顯示區域 雙向 Offer、Answer 及 HMAC 驗證成功，特殊字元與繁中 payload 保持一致。
+- HTTPS Host 搭配 WSS 顯示區域、WSS Host 搭配 HTTPS 顯示區域 均成功。
 - 指定同主機未提供 WSS 的埠，Client 建立失敗後自動改用 HTTPS 8081，完成訊號交換。
 - Host 送出 Offer 後閒置 46 秒，仍可查得待機狀態並完成配對；工作階段關閉請求成功。
 

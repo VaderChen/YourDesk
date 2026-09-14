@@ -78,7 +78,7 @@ run_client() {
   echo "ROOM：$ROOM"
   echo "配對服務：$SIGNAL_URL"
   echo "macOS 請允許螢幕錄製與輔助使用；變更權限後重新執行。"
-  echo "等待 Viewer 連線；按 Ctrl-C 結束 Client。"
+  echo "等待 顯示區域 連線；按 Ctrl-C 結束 Client。"
 	"$BIN/yourdesk-client" -signal "$SIGNAL_URL" -room "$ROOM" ${CLIENT_ARGS[@]+"${CLIENT_ARGS[@]}"}
 }
 

@@ -44,7 +44,7 @@ Windows CGO 另外執行下述原生矩陣。只回報真正執行的後端；JP
 
 狀態讀取只複製記憶體快照，不等待子程序。既有 `hardwareJPEG` 欄位改用非阻塞的 JPEG 快取讀取；尚未完成時不宣告可用，舊同步查詢介面仍保留給原有非 UI 使用者。
 
-結果僅保留本次程序記憶體，不落地硬體快取；新視窗啟動不依賴前次結果。APP 在結果完成後透過 Host 與 Viewer 私有控制管道送出受限策略。Host 於新連線通道建立後固定採用；Viewer 格式公告可讀取晚到的解碼結果，原生解碼參數則於新解碼工作階段建立時取得快照。僅實測尺寸可用於略過重複探測或排除失敗組合；未確認／未測尺寸維持原本 runtime 檢查。硬解探測失敗不直接否定軟解，沒有用首張時間排列 codec 快慢。詳見 STREAM-OPTIMIZATION.md。
+結果僅保留本次程序記憶體，不落地硬體快取；新視窗啟動不依賴前次結果。APP 在結果完成後透過 Host 與 顯示區域 私有控制管道送出受限策略。Host 於新連線通道建立後固定採用；顯示區域 格式公告可讀取晚到的解碼結果，原生解碼參數則於新解碼工作階段建立時取得快照。僅實測尺寸可用於略過重複探測或排除失敗組合；未確認／未測尺寸維持原本 runtime 檢查。硬解探測失敗不直接否定軟解，沒有用首張時間排列 codec 快慢。詳見 STREAM-OPTIMIZATION.md。
 
 ### 主畫面最佳化提示
 
@@ -112,11 +112,11 @@ Windows CGO 包含 JPEG／H.264／HEVC／AV1 各 128×128、1920×1080 十六個
 
 ## Windows FFmpeg LGPL 建置
 
-正式 Windows Client／Viewer 啟用 `ffmpeg,turbojpeg` build tags。`scripts/ffmpeg.py` 驗證固定來源 SHA-256，建置包含 H.264／HEVC／libaom AV1 解碼器、libaom AV1 編碼器、必要 parser 及色彩轉換的 FFmpeg 動態庫；明確檢查 GPL=0、nonfree=0。不啟動 ffmpeg.exe，不每張重建 decoder。libaom 使用內建 Win32 執行緒，不額外依賴 winpthreads DLL。
+正式 Windows Client／顯示區域 啟用 `ffmpeg,turbojpeg` build tags。`scripts/ffmpeg.py` 驗證固定來源 SHA-256，建置包含 H.264／HEVC／libaom AV1 解碼器、libaom AV1 編碼器、必要 parser 及色彩轉換的 FFmpeg 動態庫；明確檢查 GPL=0、nonfree=0。不啟動 ffmpeg.exe，不每張重建 decoder。libaom 使用內建 Win32 執行緒，不額外依賴 winpthreads DLL。
 
 安裝包包含 `avcodec-62.dll`、`avutil-60.dll`、`swscale-9.dll`，以及 LGPL/BSD 授權、完整來源封存和重建腳本。DLL 可替換。macOS 同樣加入 FFmpeg 的 AV1 編解碼，硬解使用其 VideoToolbox 後端。一般未帶 `ffmpeg` tag 的開發建置會明確回報未包含此 decoder，不能當作正式 Windows 支援測試。
 
-已在本機執行相同來源 CPU 函式庫的 H.264／HEVC／AV1 固定影格、尺寸、黑色像素、I/P/P 參考影格及損毀輸入 Smoke。Windows x64 Client／Viewer，以及 x64／ARM64 原生測試已交叉編譯，DLL 打包通過；Windows 實機的驅動與 GPU→CPU 切換仍待實測，不將交叉編譯當成實機通過。
+已在本機執行相同來源 CPU 函式庫的 H.264／HEVC／AV1 固定影格、尺寸、黑色像素、I/P/P 參考影格及損毀輸入 Smoke。Windows x64 Client／顯示區域，以及 x64／ARM64 原生測試已交叉編譯，DLL 打包通過；Windows 實機的驅動與 GPU→CPU 切換仍待實測，不將交叉編譯當成實機通過。
 
 ### Windows 啟動缺檔修正（2026-09-13）
 

@@ -136,11 +136,11 @@ RIFE 4.25 Lite 的轉換模型內嵌於 `internal/frameinterp`，來源、SHA256
 
 若程式仍在執行，請先完整結束後再開啟 `clientUI.app`。一般安裝版與直接執行 `runUITest.command` 維持正常版本判斷；後者也可用 `YOURDESK_TEST_UPDATE=1 ./runUITest.command` 啟用相同測試。
 
-Linux CLI 目標為 `linux/x64`、`linux/arm64`，兩者均包含於預設全平台建置，輸出 `YourDesk-版本-linux-架構-cli.zip`。套件只有 Host，不包含圖形 Viewer。各平台 README 提供繁中、英、日、韓使用方式；不附重複的使用說明.txt。
+Linux CLI 目標為 `linux/x64`、`linux/arm64`，兩者均包含於預設全平台建置，輸出 `YourDesk-版本-linux-架構-cli.zip`。套件只有 Host，不包含圖形 顯示區域。各平台 README 提供繁中、英、日、韓使用方式；不附重複的使用說明.txt。
 
 ## Windows／macOS FFmpeg LGPL
 
-Windows 桌面 Client／Viewer 正式建置使用 `turbojpeg,ffmpeg` tags，附帶三個 FFmpeg 動態庫、授權與來源封存。快取以來源版本、編譯器與組態識別；命中有效快取便不重新編譯。DLL 相依閉包檢查會阻止缺檔套件發布。macOS 的 AV1 透過 FFmpeg 接入 VideoToolbox 硬解與 libaom 軟體編解碼，隨附三個 dylib；H.264／HEVC 保留原生 VideoToolbox。詳見 [編解碼分析](HARDWARE-DETECTION.md)。
+Windows 桌面 Client／顯示區域 正式建置使用 `turbojpeg,ffmpeg` tags，附帶三個 FFmpeg 動態庫、授權與來源封存。快取以來源版本、編譯器與組態識別；命中有效快取便不重新編譯。DLL 相依閉包檢查會阻止缺檔套件發布。macOS 的 AV1 透過 FFmpeg 接入 VideoToolbox 硬解與 libaom 軟體編解碼，隨附三個 dylib；H.264／HEVC 保留原生 VideoToolbox。詳見 [編解碼分析](HARDWARE-DETECTION.md)。
 
 目前發布排除 `android/`、`androidcore/` 與本機編譯輸出；預設六個平台維持不變。
 
@@ -152,8 +152,8 @@ macOS 正式 App 封裝現在需要完整 Xcode 27 SDK，用於編譯 App Intent
 
 macOS DMG 使用 ULMO（LZMA）壓縮，支援範圍涵蓋產品要求的 macOS 12 以上；Windows 免安裝、WinPE 與 Linux ZIP 使用標準 Deflate 第 9 級。Windows 安裝程式維持既有的 solid LZMA。壓縮在封裝階段執行，可能增加建包時間；不改變解壓後的功能或資料。
 
-共用版號位於 `internal/buildinfo`，正式建置以 `-X 'yourdesk/internal/buildinfo.Version=1.YY.MMDD build HHmm'` 注入；Viewer 不再為了讀取版號而依賴整個 `clientui`。自行建置的腳本應同步使用此符號。未注入版號時，仍採執行檔修改時間產生開發版號。
+共用版號位於 `internal/buildinfo`，正式建置以 `-X 'yourdesk/internal/buildinfo.Version=1.YY.MMDD build HHmm'` 注入；顯示區域 不再為了讀取版號而依賴整個 `clientui`。自行建置的腳本應同步使用此符號。未注入版號時，仍採執行檔修改時間產生開發版號。
 
-2026-09-14 本機比較：build 1007 的相同 DMG 內容由 65,554,123 bytes 壓縮到 53,115,461 bytes（62.5 → 50.7 MiB，減少 18.97%）；掛載後 App 的 35 個檔案／連結完全一致。同一份工作樹與建置旗標下，拆除版號依賴使 Viewer 由 48,201,522 降到 47,013,186 bytes，另減少約 1.1 MiB；此減少量尚未包含於前述 DMG 比較數字。
+2026-09-14 本機比較：build 1007 的相同 DMG 內容由 65,554,123 bytes 壓縮到 53,115,461 bytes（62.5 → 50.7 MiB，減少 18.97%）；掛載後 App 的 35 個檔案／連結完全一致。同一份工作樹與建置旗標下，拆除版號依賴使 顯示區域 由 48,201,522 降到 47,013,186 bytes，另減少約 1.1 MiB；此減少量尚未包含於前述 DMG 比較數字。
 
-本輪保留編解碼、AI 模型、第三方授權、精確來源封存與重建腳本；未刪除功能。已完成映像校驗與內容比對、版號注入一致性，以及 FFmpeg／TurboJPEG Viewer 和管理介面 Smoke。體積比較映像只用於驗證，尚未重新簽章、公證或發布正式套件。
+本輪保留編解碼、AI 模型、第三方授權、精確來源封存與重建腳本；未刪除功能。已完成映像校驗與內容比對、版號注入一致性，以及 FFmpeg／TurboJPEG 顯示區域 和管理介面 Smoke。體積比較映像只用於驗證，尚未重新簽章、公證或發布正式套件。

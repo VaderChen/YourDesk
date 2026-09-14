@@ -1,6 +1,6 @@
 # 滑鼠與修飾鍵組合
 
-程式檢查發現三個環節可能使組合操作失效：Viewer 的修飾鍵進入非同步鍵盤佇列，滑鼠卻直接送出；備援鍵盤在同一幀的滑鼠之後才處理；macOS Host 建立滑鼠 CGEvent 時沒有明確套用遠端鍵盤的修飾旗標。這是程式路徑的發現，不是對使用者當次操作已完成封包擷取的結論。
+程式檢查發現三個環節可能使組合操作失效：顯示區域 的修飾鍵進入非同步鍵盤佇列，滑鼠卻直接送出；備援鍵盤在同一幀的滑鼠之後才處理；macOS Host 建立滑鼠 CGEvent 時沒有明確套用遠端鍵盤的修飾旗標。這是程式路徑的發現，不是對使用者當次操作已完成封包擷取的結論。
 
 ## 修正
 
@@ -10,12 +10,12 @@
 
 macOS 注入端以原子狀態保存已映射的修飾旗標，明確套用到滑鼠按下／放開、拖曳、移動與滾輪。RawKey 使用既有目標平台映射後的快照，舊 Key 逐鍵更新；不把數字鍵盤旗標帶入滑鼠事件。現有 Windows／macOS Ctrl／Command 映射規則不變。
 
-需更新 Viewer 以取得送出順序修正；macOS 被控端也需更新以取得注入修正。封包格式不變。
+需更新 顯示區域 以取得送出順序修正；macOS 被控端也需更新以取得注入修正。封包格式不變。
 
 ## Smoke
 
 - `go test -race ./internal/clipboard ./internal/input ./internal/hostsession`：含修飾鍵與滑鼠的交接順序，以及移動洪流不排擠釋放事件。
 - `python3 scripts/smoke-macos-input-modifiers.py`：建立實際 CGEvent，攔截 Post，驗證原始／備援修飾鍵、左／右／中鍵、拖曳、滾輪及釋放；不向使用者桌面注入事件。
-- 啟用 FFmpeg／TurboJPEG 的 Viewer 編譯與 Smoke。
+- 啟用 FFmpeg／TurboJPEG 的 顯示區域 編譯與 Smoke。
 
 尚待兩端更新後，在 Finder／應用程式內驗證 Shift 範圍選取、Ctrl 點擊、Command 多選及修飾鍵拖曳。原生事件旗標正確不等同所有應用程式的組合行為已實機確認。

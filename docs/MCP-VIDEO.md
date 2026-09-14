@@ -6,7 +6,7 @@
 
 `connect` 的桌面選項 `videoMode` 可省略，或指定 `streaming`／`paused`，不可與 terminal 或 diagnostics 同時指定。省略維持串流；paused 完成協商後暫停。舊 Host 未提供此能力時保留連線、退回全螢幕串流，APP 顯示提示。協商前可能有少量在途影格。
 
-connect 成功只表示啟動。等待 `get_status.processes[].stage == "connected"` 後使用畫面工具；暫停模式不需要先收到影格才會 connected。不要將隱藏 Viewer 視窗誤認為暫停串流。
+connect 成功只表示啟動。等待 `get_status.processes[].stage == "connected"` 後使用畫面工具；暫停模式不需要先收到影格才會 connected。不要將隱藏 顯示區域 視窗誤認為暫停串流。
 
 ## 工具與輸入
 
@@ -34,7 +34,7 @@ get_video_state 的 JSON 位於 MCP structuredContent，主要欄位如下：
 | display、displayCount | 選取螢幕索引（從 0 起）及數量；初始化尚未取得資訊時數量可為 0 |
 | changing | 切換或結果尚未確認；true 時不要依最近確認的 mode/region 執行輸入 |
 | inputReady | 畫面與視野已就緒；仍須同時確認 controlEnabled |
-| controlEnabled | Viewer 是否允許鍵鼠控制；F12 停用時為 false |
+| controlEnabled | 顯示區域 是否允許鍵鼠控制；F12 停用時為 false |
 | capabilitiesKnown | 是否已收到可辨識的 P2P 指令能力公告；false 不能直接斷言是舊版 |
 | capabilities.region | 是否提供視野設定指令 |
 | capabilities.pause | 是否提供暫停／恢復指令 |
@@ -57,17 +57,17 @@ set_video_mode 與 snapshot 的 JSON 位於 structuredContent，並以 JSON text
 
 move／button 的 x/y 相對於**回傳圖片**：左上 `(0,0)`、右下 `(1,1)`、中心 `(0.5,0.5)`。Agent 不得自行再加 region 偏移。Host 負責區域偏移、Retina 像素與邏輯座標比例、多螢幕負原點換算；圖片縮小不改變相對座標。
 
-範圍或螢幕切換後先重新 snapshot，再輸入。切換會釋放按住的鍵／按鈕；不能跨切換保留拖曳。Viewer 與 Host 使用 viewID 拒絕舊視野影格／座標，Agent 不需要自行傳入 viewID。
+範圍或螢幕切換後先重新 snapshot，再輸入。切換會釋放按住的鍵／按鈕；不能跨切換保留拖曳。顯示區域 與 Host 使用 viewID 拒絕舊視野影格／座標，Agent 不需要自行傳入 viewID。
 
 ## 新舊相容與錯誤
 
 | 情境 | 結果 |
 | --- | --- |
-| 新 Host、新 Viewer | 支援區域、暫停及按需截圖 |
+| 新 Host、新 顯示區域 | 支援區域、暫停及按需截圖 |
 | 舊 Host、全螢幕 snapshot | 回傳最近收到影格，明確標記 legacy/fresh |
 | 舊 Host、區域或 paused 工具請求 | MCP isError=true；不修改範圍、座標或中斷連線 |
 | 舊 Host、connect 指定 paused | 保留連線，降級全螢幕串流並提示；再查實際狀態 |
-| 新 Host、舊 Viewer | 未啟用新指令時，維持原有影格標頭與全螢幕座標 |
+| 新 Host、舊 顯示區域 | 未啟用新指令時，維持原有影格標頭與全螢幕座標 |
 
 參數錯誤、未連線、控制停用、逾時或不支援以 MCP 工具錯誤回報；錯誤文字不是穩定的機器判斷碼。不要從錯誤推定命令一定尚未生效。切換逾時後先查 changing，再重新設定／snapshot 確認，不能直接重送點擊。
 
