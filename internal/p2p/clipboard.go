@@ -48,10 +48,11 @@ func (p *Peer) SendClipboard(ctx context.Context, data []byte) error {
 	if len(data) > MaxClipboardMessage {
 		return errors.New("剪貼簿訊息過大")
 	}
-	if err := p.acquireClipboardSend(ctx); err != nil {
+	lane := clipboardLane(data)
+	if err := p.acquireClipboardSend(ctx, lane); err != nil {
 		return err
 	}
-	defer func() { <-p.clipboardSendGate }()
+	defer func() { <-p.clipboardSendGate[lane] }()
 	ticker := time.NewTicker(2 * time.Millisecond)
 	defer ticker.Stop()
 	for {
@@ -64,6 +65,7 @@ func (p *Peer) SendClipboard(ctx context.Context, data []byte) error {
 		if closed {
 			return errors.New("連線已結束")
 		}
+		p.clipboardWriteMu.Lock()
 		screenBuffered := uint64(0)
 		if screen != nil {
 			screenBuffered = screen.BufferedAmount()
@@ -74,8 +76,17 @@ func (p *Peer) SendClipboard(ctx context.Context, data []byte) error {
 		}
 		if dc != nil && dc.ReadyState() == webrtc.DataChannelStateOpen && dc.BufferedAmount()+uint64(len(data)) <= bufferLimit &&
 			(control == nil || control.BufferedAmount() == 0) && screenBuffered < 256*1024 {
-			return p.sendData(dc, data)
+			// 額度僅限制傳送工作者，接收回呼不等磁碟或系統剪貼簿。
+			if p.reserveClipboardSlot(lane) {
+				err := p.sendData(dc, data)
+				if err != nil {
+					p.rollbackClipboardSlot(lane)
+				}
+				p.clipboardWriteMu.Unlock()
+				return err
+			}
 		}
+		p.clipboardWriteMu.Unlock()
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -89,13 +100,17 @@ func (p *Peer) SendClipboard(ctx context.Context, data []byte) error {
 }
 
 // 等待送出資格也必須能被取消，不能在 mutex 上無限等待。
-func (p *Peer) acquireClipboardSend(ctx context.Context) error {
-	p.clipboardSendOnce.Do(func() { p.clipboardSendGate = make(chan struct{}, 1) })
+func (p *Peer) acquireClipboardSend(ctx context.Context, lane int) error {
+	p.clipboardSendOnce.Do(func() {
+		for i := range p.clipboardSendGate {
+			p.clipboardSendGate[i] = make(chan struct{}, 1)
+		}
+	})
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 	select {
-	case p.clipboardSendGate <- struct{}{}:
+	case p.clipboardSendGate[lane] <- struct{}{}:
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()

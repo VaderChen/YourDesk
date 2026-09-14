@@ -1,5 +1,7 @@
 # 跨平台建置與打包
 
+本輪修正隨 [1.26.0914 build 1049](RELEASE-1.26.0914-build-1049.md) 發行；下方保留修正過程與歷史測試條件。
+
 AV1 更新：已補上 Windows／macOS 軟體編碼、macOS VideoToolbox 硬解與軟解備援；編解碼分析頁面隱藏 128×128，但保留內部快速探測。最新支援範圍、建置與驗證限制見 [AV1 編解碼](AV1.md)。
 
 「更新三件套」代表更新文件、上傳 GitHub、發布 Release；完整步驟見 [發布流程](RELEASE-WORKFLOW.md)。
@@ -145,3 +147,13 @@ Windows 桌面 Client／Viewer 正式建置使用 `turbojpeg,ffmpeg` tags，附�
 ## Siri 擴充
 
 macOS 正式 App 封裝現在需要完整 Xcode 27 SDK，用於編譯 App Intents Extension 與新版 Siri AI schema。Go 裸執行檔建置不包含 Siri 系統索引。擴充會在外層簽署與公證前完成建置、metadata 檢查及簽署，不能只複製 Go 執行檔作為 Siri 發行包。支援範圍與驗證限制見 [SIRI.md](SIRI.md)。
+
+## 封裝體積與共用版號
+
+macOS DMG 使用 ULMO（LZMA）壓縮，支援範圍涵蓋產品要求的 macOS 12 以上；Windows 免安裝、WinPE 與 Linux ZIP 使用標準 Deflate 第 9 級。Windows 安裝程式維持既有的 solid LZMA。壓縮在封裝階段執行，可能增加建包時間；不改變解壓後的功能或資料。
+
+共用版號位於 `internal/buildinfo`，正式建置以 `-X 'yourdesk/internal/buildinfo.Version=1.YY.MMDD build HHmm'` 注入；Viewer 不再為了讀取版號而依賴整個 `clientui`。自行建置的腳本應同步使用此符號。未注入版號時，仍採執行檔修改時間產生開發版號。
+
+2026-09-14 本機比較：build 1007 的相同 DMG 內容由 65,554,123 bytes 壓縮到 53,115,461 bytes（62.5 → 50.7 MiB，減少 18.97%）；掛載後 App 的 35 個檔案／連結完全一致。同一份工作樹與建置旗標下，拆除版號依賴使 Viewer 由 48,201,522 降到 47,013,186 bytes，另減少約 1.1 MiB；此減少量尚未包含於前述 DMG 比較數字。
+
+本輪保留編解碼、AI 模型、第三方授權、精確來源封存與重建腳本；未刪除功能。已完成映像校驗與內容比對、版號注入一致性，以及 FFmpeg／TurboJPEG Viewer 和管理介面 Smoke。體積比較映像只用於驗證，尚未重新簽章、公證或發布正式套件。

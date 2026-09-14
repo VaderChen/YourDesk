@@ -1,4 +1,8 @@
 {
+ "封包分析": ["Packet analysis", "パケット分析", "패킷 분석"],
+ "請先開啟封包分析": ["Enable packet analysis first", "先にパケット分析を有効にしてください", "먼저 패킷 분석을 켜세요"],
+ "請在遠端開啟封包分析": ["Enable packet analysis on the remote device", "リモート端末でパケット分析を有効にしてください", "원격 장치에서 패킷 분석을 켜세요"],
+ "封包分析已關閉": ["Packet analysis is off", "パケット分析は無効です", "패킷 분석이 꺼져 있습니다"],
  "低延遲": ["Low latency","低遅延","낮은 지연 시간"],
  "傳輸策略": ["Transmission strategy","伝送方針","전송 전략"],
  "均衡": ["Balanced","バランス","균형"],

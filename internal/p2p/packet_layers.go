@@ -1,8 +1,9 @@
 package p2p
 
 import (
-	"github.com/pion/webrtc/v4"
 	"time"
+
+	"github.com/pion/webrtc/v4"
 )
 
 type LayerProgress struct {
@@ -18,15 +19,19 @@ type LayerProgress struct {
 }
 
 func (p *Peer) packetLayers(attempts, verified uint64) []LayerProgress {
+	observation, observed := p.observeTransport()
 	rows := []LayerProgress{
 		{ID: "L1", Name: "測試請求／回覆", Unit: "次", Sent: attempts, Received: verified, Observed: true},
 		{ID: "L2", Name: "DataChannel（全部通道）", Unit: "bytes"},
 		{ID: "L3", Name: "SCTP", Unit: "bytes"},
-		{ID: "L4", Name: "DTLS", State: p.pc.SCTP().Transport().State().String()},
+		{ID: "L4", Name: "DTLS", State: observation.DTLS},
 		{ID: "L5", Name: "ICE 傳輸", Unit: "bytes"},
 		{ID: "L6", Name: "UDP socket（本程序）", Unit: "bytes", Sent: diagnosticUDPSent.Load(), Received: diagnosticUDPReceived.Load(), Observed: diagnosticSocketSequence.Load() > 0},
 	}
-	for _, stat := range p.pc.GetStats() {
+	if !observed {
+		return rows
+	}
+	for _, stat := range observation.Report {
 		switch s := stat.(type) {
 		case webrtc.DataChannelStats:
 			rows[1].Sent += s.BytesSent
@@ -61,7 +66,15 @@ func (t *layerTracker) update(rows []LayerProgress) {
 		return
 	}
 	for i, r := range rows {
+		if !r.Observed && r.State == "" {
+			continue
+		}
 		p := &t.rows[i]
+		if r.Observed && !p.last.Observed {
+			// 第一筆有效取樣才建立基準，不把取樣前的累計流量算成本批進展。
+			*p = layerPoint{r, r, now, now}
+			continue
+		}
 		if r.Sent != p.last.Sent {
 			p.txAt = now
 		}

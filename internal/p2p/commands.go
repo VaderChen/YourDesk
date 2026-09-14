@@ -15,8 +15,9 @@ const CommandVersion = 1
 var ErrCommandUnsupported = errors.New("對端未提供此 P2P 指令")
 
 type CommandCapabilities struct {
-	Version int      `json:"version"`
-	Methods []string `json:"methods"`
+	ClipboardWindow uint32   `json:"clipboardWindow,omitempty"`
+	Version         int      `json:"version"`
+	Methods         []string `json:"methods"`
 }
 type CommandRequest struct {
 	Params  json.RawMessage `json:"params,omitempty"`
@@ -59,7 +60,7 @@ func (p *Peer) localCommands() CommandCapabilities {
 		methods = append(methods, name)
 	}
 	sort.Strings(methods)
-	return CommandCapabilities{CommandVersion, methods}
+	return CommandCapabilities{Version: CommandVersion, Methods: methods, ClipboardWindow: clipboardReceiveWindow}
 }
 func (p *Peer) announceCommands() {
 	_ = p.SendControl(Control{Type: "command-capabilities", CommandCapabilities: ptrCapabilities(p.localCommands())})
@@ -161,6 +162,10 @@ func (p *Peer) CallCommandParams(ctx context.Context, method string, params json
 func (p *Peer) handleCommand(c Control) bool {
 	p.commandsInit()
 	switch c.Type {
+	case "clipboard-credit":
+		p.acceptClipboardCredit(0, c.ClipboardConsumed)
+		p.acceptClipboardCredit(1, c.ClipboardPriorityConsumed)
+		return true
 	case "command-capabilities":
 		if v := c.CommandCapabilities; v != nil && v.Version == CommandVersion && len(v.Methods) <= 64 {
 			for _, m := range v.Methods {
@@ -169,8 +174,9 @@ func (p *Peer) handleCommand(c Control) bool {
 				}
 			}
 			p.commands.mu.Lock()
-			p.commands.remote = CommandCapabilities{v.Version, append([]string(nil), v.Methods...)}
+			p.commands.remote = CommandCapabilities{Version: v.Version, Methods: append([]string(nil), v.Methods...), ClipboardWindow: v.ClipboardWindow}
 			p.commands.mu.Unlock()
+			p.setClipboardWindow(v.ClipboardWindow)
 		}
 		return true
 	case "command-response":

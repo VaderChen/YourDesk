@@ -22,7 +22,7 @@ import (
 	"yourdesk/internal/agentvideo"
 	"yourdesk/internal/authlog"
 	"yourdesk/internal/branding"
-	"yourdesk/internal/clientui"
+	"yourdesk/internal/buildinfo"
 	"yourdesk/internal/clipboard"
 	"yourdesk/internal/p2p"
 	"yourdesk/internal/peertransport"
@@ -452,7 +452,7 @@ func (g *game) Layout(outW, outH int) (int, int) {
 }
 
 func main() {
-	authlog.Start(clientui.ApplicationVersion(), "viewer")
+	authlog.Start(buildinfo.Current(), "viewer")
 	defer nativeCloseTitlebar()
 	signalURL := flag.String("signal", "wss://127.0.0.1:8080/ws", "rendezvous WebSocket URL")
 	name := flag.String("name", "", "遠端顯示 顯示名稱")

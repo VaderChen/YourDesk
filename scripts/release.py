@@ -104,7 +104,7 @@ def compile_program(name, folder, target, version):
     system, _ = target.split('/')
     gui = system != 'linux' and name in ('client', 'remote')
     output = ('YourDesk' if name == 'desktop' else 'yourdesk-' + name) + ('.exe' if system == 'windows' else '')
-    flags = f"-s -w -X 'yourdesk/internal/clientui.Version={version}'"
+    flags = f"-s -w -X 'yourdesk/internal/buildinfo.Version={version}'"
     if os.environ.get('YOURDESK_DIAGNOSTIC') == '1':
         flags += ' -X yourdesk/internal/authlog.Enabled=1'
     if system == 'windows':
@@ -313,7 +313,7 @@ def winpe_zip(folder, stem):
                 shutil.copy2(source, package / source.name)
         manifest(package)
         archive = stage / (stem + '.zip')
-        with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as output:
+        with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as output:
             for item in sorted(package.rglob('*')):
                 if item.is_file():
                     output.write(item, item.relative_to(stage))
@@ -480,7 +480,7 @@ def windows_portable_zip(folder, stem, version):
         write_instructions(package, 'windows', version)
         manifest(package)
         archive = stage / (stem + '-portable.zip')
-        with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as output:
+        with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as output:
             for item in sorted(package.rglob('*')):
                 if item.is_file():
                     output.write(item, item.relative_to(stage))
@@ -513,7 +513,8 @@ def pack(release, targets=None):
                 notarize_app(app)
                 (stage / 'Applications').symlink_to('/Applications')
                 output = folder / (stem + '.dmg')
-                run(['hdiutil', 'create', '-volname', 'YourDesk', '-srcfolder', stage, '-ov', '-format', 'UDZO', output])
+                # LZMA 映像由 macOS 10.15 起支援；產品最低版本為 macOS 12。
+                run(['hdiutil', 'create', '-volname', 'YourDesk', '-srcfolder', stage, '-ov', '-format', 'ULMO', output])
                 run(['codesign', '--force', '--timestamp', '--sign', identity, output])
                 run(['codesign', '--verify', '--strict', output])
                 notarize(output)
@@ -530,7 +531,7 @@ def pack(release, targets=None):
             manifest(folder)
             with tempfile.TemporaryDirectory(prefix='yourdesk-linux-') as temporary:
                 archive = Path(temporary) / (stem + '-cli.zip')
-                with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as output:
+                with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as output:
                     for item in sorted(folder.rglob('*')):
                         if item.is_file():
                             output.write(item, item.relative_to(folder.parent))

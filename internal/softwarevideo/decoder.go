@@ -5,6 +5,8 @@ package softwarevideo
 
 /*
 #cgo !windows LDFLAGS: -lavcodec -lswscale -lavutil
+// 執行期路徑僅由此套件提供，避免全域 CGO_LDFLAGS 在各套件重複累加。
+#cgo darwin LDFLAGS: -Wl,-rpath,@loader_path -Wl,-rpath,@loader_path/../Frameworks
 #cgo windows LDFLAGS: -l:libavcodec.dll.a -l:libswscale.dll.a -l:libavutil.dll.a
 #include <libavcodec/avcodec.h>
 #include <libavutil/imgutils.h>
