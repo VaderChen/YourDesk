@@ -29,6 +29,8 @@ import android.webkit.JavascriptInterface;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.webkit.WebChromeClient;
+import android.webkit.PermissionRequest;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.Button;
@@ -171,6 +173,11 @@ public final class MainActivity extends Activity {
       }
       @Override public android.webkit.WebResourceResponse shouldInterceptRequest(WebView v, WebResourceRequest r) {
         return loader.shouldInterceptRequest(r.getUrl());
+      }
+    });
+    web.setWebChromeClient(new WebChromeClient() {
+      @Override public void onPermissionRequest(PermissionRequest request) {
+        runOnUiThread(() -> { for (String resource : request.getResources()) if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(resource)) { request.grant(new String[]{resource}); return; } request.deny(); });
       }
     });
     root.addView(web, new FrameLayout.LayoutParams(-1, -1));
@@ -861,6 +868,14 @@ public final class MainActivity extends Activity {
   }
 
   final class Bridge {
+    @JavascriptInterface public void setSiteDialogVisible(boolean visible) {
+      if (nativeScreen == null || nativeVideo == null) return;
+      if (visible) { nativeScreen.setVisibility(View.GONE); nativeVideo.setVisibility(View.GONE); }
+    }
+    @JavascriptInterface public void requestCameraPermission() {
+      if (android.os.Build.VERSION.SDK_INT >= 23 && checkSelfPermission(android.Manifest.permission.CAMERA) != android.content.pm.PackageManager.PERMISSION_GRANTED)
+        requestPermissions(new String[]{android.Manifest.permission.CAMERA}, 7001);
+    }
     private final Object credentialLock = new Object();
 
     private javax.crypto.SecretKey key() throws Exception {
