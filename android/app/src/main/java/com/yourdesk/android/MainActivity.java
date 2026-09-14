@@ -197,7 +197,8 @@ public final class MainActivity extends Activity {
     });
     root.addView(web, new FrameLayout.LayoutParams(-1, -1));
     qrPreview = new PreviewView(this); qrPreview.setVisibility(View.GONE);
-    FrameLayout.LayoutParams qrLp = new FrameLayout.LayoutParams((int)(getResources().getDisplayMetrics().widthPixels * 0.82f), dp(180)); qrLp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL; qrLp.topMargin = dp(150); root.addView(qrPreview, qrLp);
+    qrPreview.setBackgroundColor(Color.BLACK);
+    FrameLayout.LayoutParams qrLp = new FrameLayout.LayoutParams(-1, dp(220)); qrLp.gravity = Gravity.CENTER; root.addView(qrPreview, qrLp);
 
     nativeVideo = new TextureView(this);
     nativeVideo.setOpaque(true);
