@@ -259,7 +259,11 @@ def copy_project_licenses(folder):
     licenses = folder / "ThirdPartyLicenses"
     licenses.mkdir(exist_ok=True)
     for source in (ROOT / "docs/third-party").glob("*-LICENSE.txt"):
-        shutil.copy2(source, licenses / source.name)
+        destination = licenses / source.name
+        # 模組快取的授權檔可能唯讀；重複封裝仍須能更新副本。
+        if destination.exists():
+            destination.chmod(destination.stat().st_mode | 0o200)
+        shutil.copyfile(source, destination)
 
 
 def copy_model_licenses(folder):
