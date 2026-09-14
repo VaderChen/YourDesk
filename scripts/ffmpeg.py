@@ -139,7 +139,10 @@ def prepare(target, env):
     result['CGO_CFLAGS'] = (result.get('CGO_CFLAGS', '') + f' -I{shlex.quote(str(prefix / "include"))}').strip()
     result['CGO_LDFLAGS'] = (result.get('CGO_LDFLAGS', '') + f' -L{shlex.quote(str(prefix / "lib"))}').strip()
     if system == 'darwin':
-        result['CGO_LDFLAGS'] += ' -Wl,-rpath,@loader_path -Wl,-rpath,@loader_path/../Frameworks'
+        # CGo 預設拒絕以 @ 開頭的連結器參數；只允許套件內這兩個 macOS 路徑。
+        allowed = r'-Wl,-rpath,@loader_path(?:/\.\./Frameworks)?'
+        existing = result.get('CGO_LDFLAGS_ALLOW', '')
+        result['CGO_LDFLAGS_ALLOW'] = f'(?:{existing})|(?:{allowed})' if existing else allowed
     return result, prefix
 
 
@@ -181,9 +184,13 @@ if __name__ == '__main__':
     target = sys.argv[1]
     env, prefix = prepare(target, release.environment(target, True))
     env, jpeg_source = turbojpeg.prepare(target, env)
+    test_flags = []
     if sys.argv[3] == 'test' and target.startswith('darwin/'):
-        env['CGO_LDFLAGS'] += ' -Wl,-rpath,' + shlex.quote(str(prefix / 'lib'))
-    subprocess.run(sys.argv[2:4] + ['-tags', 'turbojpeg,ffmpeg'] + sys.argv[4:], env=env, check=True)
+        # macOS 啟動工具鏈時可能清除 DYLD_*；在啟動測試執行檔的最後一步才設定。
+        # 快取絕對路徑只存在測試程序環境，不寫入正式程式的 rpath。
+        libraries = os.pathsep.join(filter(None, (str(prefix / 'lib'), env.get('DYLD_LIBRARY_PATH', ''))))
+        test_flags = ['-exec', '/usr/bin/env ' + shlex.quote('DYLD_LIBRARY_PATH=' + libraries)]
+    subprocess.run(sys.argv[2:4] + ['-tags', 'turbojpeg,ffmpeg'] + test_flags + sys.argv[4:], env=env, check=True)
     if sys.argv[3] == 'build' and '-o' in sys.argv[4:]:
         output = Path(sys.argv[sys.argv.index('-o') + 1]).resolve().parent
         copy_runtime(prefix, output)

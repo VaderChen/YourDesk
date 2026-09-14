@@ -21,7 +21,7 @@ func (s *server) packetTest(w http.ResponseWriter, r *http.Request) {
 	}
 	key := "viewer:packet-" + in.ID
 	if in.Action != "stop" && !authlog.IsEnabled() {
-		fail(w, errors.New("請先開啟網路 Debug"))
+		fail(w, errors.New("請先開啟封包分析"))
 		return
 	}
 	s.mu.Lock()

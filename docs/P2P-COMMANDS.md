@@ -34,13 +34,15 @@
 
 `internal/p2p/commands.go` 提供 `RegisterCommand`、`RemoteCommands`、`SupportsCommand` 與 `CallCommand`，並以 `RegisterCommandParams`、`CallCommandParams` 支援最多 8 KiB JSON 參數。原有六項指令保持無參數介面，檔案與 Shell handler 以明確型別驗證並拒絕未知欄位。
 
-控制訊息新增三種類型：
+控制訊息包含下列類型：
 
-- `command-capabilities`：version 與實際支援的方法名稱；通道開啟及新 handler 註冊時公告。
+- `command-capabilities`：version 與實際支援的方法名稱；通道開啟及新 handler 註冊時公告。選用的 `clipboardWindow` 為每類剪貼簿訊息的未消費上限，目前為 32；缺省／零不啟用額度流控。
 - `command-request`：version、單一 Peer 內遞增 ID、method、expires、選用 params。
 - `command-response`：對應 ID、結果或結構化錯誤代碼。
+- `clipboard-credit`：`clipboardConsumed` 為普通剪貼簿資料累計消費量，`clipboardPriorityConsumed` 為 pull 資料（binary type 2）、`pull-read`、`pull-error` 與 `ack` 的累計消費量。兩類各自使用 `clipboardWindow` 額度；它不是傳輸成功 ack。普通類含 hello、傳輸中繼資料、offer 與 binary type 1 資料。累計值在同一個 Peer 內不重設，重複／倒退／超過送出量的值不增加額度。
 
-既有控制訊息保持原本路徑，沒有新增獨立事件種類。
+
+既有控制事件改由有界工作者依接收順序執行，保留舊版文字剪貼簿與貼上按鍵順序；指令與額度處理不等待這個工作者。訊息與資料通道名稱不變。詳見 [剪貼簿流控與驗證](CLIPBOARD-DIAGNOSIS.md)。
 
 指令版本為 1，預設呼叫逾時五秒，最多 32 個待回覆請求；接收端最多並行四項指令，回覆內容最多 16 KiB。每個 Peer 保留最近序號範圍內的結果，重複請求回傳已存結果或 in_progress；超出範圍的舊序號不重新執行。
 

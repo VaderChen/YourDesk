@@ -41,7 +41,6 @@ func (p *Peer) startLiveness() {
 			monitorLiveness(ctx, func() bool { return p.Connected() && p.SupportsCommand("ping") }, func(ctx context.Context) error {
 				_, err := p.CallCommand(ctx, "ping")
 				if err != nil && ctx.Err() != context.Canceled {
-					p.logTransportStall()
 					authlog.Event("ping_timeout", nil)
 					p.diagnosticTransport()
 					authlog.Stacks()
@@ -60,28 +59,6 @@ func (p *Peer) startLiveness() {
 	})
 }
 
-// 僅記錄流量與視窗，不記錄 IP、SDP 或傳輸內容。
-func (p *Peer) logTransportStall() {
-	if s, ok := p.pc.SCTP().Transport().ICETransport().GetSelectedCandidatePairStats(); ok {
-		slog.Warn("P2P 停滯路徑取樣", "pair", s.ID, "state", s.State, "responsesReceived", s.ResponsesReceived)
-	}
-	for _, stat := range p.pc.GetStats() {
-		if s, ok := stat.(webrtc.TransportStats); ok {
-			slog.Warn("P2P 停滯底層取樣", "sentBytes", s.BytesSent, "receivedBytes", s.BytesReceived)
-		}
-		if s, ok := stat.(webrtc.SCTPTransportStats); ok {
-			slog.Warn("P2P 停滯傳輸取樣", "sentBytes", s.BytesSent, "receivedBytes", s.BytesReceived, "receiverWindow", s.ReceiverWindow, "congestionWindow", s.CongestionWindow, "sctpRTT", s.SmoothedRoundTripTime)
-		}
-	}
-	p.mu.RLock()
-	channels := []*webrtc.DataChannel{p.screen, p.control, p.clipboard}
-	p.mu.RUnlock()
-	for _, dc := range channels {
-		if dc != nil {
-			slog.Warn("P2P 停滯通道取樣", "channel", dc.Label(), "state", dc.ReadyState().String(), "bufferedBytes", dc.BufferedAmount())
-		}
-	}
-}
 func monitorLiveness(ctx context.Context, ready func() bool, ping func(context.Context) error, failed func(), progress ...func() bool) {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
@@ -133,8 +110,13 @@ func (p *Peer) diagnosticTransport() {
 	if !authlog.IsEnabled() {
 		return
 	}
-	authlog.Event("dtls", map[string]any{"layer": "L4", "state": p.pc.SCTP().Transport().State().String()})
-	for _, stat := range p.pc.GetStats() {
+	observation, ok := p.observeTransport()
+	if !ok {
+		authlog.Event("transport-sample-unavailable", nil)
+		return
+	}
+	authlog.Event("dtls", map[string]any{"layer": "L4", "state": observation.DTLS})
+	for _, stat := range observation.Report {
 		switch s := stat.(type) {
 		case webrtc.DataChannelStats:
 			authlog.Event("data-channel", map[string]any{"layer": "L2", "label": s.Label, "sent": s.BytesSent, "received": s.BytesReceived, "messagesSent": s.MessagesSent, "messagesReceived": s.MessagesReceived})
@@ -144,12 +126,7 @@ func (p *Peer) diagnosticTransport() {
 			authlog.Event("sctp", map[string]any{"layer": "L3", "sent": s.BytesSent, "received": s.BytesReceived, "receiverWindow": s.ReceiverWindow, "congestionWindow": s.CongestionWindow, "rtt": s.SmoothedRoundTripTime})
 		}
 	}
-	p.mu.RLock()
-	channels := []*webrtc.DataChannel{p.screen, p.control, p.clipboard}
-	p.mu.RUnlock()
-	for _, dc := range channels {
-		if dc != nil {
-			authlog.Event("channel", map[string]any{"layer": "L2", "label": dc.Label(), "state": dc.ReadyState().String(), "buffered": dc.BufferedAmount()})
-		}
+	for _, channel := range observation.Channels {
+		authlog.Event("channel", map[string]any{"layer": "L2", "label": channel.Label, "state": channel.State, "buffered": channel.Buffered})
 	}
 }

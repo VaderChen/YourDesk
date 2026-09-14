@@ -15,7 +15,8 @@ func (s *Sync) newChannelReady() bool {
 	return s.remote.Load() && s.clipCtx != nil && s.clipCtx.Err() == nil && s.peer.ClipboardReady()
 }
 
-// 舊協定沒有接收 ack；文字寫入與後續按鍵同在有序 control 回呼內完成。
+// 舊協定沒有接收 ack；文字寫入與後續按鍵在同一個有序控制工作者完成。
+// P2P 接收回呼只負責排隊，不等待系統剪貼簿寫入。
 func (s *Sync) Handle(c p2p.Control) bool {
 	if c.Type != "clipboard-capabilities" && c.Type != "clipboard-text" {
 		return false

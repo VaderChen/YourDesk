@@ -26,7 +26,7 @@ type probeReply struct {
 func probeHash(b []byte) string { h := sha256.Sum256(b); return hex.EncodeToString(h[:]) }
 func answerProbe(raw json.RawMessage) (any, error) {
 	if !authlog.IsEnabled() {
-		return nil, fmt.Errorf("請在遠端開啟網路 Debug")
+		return nil, fmt.Errorf("請在遠端開啟封包分析")
 	}
 	var in probePayload
 	if err := json.Unmarshal(raw, &in); err != nil {
@@ -57,7 +57,7 @@ type PacketTestReport struct {
 func (p *Peer) RunPacketTest(ctx context.Context) PacketTestReport {
 	report := PacketTestReport{}
 	if !authlog.IsEnabled() {
-		report.Error = "網路 Debug 已關閉"
+		report.Error = "封包分析已關閉"
 		return report
 	}
 	if !p.SupportsCommand("network.probe") {
@@ -99,9 +99,6 @@ func (p *Peer) RunPacketTest(ctx context.Context) PacketTestReport {
 		go func() {
 			defer wg.Done()
 			for time.Now().Before(until) && ctx.Err() == nil && authlog.IsEnabled() {
-				if !time.Now().Before(until) || !authlog.IsEnabled() {
-					return
-				}
 				mu.Lock()
 				n := report.Attempts
 				report.Attempts++

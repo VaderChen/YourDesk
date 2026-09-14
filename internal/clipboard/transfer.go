@@ -480,7 +480,15 @@ func (s *Sync) receive(ctx context.Context) {
 		defer cancel()
 		_ = s.sendPacket(sendCtx, p)
 	}
+	// 完成處理才歸還額度；routePackets 可繼續轉送 pull 回覆及 ack，
+	// 不因原生剪貼簿寫入停住而一起卡在滿載的 packets 佇列。
+	var creditData []byte
+	creditPending := false
 	for {
+		if creditPending {
+			s.peer.ClipboardConsumed(creditData)
+			creditPending = false
+		}
 		select {
 		case <-ctx.Done():
 			return
@@ -491,6 +499,8 @@ func (s *Sync) receive(ctx context.Context) {
 				current = nil
 			}
 		case data := <-s.packets:
+			creditPending = true
+			creditData = data
 			if s.handlePullData(data) {
 				continue
 			}

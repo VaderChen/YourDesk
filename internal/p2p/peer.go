@@ -50,64 +50,72 @@ type EnhancementReport struct {
 	Bitrate        int    `json:"bitrate"`
 }
 type Control struct {
-	ViewID               uint64                     `json:"viewID,omitempty"`
-	CommandCapabilities  *CommandCapabilities       `json:"commandCapabilities,omitempty"`
-	CommandRequest       *CommandRequest            `json:"commandRequest,omitempty"`
-	CommandResponse      *CommandResponse           `json:"commandResponse,omitempty"`
-	AppVersion           string                     `json:"appVersion,omitempty"`
-	KeyframeInterval     int                        `json:"keyframeInterval,omitempty"`
-	StreamConfig         *streamconfig.Request      `json:"streamConfig,omitempty"`
-	StreamCapabilities   *streamconfig.Capabilities `json:"streamCapabilities,omitempty"`
-	StreamResult         *streamconfig.Result       `json:"streamResult,omitempty"`
-	EnhancementReport    *EnhancementReport         `json:"enhancementReport,omitempty"`
-	ImageEnhancement     bool                       `json:"imageEnhancement,omitempty"`
-	EnhancementSupported bool                       `json:"enhancementSupported,omitempty"`
-	DisableMapping       bool                       `json:"disableMapping,omitempty"`
-	Platform             string                     `json:"platform,omitempty"`
-	VideoCodec           byte                       `json:"videoCodec,omitempty"`
-	EncodingMode         string                     `json:"encodingMode,omitempty"`
-	RawKey               *rawkey.Event              `json:"rawKey,omitempty"`
-	Profile              string                     `json:"profile,omitempty"`
-	ViewWidth            int                        `json:"viewWidth,omitempty"`
-	ViewHeight           int                        `json:"viewHeight,omitempty"`
-	Clipboard            []byte                     `json:"clipboard,omitempty"`
-	DisplayRequest       uint64                     `json:"displayRequest,omitempty"`
-	Display              *int                       `json:"display,omitempty"`
-	DisplayCount         int                        `json:"displayCount,omitempty"`
-	HardwareDecodeCodecs []byte                     `json:"hardwareDecodeCodecs,omitempty"`
-	Codecs               []byte                     `json:"codecs,omitempty"`
-	Type                 string                     `json:"type"`
-	X                    float64                    `json:"x,omitempty"`
-	Y                    float64                    `json:"y,omitempty"`
-	Button               int                        `json:"button,omitempty"`
-	Down                 bool                       `json:"down,omitempty"`
-	Key                  string                     `json:"key,omitempty"`
-	Delta                float64                    `json:"delta,omitempty"`
+	ClipboardPriorityConsumed uint64                     `json:"clipboardPriorityConsumed,omitempty"`
+	ClipboardConsumed         uint64                     `json:"clipboardConsumed,omitempty"`
+	ViewID                    uint64                     `json:"viewID,omitempty"`
+	CommandCapabilities       *CommandCapabilities       `json:"commandCapabilities,omitempty"`
+	CommandRequest            *CommandRequest            `json:"commandRequest,omitempty"`
+	CommandResponse           *CommandResponse           `json:"commandResponse,omitempty"`
+	AppVersion                string                     `json:"appVersion,omitempty"`
+	KeyframeInterval          int                        `json:"keyframeInterval,omitempty"`
+	StreamConfig              *streamconfig.Request      `json:"streamConfig,omitempty"`
+	StreamCapabilities        *streamconfig.Capabilities `json:"streamCapabilities,omitempty"`
+	StreamResult              *streamconfig.Result       `json:"streamResult,omitempty"`
+	EnhancementReport         *EnhancementReport         `json:"enhancementReport,omitempty"`
+	ImageEnhancement          bool                       `json:"imageEnhancement,omitempty"`
+	EnhancementSupported      bool                       `json:"enhancementSupported,omitempty"`
+	DisableMapping            bool                       `json:"disableMapping,omitempty"`
+	Platform                  string                     `json:"platform,omitempty"`
+	VideoCodec                byte                       `json:"videoCodec,omitempty"`
+	EncodingMode              string                     `json:"encodingMode,omitempty"`
+	RawKey                    *rawkey.Event              `json:"rawKey,omitempty"`
+	Profile                   string                     `json:"profile,omitempty"`
+	ViewWidth                 int                        `json:"viewWidth,omitempty"`
+	ViewHeight                int                        `json:"viewHeight,omitempty"`
+	Clipboard                 []byte                     `json:"clipboard,omitempty"`
+	DisplayRequest            uint64                     `json:"displayRequest,omitempty"`
+	Display                   *int                       `json:"display,omitempty"`
+	DisplayCount              int                        `json:"displayCount,omitempty"`
+	HardwareDecodeCodecs      []byte                     `json:"hardwareDecodeCodecs,omitempty"`
+	Codecs                    []byte                     `json:"codecs,omitempty"`
+	Type                      string                     `json:"type"`
+	X                         float64                    `json:"x,omitempty"`
+	Y                         float64                    `json:"y,omitempty"`
+	Button                    int                        `json:"button,omitempty"`
+	Down                      bool                       `json:"down,omitempty"`
+	Key                       string                     `json:"key,omitempty"`
+	Delta                     float64                    `json:"delta,omitempty"`
 }
 
 type Peer struct {
-	clipboardSendOnce sync.Once
-	clipboardSendGate chan struct{}
-	livenessOnce      sync.Once
-	sentBytes         atomic.Uint64
-	receivedBytes     atomic.Uint64
-	transportMode     peertransport.Mode
-	commandsOnce      sync.Once
-	commands          commandState
-	pc                *webrtc.PeerConnection
-	screen            *webrtc.DataChannel
-	control           *webrtc.DataChannel
-	clipboard         *webrtc.DataChannel
-	clipboardInbox    chan []byte
-	clipboardDone     chan struct{}
-	clipboardOnce     sync.Once
-	mu                sync.RWMutex
-	closed            bool
-	done              chan struct{}
-	doneOnce          sync.Once
-	controlMu         sync.Mutex
-	pendingControl    [][]byte
-	controlCongested  atomic.Bool
+	transportSamples    transportSampler
+	clipboardFlow       clipboardFlowState
+	controlDispatchOnce sync.Once
+	controlInbox        chan Control
+	controlOverflowOnce sync.Once
+	clipboardSendOnce   sync.Once
+	clipboardSendGate   [2]chan struct{}
+	clipboardWriteMu    sync.Mutex
+	livenessOnce        sync.Once
+	sentBytes           atomic.Uint64
+	receivedBytes       atomic.Uint64
+	transportMode       peertransport.Mode
+	commandsOnce        sync.Once
+	commands            commandState
+	pc                  *webrtc.PeerConnection
+	screen              *webrtc.DataChannel
+	control             *webrtc.DataChannel
+	clipboard           *webrtc.DataChannel
+	clipboardInbox      chan []byte
+	clipboardDone       chan struct{}
+	clipboardOnce       sync.Once
+	mu                  sync.RWMutex
+	closed              bool
+	done                chan struct{}
+	doneOnce            sync.Once
+	controlMu           sync.Mutex
+	pendingControl      [][]byte
+	controlCongested    atomic.Bool
 }
 
 func config() webrtc.Configuration {
@@ -159,7 +167,7 @@ func NewHostWithTransport(ctx context.Context, signal *signaling.Client, mode pe
 			p.onMessage(dc, func(m webrtc.DataChannelMessage) {
 				var c Control
 				if decodeControl(m.Data, &c) == nil && !p.handleCommand(c) && onControl != nil {
-					onControl(c)
+					p.dispatchControl(c, onControl)
 				}
 			})
 		}
@@ -185,7 +193,7 @@ func NewHostWithTransport(ctx context.Context, signal *signaling.Client, mode pe
 	p.onMessage(p.control, func(m webrtc.DataChannelMessage) {
 		var c Control
 		if decodeControl(m.Data, &c) == nil && !p.handleCommand(c) && onControl != nil {
-			onControl(c)
+			p.dispatchControl(c, onControl)
 		}
 	})
 	p.control.OnOpen(func() { p.flushControl(); p.announceCommands(); p.startLiveness() })
@@ -305,11 +313,13 @@ func NewViewerWithTransport(ctx context.Context, signal *signaling.Client, mode 
 			p.onMessage(dc, func(m webrtc.DataChannelMessage) {
 				var c Control
 				if decodeControl(m.Data, &c) == nil && !p.handleCommand(c) {
-					for _, handler := range onControl {
-						if handler != nil {
-							handler(c)
+					p.dispatchControl(c, func(c Control) {
+						for _, handler := range onControl {
+							if handler != nil {
+								handler(c)
+							}
 						}
-					}
+					})
 				}
 			})
 		}

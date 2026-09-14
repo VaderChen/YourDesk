@@ -10,7 +10,7 @@ YourDesk 是支援 macOS 與 Windows 的遠端桌面工具。從連線、站台�
 
 ## 特色與功能
 
-**已處理解碼佇列阻塞造成的串流穩定問題。**目前回報的停滯／斷線只發生在 macOS 對 macOS；其他平台尚未觀察到相同問題。Viewer 與背景診斷改用非阻塞影格交接，解碼佇列滿載時略過新影格，避免阻塞 WebRTC DataChannel 接收回呼。修正已同步至主分支，包含滿載與高壓回歸測試；已發布的 build 2323 不包含這筆後續修正。本次沒有加入背景自動重連／斷線續傳。詳見 [最新修正](docs/RELEASE-NEXT-DRAFT.md)、[串流穩定修正與存活判斷](docs/STREAM-RECOVERY.md) 及 [網路 Debug](docs/NETWORK-DEBUG.md)。
+**1.26.0914 build 1049：串流穩定修正、剪貼簿流控與安裝包瘦身。**已處理解碼佇列滿載時阻塞 DataChannel 接收回呼的問題；剪貼簿／檔案改以接收額度等待慢速端，保留完整內容。「封包分析」採背景日誌及有期限的統計取樣，降低診斷本身造成阻塞的風險。macOS DMG 改用 LZMA 壓縮。目前先前回報的停滯／斷線僅見於 macOS 對 macOS；長時間及跨機大檔案傳輸仍需持續驗證。本版沒有背景自動重連／斷線續傳。詳見 [本版說明](docs/RELEASE-1.26.0914-build-1049.md)、[串流穩定修正](docs/STREAM-RECOVERY.md) 與 [封包分析](docs/NETWORK-DEBUG.md)。
 
 - **GUI 與 CMD 雙模式**：支援遠端桌面與互動命令列，可依工作選擇模式；命令列使用獨立視窗，亦可連入 Linux CLI Host。
 - **MCP AI Agent 遠端操控**：AI Agent 可透過 MCP 連線遠端、操作桌面或命令列、查詢站台能力，完成工作後斷線。

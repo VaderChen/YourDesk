@@ -11,13 +11,13 @@ import (
 func TestClipboardSendWaitCancellation(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		p := &Peer{done: make(chan struct{}), clipboardDone: make(chan struct{})}
-		if err := p.acquireClipboardSend(context.Background()); err != nil {
+		if err := p.acquireClipboardSend(context.Background(), 0); err != nil {
 			t.Fatal(err)
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 		result := make(chan error, 1)
-		go func() { result <- p.acquireClipboardSend(ctx) }()
+		go func() { result <- p.acquireClipboardSend(ctx, 0) }()
 		synctest.Wait()
 		select {
 		case err := <-result:
@@ -28,12 +28,12 @@ func TestClipboardSendWaitCancellation(t *testing.T) {
 		if err := <-result; !errors.Is(err, context.DeadlineExceeded) {
 			t.Fatal(err)
 		}
-		<-p.clipboardSendGate
-		if err := p.acquireClipboardSend(context.Background()); err != nil {
+		<-p.clipboardSendGate[0]
+		if err := p.acquireClipboardSend(context.Background(), 0); err != nil {
 			t.Fatal(err)
 		}
 		close(p.done)
-		if err := p.acquireClipboardSend(context.Background()); err == nil {
+		if err := p.acquireClipboardSend(context.Background(), 0); err == nil {
 			t.Fatal("斷線後仍等待送出")
 		}
 	})

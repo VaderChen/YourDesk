@@ -16,6 +16,7 @@ func (s *Sync) routePackets(ctx context.Context) {
 			return
 		case data := <-s.peer.ClipboardMessages():
 			if s.handlePullData(data) {
+				s.peer.ClipboardConsumed(data)
 				continue
 			}
 			if len(data) > 1 && data[0] == 0 {
@@ -24,6 +25,7 @@ func (s *Sync) routePackets(ctx context.Context) {
 					switch m.Type {
 					case "pull-read", "pull-error":
 						s.handlePull(ctx, m)
+						s.peer.ClipboardConsumed(data)
 						continue
 					case "ack":
 						s.mu.Lock()
@@ -39,6 +41,7 @@ func (s *Sync) routePackets(ctx context.Context) {
 							default:
 							}
 						}
+						s.peer.ClipboardConsumed(data)
 						continue
 					}
 				}
