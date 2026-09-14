@@ -29,7 +29,7 @@ func (g *game) nextDisplay()            { g.changeDisplay(-1) }
 func (g *game) selectDisplay(index int) { g.changeDisplay(index) }
 
 func (g *game) changeDisplay(index int) {
-	if g.peer == nil {
+	if g.peer == nil || g.crop.blockInput() {
 		return
 	}
 	g.mu.Lock()

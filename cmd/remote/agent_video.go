@@ -14,6 +14,7 @@ import (
 )
 
 type agentVideoResult struct {
+	local bool
 	out   agentremote.Response
 	state agentvideo.State
 	frame image.Image
@@ -26,6 +27,11 @@ func (g *game) applyAgentVideo() {
 	select {
 	case result := <-g.agentVideoResults:
 		g.agentVideoBusy = false
+		if result.out.Error != "" {
+			g.mu.Lock()
+			g.agentViewChanging = false
+			g.mu.Unlock()
+		}
 		if result.out.Error == "" {
 			g.mu.Lock()
 			g.agentViewID = result.state.ViewID
@@ -56,16 +62,35 @@ func (g *game) applyAgentVideo() {
 				}()
 			}
 		}
+		if !result.local && result.out.Error == "" {
+			g.crop.active = result.state.Region != agentvideo.Full()
+			if g.crop.active {
+				g.crop.message = "復原：恢復全畫面串流"
+			} else {
+				g.crop.message = "裁切：拖曳調整，再按一次套用"
+			}
+		}
+		if result.local {
+			g.finishCrop(result)
+			return
+		}
 		data, _ := json.Marshal(result.out)
 		fmt.Fprintln(os.Stdout, agentremote.Prefix+string(data))
 	default:
 	}
 }
 func (g *game) dispatchAgentVideo(r agentremote.Request) bool {
+	return g.dispatchVideo(r, false)
+}
+func (g *game) dispatchVideo(r agentremote.Request, local bool) bool {
 	if r.Action != "video.stream" && r.Action != "video.snapshot" {
 		return false
 	}
 	replyError := func(err error) {
+		if local {
+			g.finishCrop(agentVideoResult{local: true, out: agentremote.Response{Error: err.Error()}})
+			return
+		}
 		data, _ := json.Marshal(agentremote.Response{ID: r.ID, Error: err.Error()})
 		fmt.Fprintln(os.Stdout, agentremote.Prefix+string(data))
 	}
@@ -87,12 +112,16 @@ func (g *game) dispatchAgentVideo(r agentremote.Request) bool {
 		return true
 	}
 	if !g.peer.SupportsCommand(r.Action) {
+		if local {
+			replyError(fmt.Errorf("遠端版本不支援區域串流，請更新 Host"))
+			return true
+		}
 		out := g.legacyAgentVideo(r, request)
 		data, _ := json.Marshal(out)
 		fmt.Fprintln(os.Stdout, agentremote.Prefix+string(data))
 		return true
 	}
-	if g.agentVideoBusy {
+	if g.agentVideoBusy || (!local && g.crop.blockInput()) {
 		replyError(fmt.Errorf("視野切換或截圖進行中"))
 		return true
 	}
@@ -114,7 +143,7 @@ func (g *game) dispatchAgentVideo(r agentremote.Request) bool {
 	g.mu.Unlock()
 	peer, results := g.peer, g.agentVideoResults
 	go func() {
-		result := agentVideoResult{out: agentremote.Response{ID: r.ID}}
+		result := agentVideoResult{local: local, out: agentremote.Response{ID: r.ID}}
 		defer func() { results <- result }()
 		ctx, cancel := context.WithDeadline(context.Background(), time.UnixMilli(r.Expires))
 		defer cancel()

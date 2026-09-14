@@ -256,6 +256,10 @@ PROJECT_LICENSE_FILES = ('LICENSE.md', 'LICENSE.en.md', 'LICENSE.ja.md', 'LICENS
 def copy_project_licenses(folder):
     for name in PROJECT_LICENSE_FILES:
         shutil.copy2(ROOT / name, folder / name)
+    licenses = folder / "ThirdPartyLicenses"
+    licenses.mkdir(exist_ok=True)
+    for source in (ROOT / "docs/third-party").glob("*-LICENSE.txt"):
+        shutil.copy2(source, licenses / source.name)
 
 
 def copy_model_licenses(folder):

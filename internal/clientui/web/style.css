@@ -129,7 +129,7 @@ dialog input:focus, dialog select:focus, dialog textarea:focus { outline: 2px so
 .header-room { display: flex; align-items: center; gap: 9px; min-width: 0; }
 .header-room label { white-space: nowrap; color: #7b8c80; }
 .header-room code { white-space: nowrap; font-size: 13px; }
-.header-room .icon-button { flex-shrink: 0; }
+.header-room .icon-button { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 28px; width: 28px; height: 28px; padding: 0; line-height: 1; }
 .heading-secret { display: flex; align-items: center; gap: 12px; width: 280px; }
 .heading-secret > label { white-space: nowrap; }
 .heading-secret .copy-row { flex: 1; min-width: 0; margin-top: 0; }
@@ -398,3 +398,15 @@ dialog .remember-row input { display: inline-block; width: 16px; height: 16px; m
 .host-actions { display: flex; align-items: center; gap: 4px; min-width: 0; }
 .host-actions > .icon-button { flex: 0 0 32px; width: 32px; height: 32px; display: grid; place-items: center; }
 .host-actions > .icon-button[hidden] { display: none; }
+
+#site-qr-dialog { width: min(400px, calc(100vw - 32px)); }
+#site-qr-image { display: block; width: min(320px, 100%); height: auto; margin: 12px auto; background: white; image-rendering: pixelated; }
+#site-qr-image[hidden] { display: none; }
+#site-qr-name, #site-qr-room { display: block; text-align: center; overflow-wrap: anywhere; }
+#site-qr-dialog .help-description { display: block; margin: 14px 0; }
+
+/* 桌面連線狀態獨立於 Presence，淺色與深色主題皆維持辨識度。 */
+.mini-device.connected { color: #08783e; background: #cbf5dc; box-shadow: inset 0 0 0 1px #27a665; }
+.mini-device.connecting { color: #946000; background: #fff0c2; }
+[data-theme="dark"] .mini-device.connected { color: #69f3a0; background: #17432b; box-shadow: inset 0 0 0 1px #42bf77; }
+[data-theme="dark"] .mini-device.connecting { color: #ffda79; background: #4d3a14; }

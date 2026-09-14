@@ -5,7 +5,7 @@
   <title>YourDesk · 裝置與站台</title><link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="topbar"><a class="brand" href="/" aria-label="YourDesk 首頁" data-tooltip="遠端工作空間"><img class="brand-mark" src="app-icon.png" alt="" width="26" height="26">YourDesk</a><div class="header-room"><label for="device-room">本機 ID</label><code id="device-room">—</code><button class="icon-button" id="copy-room" aria-label="複製本機 ID" data-tooltip="複製本機 ID">⧉</button></div><div class="local-badge"><i></i><span id="host-status">無法連線</span></div></header>
+  <header class="topbar"><a class="brand" href="/" aria-label="YourDesk 首頁" data-tooltip="遠端工作空間"><img class="brand-mark" src="app-icon.png" alt="" width="26" height="26">YourDesk</a><div class="header-room"><label for="device-room">本機 ID</label><code id="device-room">—</code><button class="icon-button" id="copy-room" aria-label="複製本機 ID" data-tooltip="複製本機 ID">⧉</button><button class="icon-button" id="share-site-qr" type="button" aria-label="顯示站台 QR Code" data-tooltip="顯示站台 QR Code"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 3h6v6H3zM15 3h6v6h-6zM3 15h6v6H3zM15 15h3v3h3v3h-6v-3h-3v-3h3zM12 3v3M3 12h6M12 9v3h6M21 12v3"/></svg></button></div><div class="local-badge"><i></i><span id="host-status">無法連線</span></div></header>
   <main>
     <section class="sites-section" aria-label="站台管理">
       <div class="section-heading"><div class="host-actions"><button id="open-settings" class="icon-button settings-button" type="button" aria-label="設定" data-tooltip="設定" aria-haspopup="dialog" aria-controls="settings-dialog"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 3-.6 2.4-1.7 1L4.3 6 2 10l1.8 1.7v2L2 15.4l2.3 4 2.4-.4 1.7 1L9 22h4.6l.6-2 1.7-1 2.4.4 2.3-4-1.8-1.7v-2l1.8-1.7-2.3-4-2.4.4-1.7-1L13.6 3Z"/><circle cx="11.3" cy="12.5" r="3.2"/></svg></button><button id="stop-incoming" class="icon-button stop-incoming" type="button" aria-label="關閉遠端連線" data-tooltip="關閉遠端連線" hidden><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2" fill="currentColor"/></svg></button></div><div id="password-reminder" class="password-reminder" role="status" hidden><span>請到設定修改初始連線密碼。</span><button type="button" id="change-initial-password" class="button">修改密碼</button><button type="button" id="dismiss-password-reminder" class="icon-button" aria-label="關閉提醒">×</button></div><form id="quick-form" class="quick-connect"><label for="quick-room">快速連線</label><input id="quick-room" name="room" required maxlength="200" placeholder="貼上遠端 ID 或 IP" autocomplete="off" spellcheck="false"><button id="quick-submit" class="button" type="submit">連線 ↗</button><button id="quick-stop" class="icon-button" type="button" hidden aria-label="取消快速連線" data-tooltip="取消快速連線">×</button></form><div class="actions"><button id="add-site" class="button primary">＋ 新增站台</button></div></div>
@@ -16,6 +16,7 @@
   </main>
   <div id="notice" role="status" aria-live="polite" hidden></div>
   <div id="connection-error" role="alert" hidden></div>
+  <dialog id="site-qr-dialog" aria-labelledby="site-qr-title"><form method="dialog"><div class="modal-heading"><h2 id="site-qr-title">站台 QR Code</h2><button class="icon-button" type="submit" aria-label="關閉">×</button></div><p id="site-qr-status" role="status">正在產生 QR Code…</p><img id="site-qr-image" width="320" height="320" alt="站台 QR Code" hidden><p id="site-qr-name"></p><code id="site-qr-room"></code><p class="help-description">包含站台名稱、ID 與伺服器位址，不含連線密碼。</p><div class="modal-actions"><button class="button" id="copy-site-link" type="button" disabled>複製站台連結</button><button class="button" type="submit">關閉</button></div></form></dialog>
   <dialog id="startup-optimization-dialog" aria-labelledby="startup-optimization-title" aria-describedby="startup-optimization-description">
     <form method="dialog">
       <div class="connection-spinner" aria-hidden="true"></div>
@@ -174,6 +175,7 @@
   <script src="app.js"></script>
   <script src="diagnostics.js"></script>
   <script src="packet-test.js"></script>
+  <script src="site-qr.js"></script>
 
 
   <script src="terminal.js"></script>

@@ -11,8 +11,10 @@
  .windows .window button{width:46px;height:51px;border:0;border-radius:0;background:transparent;color:var(--ink);font-size:16px;line-height:1}
  .windows .window button:hover{background:var(--hover)}
  .windows .window .close:hover{background:#c42b1c;color:white}
- .windows .actions{width:158px;padding-right:10px}
+ .windows .actions{width:auto;padding-right:10px}
  .win-popup{position:fixed;z-index:10;min-width:190px;max-width:calc(100vw - 20px);padding:6px;background:var(--bg);border:1px solid var(--edge);border-radius:12px;box-shadow:0 4px 10px #0003;overflow:auto;max-height:calc(100vh - 72px)}
+ .win-popup.crop-confirm{width:420px;padding:22px;max-height:calc(100vh - 72px)}
+ .crop-confirm h2{font-size:17px;margin:0 0 14px}.crop-confirm p{line-height:1.6;white-space:normal;margin:0}.crop-confirm .buttons{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}.crop-confirm .buttons button{width:auto;border:1px solid var(--edge)}.crop-confirm [data-confirm="16"]{background:#216b50;color:white}
  .win-popup[hidden]{display:none}
  .win-popup.tip{padding:12px 16px;min-width:0;white-space:pre-line;font-size:12px;line-height:1.6;pointer-events:none}
  .win-popup button{display:flex;align-items:center;gap:12px;width:100%;height:34px;text-align:left;padding:0 10px}
@@ -21,8 +23,8 @@
  .win-popup hr{border:0;border-top:1px solid var(--edge);margin:6px 4px}
  .win-popup .status-row{display:grid;grid-template-columns:auto 1fr;gap:18px;white-space:nowrap}
  .win-popup .status-row b{font-weight:600;color:var(--muted)}
- @media(max-width:760px){.windows .traffic{width:157px;gap:7px;padding-right:8px}.windows .traffic output{min-width:50px}.windows .fps{width:60px;margin-right:8px;padding-right:8px}.windows .title{padding-left:8px;padding-right:6px}}
- @media(max-width:640px){.windows .title svg{display:none}.windows .window{width:108px}.windows .window button{width:36px}.windows .actions{width:140px;gap:3px}.windows .title{font-size:11px}}
+ @media(max-width:760px){.windows .fps{width:60px;margin-right:8px;padding-right:8px}.windows .title{padding-left:8px;padding-right:6px}}
+ @media(max-width:640px){.windows .title svg{display:none}.windows .window{width:108px}.windows .window button{width:36px}.windows .actions{width:auto;gap:3px}.windows .title{font-size:11px}}
  `;
  document.head.append(style);
  const controls=document.querySelector('.window');
@@ -37,15 +39,25 @@
  const publishRegion=()=>{
   if(popup.hidden){send({popup:true,menu:false,width:0,height:0});return}
   const r=popup.getBoundingClientRect();
-  send({popup:true,menu:kind==='menu',x:r.x,y:r.y,width:r.width,height:r.height});
+  send({popup:true,menu:kind==='menu'||kind==='confirm',x:r.x,y:r.y,width:r.width,height:r.height});
  };
- window.closeWindowsPopup=()=>{popup.hidden=true;kind='';publishRegion()};
+ window.closeWindowsPopup=()=>{const cancel=kind==='confirm';popup.hidden=true;kind='';publishRegion();if(cancel)send({action:17})};
  const position=rect=>{
   popup.hidden=false;popup.style.left='10px';popup.style.top='62px';
   popup.style.left=Math.max(10,Math.min(rect.right-popup.offsetWidth,innerWidth-popup.offsetWidth-10))+'px';
   publishRegion();
  };
+ window.showCropConfirmation=()=>{
+  window.closeWindowsPopup();kind='confirm';popup.className='win-popup crop-confirm';popup.setAttribute('role','dialog');popup.setAttribute('aria-modal','true');
+  const content=new DOMParser().parseFromString(window.cropConfirmationDocument(),'text/html');
+  popup.replaceChildren(...content.body.children);
+  popup.querySelectorAll('script').forEach(node=>node.remove());
+  popup.querySelectorAll('[data-confirm]').forEach(button=>button.addEventListener('click',()=>{const action=Number(button.dataset.confirm);kind='';window.closeWindowsPopup();send({action})}));
+  position({right:innerWidth/2+210});popup.style.top=Math.max(62,(innerHeight-popup.offsetHeight)/2)+'px';publishRegion();
+  popup.querySelector('[data-confirm="17"]').focus();
+ };
  window.windowsTitlebarBridge=message=>{
+  if(kind==='confirm' && typeof message!=='number')return;
   if(typeof message==='number'){send({action:message});return}
   if(message.menu){
    window.closeWindowsPopup();
