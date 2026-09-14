@@ -660,7 +660,11 @@ func main() {
 		stats.received.Add(1)
 		stats.wire.Store(uint32(f.Codec))
 		// 封包已重組為獨立記憶體，交給解碼 worker 後即可接收下一幀。
-		decodeFrames.Submit(f)
+		// 網路回呼不可等待解碼 worker；滿載時略過影格，讓
+		// DataChannel read loop 持續消費 SCTP。
+		if !decodeFrames.TrySubmit(f) {
+			slog.Debug("遠端顯示 解碼佇列滿載，略過影格")
+		}
 	}, g.receiveDisplays, func(c p2p.Control) {
 		if c.Type == "desktop-unavailable" {
 			fatal(fmt.Errorf("此裝置沒有桌面環境，請改用命令列連線。"))

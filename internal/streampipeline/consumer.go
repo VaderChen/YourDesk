@@ -62,6 +62,35 @@ func (c *Consumer[T]) Submit(value T) bool {
 	}
 }
 
+// TrySubmit 以非阻塞方式交接工作。來源位於網路／事件回呼時，佇列滿載
+// 應丟棄目前項目而返回，避免把處理階段的延遲反壓到來源讀取迴圈。
+func (c *Consumer[T]) TrySubmit(value T) bool {
+	if c.ctx.Err() != nil {
+		return false
+	}
+	var slot *T
+	select {
+	case slot = <-c.free:
+	default:
+		return false
+	}
+	*slot = value
+	select {
+	case <-c.ctx.Done():
+		var zero T
+		*slot = zero
+		c.free <- slot
+		return false
+	case c.ready <- slot:
+		return true
+	default:
+		var zero T
+		*slot = zero
+		c.free <- slot
+		return false
+	}
+}
+
 // Close 停止接收並等待當前處理完成，之後才可釋放原生解碼資源。
 // 不關閉輸入 channel，避免與尚未返回的來源回呼競爭。可重複呼叫。
 func (c *Consumer[T]) Close() {

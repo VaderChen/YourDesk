@@ -2,6 +2,7 @@ package streampipeline
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 )
@@ -75,4 +76,61 @@ func TestConsumerBackpressureAndClose(t *testing.T) {
 	if c.Submit(4) {
 		t.Fatal("accepted after close")
 	}
+}
+
+func TestConsumerTrySubmitDropsWhenFull(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	entered, release := make(chan struct{}), make(chan struct{})
+	var enteredOnce sync.Once
+	c := NewConsumer(ctx, func(int) {
+		enteredOnce.Do(func() { close(entered) })
+		<-release
+	})
+	defer c.Close()
+	if !c.TrySubmit(1) || !c.TrySubmit(2) {
+		t.Fatal("first two submissions should occupy the bounded handoff")
+	}
+	<-entered
+	if c.TrySubmit(3) {
+		t.Fatal("full handoff must return false immediately")
+	}
+	close(release)
+}
+
+func TestConsumerTrySubmitHighPressure(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	entered, release := make(chan struct{}), make(chan struct{})
+	var enteredOnce sync.Once
+	c := NewConsumer(ctx, func(int) {
+		enteredOnce.Do(func() { close(entered) })
+		<-release
+	})
+	defer c.Close()
+	if !c.TrySubmit(1) || !c.TrySubmit(2) {
+		t.Fatal("failed to fill handoff")
+	}
+	<-entered
+
+	const attempts = 100_000
+	done := make(chan int, 1)
+	go func() {
+		dropped := 0
+		for i := 0; i < attempts; i++ {
+			if !c.TrySubmit(i) {
+				dropped++
+			}
+		}
+		done <- dropped
+	}()
+	select {
+	case dropped := <-done:
+		if dropped != attempts {
+			t.Fatalf("accepted %d submissions while consumer was blocked", attempts-dropped)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("TrySubmit blocked under sustained full-queue pressure")
+	}
+	close(release)
 }
