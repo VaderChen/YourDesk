@@ -10,7 +10,7 @@ YourDesk 是支援 macOS 與 Windows 的遠端桌面工具。從連線、站台�
 
 ## 特色與功能
 
-**1.26.0914 build 1049：串流穩定修正、剪貼簿流控與安裝包瘦身。**已處理解碼佇列滿載時阻塞 DataChannel 接收回呼的問題；剪貼簿／檔案改以接收額度等待慢速端，保留完整內容。「封包分析」採背景日誌及有期限的統計取樣，降低診斷本身造成阻塞的風險。macOS DMG 改用 LZMA 壓縮。目前先前回報的停滯／斷線僅見於 macOS 對 macOS；長時間及跨機大檔案傳輸仍需持續驗證。本版沒有背景自動重連／斷線續傳。詳見 [本版說明](docs/RELEASE-1.26.0914-build-1049.md)、[串流穩定修正](docs/STREAM-RECOVERY.md) 與 [封包分析](docs/NETWORK-DEBUG.md)。
+**1.26.0914 build 1419：裁切串流、滑鼠組合鍵與桌面站台 QR Code。**裁切框預設置中、寬高各半，可拖曳調整；復原前以 WebView 確認。修正 macOS 裁切黑畫面及修飾鍵滑鼠操作，簡化工具列並改善連線狀態顏色。Windows 裁切已有使用者實測回報，其餘跨機情境仍持續驗證。詳見 [本版說明](docs/RELEASE-1.26.0914-build-1419.md)、[滑鼠組合鍵](docs/INPUT-MODIFIERS.md) 與 [站台 QR Code](docs/SITE-QR.md)。
 
 - **GUI 與 CMD 雙模式**：支援遠端桌面與互動命令列，可依工作選擇模式；命令列使用獨立視窗，亦可連入 Linux CLI Host。
 - **MCP AI Agent 遠端操控**：AI Agent 可透過 MCP 連線遠端、操作桌面或命令列、查詢站台能力，完成工作後斷線。

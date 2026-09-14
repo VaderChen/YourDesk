@@ -7,6 +7,8 @@ package main
 int yd_fullscreen_requested(void);
 void yd_toggle_fullscreen(void);
 int yd_fullscreen_transitioning(void);
+void yd_confirm_crop(void);
+void yd_set_crop(int state, const char *message);
 int yd_titlebar_overlay(void);
 int yd_titlebar_visible(void);
 void yd_configure_titlebar(const char *html);
@@ -96,3 +98,11 @@ func nativeSetEnhancementStatus(status enhancementDisplayStatus) {
 	defer C.free(unsafe.Pointer(value))
 	C.yd_set_enhancement_status(value)
 }
+
+func nativeSetCrop(state int, message string) {
+	p := C.CString(message)
+	defer C.free(unsafe.Pointer(p))
+	C.yd_set_crop(C.int(state), p)
+}
+
+func nativeConfirmCrop() { C.yd_confirm_crop() }

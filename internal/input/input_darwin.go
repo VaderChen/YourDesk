@@ -9,6 +9,9 @@ package input
 #include <IOKit/hidsystem/IOHIDLib.h>
 #include <IOKit/hidsystem/IOHIDParameter.h>
 static int yd_request_accessibility(int prompt) { const void *keys[]={kAXTrustedCheckOptionPrompt}; const void *values[]={prompt ? kCFBooleanTrue : kCFBooleanFalse}; CFDictionaryRef opts=CFDictionaryCreate(kCFAllocatorDefault,keys,values,1,&kCFCopyStringDictionaryKeyCallBacks,&kCFTypeDictionaryValueCallBacks); Boolean ok=AXIsProcessTrustedWithOptions(opts); CFRelease(opts); return ok ? 1 : 0; }
+CGEventFlags yd_input_flags(void);
+void yd_input_set_modifiers(CGEventFlags flags);
+void yd_input_modifier_key(int code,int down);
 void yd_mouse_move(double x, double y);
 void yd_mouse_button(double x, double y, int button, int down);
 // CGEvent coordinates are logical screen points, not Retina backing pixels.
@@ -19,7 +22,11 @@ static void yd_button(int b,int down) {
  yd_mouse_button(p.x,p.y,b,down);
 }
 static void yd_button_at(double x,double y,int b,int down) { yd_mouse_button(x,y,b,down); }
-static void yd_key(int code,int down) { CGEventRef e=CGEventCreateKeyboardEvent(NULL,(CGKeyCode)code,down != 0); CGEventPost(kCGHIDEventTap,e); CFRelease(e); }
+static void yd_key(int code,int down) {
+ yd_input_modifier_key(code,down);
+ CGEventRef e=CGEventCreateKeyboardEvent(NULL,(CGKeyCode)code,down != 0);
+ if(e){CGEventSetFlags(e,yd_input_flags());CGEventPost(kCGHIDEventTap,e);CFRelease(e);}
+}
 static int yd_modifier_lock(int selector,int on) {
  io_service_t service=IOServiceGetMatchingService(kIOMainPortDefault,IOServiceMatching("IOHIDSystem"));
  if(!service)return -1;
@@ -45,12 +52,13 @@ static void yd_raw_key(int code,int down,unsigned long long mods,int repeat,int 
   // 保留 Caps Lock 的實體狀態，讓系統輸入來源處理器辨識按下／放開。
   flags|=nativeFlags&(NX_ALPHASHIFT_STATELESS_MASK|NX_DEVICE_ALPHASHIFT_STATELESS_MASK);
  }
+ yd_input_set_modifiers(flags);
  CGEventSetFlags(e,flags);
  CGEventSetIntegerValueField(e,kCGEventSourceUserData,0x5944524b);
  CGEventSetIntegerValueField(e,kCGKeyboardEventAutorepeat,repeat);
  CGEventPost(kCGHIDEventTap,e);CFRelease(e);
 }
-static void yd_wheel(int delta) { CGEventRef e=CGEventCreateScrollWheelEvent(NULL,kCGScrollEventUnitLine,1,delta); CGEventPost(kCGHIDEventTap,e); CFRelease(e); }
+static void yd_wheel(int delta) { CGEventRef e=CGEventCreateScrollWheelEvent(NULL,kCGScrollEventUnitLine,1,delta); if(e){CGEventSetFlags(e,yd_input_flags());CGEventPost(kCGHIDEventTap,e);CFRelease(e);} }
 */
 import "C"
 import (

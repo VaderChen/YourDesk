@@ -142,7 +142,7 @@ func (s *Sync) Poll(force bool) {
 	}
 }
 
-// CancelKeys 在失焦、暫停控制、切換螢幕時取消尚未送出的貼上與按鍵。
+// CancelKeys 在失焦、暫停控制、切換螢幕時取消尚未送出的貼上與輸入。
 func (s *Sync) CancelKeys(reasons ...string) {
 	reason := "輸入狀態重設"
 	if len(reasons) > 0 {
@@ -166,6 +166,7 @@ func (s *Sync) CancelKeys(reasons ...string) {
 			copy := *c.RawKey
 			copy.Down = false
 			copy.Repeat = false
+			copy.Modifiers = 0
 			c.RawKey = &copy
 		} else {
 			c.Down = false
@@ -190,17 +191,21 @@ func (s *Sync) SendControl(c p2p.Control) error {
 	if s.peer == nil {
 		return fmt.Errorf("操作連線尚未就緒")
 	}
-	if c.Type != "key" && c.Type != "raw-key" {
+	if c.Type != "key" && c.Type != "raw-key" && c.Type != "button" && c.Type != "move" && c.Type != "wheel" {
 		return s.peer.SendControl(c)
 	}
 	if s.ctx.Err() != nil {
 		return s.ctx.Err()
 	}
+	// 滑鼠與鍵盤共用順序；滿載時略過過時的移動，保留可靠事件空間。
+	if c.Type == "move" && len(s.keys) >= 64 {
+		return nil
+	}
 	select {
 	case s.keys <- keyJob{control: c, generation: s.generation}:
 		return nil
 	default:
-		return fmt.Errorf("鍵盤佇列已滿")
+		return fmt.Errorf("輸入佇列已滿")
 	}
 }
 func (s *Sync) keyboard(ctx context.Context) {
@@ -262,10 +267,15 @@ func (s *Sync) keyboard(ctx context.Context) {
 				if c.RawKey != nil {
 					id = fmt.Sprintf("%s/%d", c.RawKey.Platform, c.RawKey.Code)
 				}
-				if down {
-					s.held[id] = c
-				} else {
-					delete(s.held, id)
+				if c.Type == "button" {
+					id = fmt.Sprintf("mouse/%d", c.Button)
+				}
+				if c.Type == "key" || c.Type == "raw-key" || c.Type == "button" {
+					if down {
+						s.held[id] = c
+					} else {
+						delete(s.held, id)
+					}
 				}
 			} else if ctx.Err() == nil {
 				slog.Debug("鍵盤傳送失敗", "error", err)

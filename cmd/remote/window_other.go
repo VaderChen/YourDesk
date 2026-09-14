@@ -38,3 +38,7 @@ func nativeTitlebarPopupOpen() bool { return false }
 func nativePrepareViewerWindow() {}
 
 func nativeSetEnhancementStatus(enhancementDisplayStatus) {}
+
+func nativeSetCrop(int, string) {}
+
+func nativeConfirmCrop() {}

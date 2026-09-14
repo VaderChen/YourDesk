@@ -12,6 +12,8 @@ static atomic_bool fullscreenTransitioning = false;
 static NSInteger pendingMenuAction = 0;
 static atomic_int titlebarAction = 0;
 static atomic_int titlebarMode = 0;
+static int cropState = 0;
+static NSString *cropMessage = @"";
 static atomic_int qualityMode = 1;
 static atomic_int displayIndex = 0;
 static atomic_int displayCount = 0;
@@ -19,6 +21,7 @@ static atomic_bool displayPending = false;
 static atomic_bool titlebarConfigured = false;
 static atomic_bool titlebarConfigurePending = false;
 static WKWebView *titlebarWeb;
+static NSPanel *cropPanel;
 static NSView *titlebarControls;
 static NSArray<NSValue *> *titlebarInteractiveRects;
 static atomic_bool fullscreenActive = false;
@@ -66,6 +69,7 @@ static void ydUpdateTitlebar(void) {
     if (!titlebarLoaded || !titlebarWeb.window) return;
     NSDictionary *state = @{@"title": titlebarWeb.window.title ?: @"YourDesk",
         @"strings": titlebarStrings ?: @{}, @"language": titlebarLanguage,
+        @"crop":@(cropState), @"cropMessage":cropMessage,
         @"enhancement":enhancementStatus ?: @{},
         @"videoCodec":videoCodec,@"sourceEncoding":sourceEncoding,@"receiverDecoding":receiverDecoding,
         @"tx": @(trafficTX), @"rx": @(trafficRX), @"fps": @(viewerFPS), @"renderFPS": @(renderFPS),
@@ -133,6 +137,11 @@ static void ydUpdateTitlebar(void) {
     if (!message.frameInfo.mainFrame) return;
     if ([message.body isKindOfClass:[NSDictionary class]]) {
         NSDictionary *body = message.body;
+        if (cropPanel && message.webView == cropPanel.contentView && [body[@"cropHeight"] isKindOfClass:[NSNumber class]]) {
+            CGFloat height=MIN(400,MAX(140,[body[@"cropHeight"] doubleValue]));
+            if (fabs(cropPanel.contentView.frame.size.height-height)>1) [cropPanel setContentSize:NSMakeSize(440,height)];
+            return;
+        }
         if ([body[@"interactiveRects"] isKindOfClass:[NSArray class]]) {
             NSMutableArray *rects=[NSMutableArray array];
             NSArray *items=body[@"interactiveRects"];
@@ -227,9 +236,13 @@ static void ydUpdateTitlebar(void) {
     if (![message.body isKindOfClass:[NSNumber class]]) return;
     [titlebarTooltip close];
     int action = [message.body intValue];
+    if ((action==16 || action==17) && cropPanel) {
+      [cropPanel.sheetParent endSheet:cropPanel]; [cropPanel orderOut:nil];
+      [cropPanel release];cropPanel=nil;atomic_store(&titlebarAction,action);return;
+    }
     if (action == 7) [titlebarWeb.window miniaturize:nil];
     else if (action >= 100 && action < 104 && action-100 < atomic_load(&displayCount) && !atomic_load(&displayPending)) atomic_store(&titlebarAction, action);
-    else if ((action >= 1 && action <= 6) || action==13) atomic_store(&titlebarAction, action);
+    else if ((action >= 1 && action <= 6) || action==13 || action==14 ) atomic_store(&titlebarAction, action);
     // 按下 HTML 按鈕後，鍵盤焦點交還遠端畫布。
     [titlebarWeb.window makeFirstResponder:titlebarWeb.window.contentView];
 }
@@ -508,4 +521,38 @@ void yd_set_enhancement_status(const char *json) {
   }
  });
  [text release];
+}
+
+void yd_set_crop(int state, const char *message) {
+ NSString *text = [[NSString alloc] initWithUTF8String:message];
+ dispatch_async(dispatch_get_main_queue(), ^{
+ if (cropState != state || ![cropMessage isEqualToString:text]) { cropState=state; [cropMessage release]; cropMessage=[text copy]; ydUpdateTitlebar(); }
+ });
+ [text release];
+}
+
+void yd_confirm_crop(void) {
+ dispatch_async(dispatch_get_main_queue(), ^{
+  if (titlebarWeb.window && titlebarLoaded) {
+   [titlebarWeb evaluateJavaScript:@"window.cropConfirmationDocument()" completionHandler:^(id html, NSError *error) {
+    if (error || ![html isKindOfClass:[NSString class]] || !titlebarWeb.window) {atomic_store(&titlebarAction,17);return;}
+    cropPanel=[[NSPanel alloc] initWithContentRect:NSMakeRect(0,0,440,220) styleMask:NSWindowStyleMaskTitled backing:NSBackingStoreBuffered defer:NO];
+    cropPanel.title=ydText(@"復原全畫面串流？");
+    WKWebView *web=[[WKWebView alloc] initWithFrame:NSMakeRect(0,0,440,220) configuration:titlebarWeb.configuration];
+    cropPanel.contentView=web;[web loadHTMLString:html baseURL:nil];[web release];
+    [titlebarWeb.window beginSheet:cropPanel completionHandler:nil];
+   }];return;
+  }
+  NSWindow *parent=titlebarWeb.window ?: NSApp.keyWindow;
+  if(!parent){atomic_store(&titlebarAction,17);return;}
+  NSAlert *alert = [[NSAlert alloc] init];
+  alert.messageText = ydText(@"復原全畫面串流？");
+  alert.informativeText = ydText(@"復原後將取消目前的裁切區域，恢復串流整個螢幕。");
+  [alert addButtonWithTitle:ydText(@"取消")];
+  [alert addButtonWithTitle:ydText(@"復原")];
+  [alert beginSheetModalForWindow:parent completionHandler:^(NSModalResponse response) {
+   atomic_store(&titlebarAction,response == NSAlertSecondButtonReturn ? 16 : 17);
+  }];
+  [alert release];
+ });
 }

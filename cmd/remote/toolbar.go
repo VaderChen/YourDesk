@@ -37,13 +37,18 @@ func (g *game) toolbarHeight() int {
 }
 func (g *game) toolbarButton(i int) image.Rectangle {
 	s := g.toolbarScale()
-	x := float64(g.finalWidth) - (12+6*36+5*4)*s + float64(i)*40*s
+	x := float64(g.finalWidth) - (12+7*36+6*4)*s + float64(i)*40*s
 	return image.Rect(int(x), int(4*s), int(x+36*s), int(40*s))
 }
 
 // 僅處理本機按鈕；整個按下／放開手勢都不轉送遠端。
 func (g *game) updateToolbar() (bool, error) {
 	nativeConfigureTitlebar()
+	if state := g.crop.status(); state != g.crop.publishedState || g.crop.message != g.crop.publishedMessage {
+		nativeSetCrop(state, g.crop.message)
+		g.crop.publishedState = state
+		g.crop.publishedMessage = g.crop.message
+	}
 	nativeSetTitlebarMode(int(g.mode))
 	nativeSetQuality(g.quality)
 	selected, count, pending := g.displayStatus()
@@ -67,6 +72,14 @@ func (g *game) updateToolbar() (bool, error) {
 			g.quality = action - 10
 		case 6:
 			g.nextDisplay()
+		case 14:
+			g.toggleCrop()
+		case 16:
+			g.crop.confirming = false
+			g.resetCrop()
+		case 17:
+			g.crop.confirming = false
+			g.crop.draining = true
 		}
 	}
 	g.updateQuality()
@@ -79,7 +92,7 @@ func (g *game) updateToolbar() (bool, error) {
 	px, py := g.finalTransform.Apply(float64(x), float64(y))
 	hovered := -1
 	if ebiten.IsFocused() {
-		for i := 0; i < 6; i++ {
+		for i := 0; i < 7; i++ {
 			if image.Pt(int(px), int(py)).In(g.toolbarButton(i)) {
 				hovered = i
 				break
@@ -108,6 +121,8 @@ func (g *game) updateToolbar() (bool, error) {
 				return true, g.requestClose()
 			case 5:
 				g.nextDisplay()
+			case 6:
+				g.toggleCrop()
 			}
 		}
 		g.toolbarCapture = 0
@@ -151,7 +166,7 @@ func (g *game) drawToolbar(screen viewerCanvas) {
 	s := float32(g.toolbarScale())
 	selectedDisplay, displayCount, displayPending := g.displayStatus()
 	vector.DrawFilledRect(dst, 0, float32(h)-1, float32(w), 1, color.RGBA{208, 220, 214, 255}, false)
-	for i := 0; i < 6; i++ {
+	for i := 0; i < 7; i++ {
 		rect := g.toolbarButton(i)
 		x, y := float32(rect.Min.X), float32(rect.Min.Y)
 		selected := (i == 0 && g.mode == viewOriginal) || (i == 1 && g.mode == viewAuto) || (i == 2 && g.mode == viewShrink)
@@ -219,6 +234,19 @@ func (g *game) drawToolbar(screen viewerCanvas) {
 			line(8, 23, 8, 9)
 			line(17, 23, 17, 27)
 			line(12, 27, 23, 27)
+		case 6:
+			if g.crop.active {
+				line(8, 12, 25, 12)
+				line(25, 12, 25, 26)
+				line(25, 26, 12, 26)
+				line(8, 12, 14, 6)
+				line(8, 12, 14, 18)
+				break
+			}
+			line(11, 6, 11, 25)
+			line(11, 25, 30, 25)
+			line(6, 11, 25, 11)
+			line(25, 11, 25, 30)
 		case 4:
 			line(11, 11, 25, 25)
 			line(25, 11, 11, 25)

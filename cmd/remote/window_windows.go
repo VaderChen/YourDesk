@@ -6,6 +6,7 @@ package main
 #cgo LDFLAGS: -luser32 -lgdi32
 #include "window_windows.h"
 #include <stdlib.h>
+static int yd_confirm_crop(void) { return MessageBoxW((HWND)yd_win_find_viewer(), L"復原後將取消目前的裁切區域，恢復串流整個螢幕。", L"復原全畫面串流？", MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) == IDYES; }
 */
 import "C"
 
@@ -47,6 +48,8 @@ type windowsTitlebarState struct {
 	Title            string                   `json:"title"`
 	Strings          map[string]string        `json:"strings"`
 	Language         string                   `json:"language"`
+	Crop             int                      `json:"crop"`
+	CropMessage      string                   `json:"cropMessage"`
 	Mode             int                      `json:"mode"`
 	Quality          int                      `json:"quality"`
 	Display          int                      `json:"display"`
@@ -155,7 +158,7 @@ func runWindowsTitlebar() {
 		switch message.Action {
 		case 7, 8, 9:
 			C.yd_win_command(C.int(message.Action))
-		case 1, 2, 3, 4, 5, 6, 10, 11, 12, 13:
+		case 1, 2, 3, 4, 5, 6, 10, 11, 12, 13, 14, 16, 17:
 			C.yd_win_command(0)
 			select {
 			case winChrome.actions <- message.Action:
@@ -410,4 +413,28 @@ func nativeSetEnhancementStatus(status enhancementDisplayStatus) {
 	winChrome.mu.Lock()
 	winChrome.state.Enhancement = status
 	winChrome.mu.Unlock()
+}
+
+func nativeSetCrop(state int, message string) {
+	winChrome.mu.Lock()
+	winChrome.state.Crop = state
+	winChrome.state.CropMessage = message
+	winChrome.mu.Unlock()
+}
+
+func nativeConfirmCrop() {
+	if nativeTitlebarControls() {
+		windowsDispatch(func(w webview.WebView) { w.Eval("window.showCropConfirmation()") })
+		return
+	}
+	go func() {
+		action := 17
+		if C.yd_confirm_crop() != 0 {
+			action = 16
+		}
+		select {
+		case winChrome.actions <- action:
+		default:
+		}
+	}()
 }

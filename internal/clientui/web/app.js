@@ -183,6 +183,24 @@ function groupName(id) {
   return state.library.groups.find(group => group.id === id)?.name || i18n.t('未分組');
 }
 // 本機與遠端站台皆依 Server 實際註冊結果顯示在線狀態。
+// 已建立的連線優先於 Presence，避免查詢失敗或 Host 忙碌時顯示成離線。
+function applySiteDeviceStatus(icon, site) {
+ const key=`viewer:${site?.id}`,stage=state.sessions?.[key]?.stage;
+ const online=siteOnline(site);
+ const connected=stage==='connected';
+ const connecting=!connected && (['waiting','password','authenticating'].includes(stage) || (!stage && Object.hasOwn(state.running||{},key)));
+ const status=connected?'connected':connecting?'connecting':online===true?'online':'offline';
+ for(const name of ['connected','connecting','online','offline'])icon.classList.toggle(name,name===status);
+ const label=connected?'遠端桌面已連線':connecting?'遠端桌面連線中':online===true?'Client 在線上':online===false?'Client 不在線上':'無法確認 Client 狀態';
+ icon.dataset.tooltip=i18n.t(label);
+ icon.setAttribute('aria-label',i18n.t(label));
+}
+function refreshSiteDeviceStatuses() {
+ document.querySelectorAll('.site-card').forEach(card=>{
+  const icon=card.querySelector('.mini-device');
+  if(icon)applySiteDeviceStatus(icon,state.library.sites.find(site=>site.id===card.dataset.siteId));
+ });
+}
 function siteOnline(site) { const value=sitePresence[site?.id]; return value && typeof value==='object'?value.online:value; }
 function siteCapability(site,name) { return sitePresence[site?.id]?.capabilities?.[name]; }
 function applySiteCapabilities(card,site) {
@@ -292,9 +310,8 @@ function renderSites() {
     const title = text('div', '', 'card-title');
     const name = text('h3', site.name); name.dataset.tooltip = site.name;
     title.append(name, text('p', groupName(site.group)));
-    const online = siteOnline(site);
-    const device = text('span', '', `mini-device${online === true ? ' online' : ' offline'}`);
-    device.dataset.tooltip = i18n.t(online === true ? 'Client 在線上' : online === false ? 'Client 不在線上' : '無法確認 Client 狀態');
+    const device = text('span', '', 'mini-device');
+    applySiteDeviceStatus(device,site);
     const screen = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     for (const [key, value] of Object.entries({ viewBox: '0 0 24 24', width: '20', height: '20', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.8', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' })) screen.setAttribute(key, value);
     const outline = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -463,6 +480,7 @@ async function updateRunning() {
  state.running = latest.running;
   state.quick = latest.quick;
   state.sessions = latest.sessions;
+  refreshSiteDeviceStatuses();
   state.notice = latest.notice;
   showHostConflict(latest.hostConflict);
   state.passwordPrompt = latest.passwordPrompt;
@@ -1020,10 +1038,7 @@ async function refreshPresence() {
     const site=state.library.sites.find(site=>site.id===card.dataset.siteId);
     applySiteCapabilities(card,site);
     const icon = card.querySelector('.mini-device');
-    const online = siteOnline(state.library.sites.find(site => site.id === card.dataset.siteId));
-    icon.classList.toggle('online', online === true);
-    icon.classList.toggle('offline', online !== true);
-    icon.dataset.tooltip = i18n.t(online === true ? 'Client 在線上' : online === false ? 'Client 不在線上' : '無法確認 Client 狀態');
+    applySiteDeviceStatus(icon,site);
   });
 }
 setInterval(refreshPresence, 5000);

@@ -380,6 +380,10 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 		s.openTerminalWindow(w, r)
 		return
 	}
+	if r.URL.Path == "/api/site-qr" && r.Method == "GET" {
+		s.siteQR(w, r)
+		return
+	}
 	if r.URL.Path == "/api/network-debug" && (r.Method == "GET" || r.Method == "POST") {
 		s.networkDebug(w, r)
 		return

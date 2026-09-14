@@ -35,6 +35,7 @@ import (
 )
 
 type game struct {
+	crop                                      cropEditor
 	agentRegion                               agentvideo.Region // mu 保護
 	agentViewID, frameViewID, displayedViewID uint64            // mu 保護
 	agentPaused, agentViewChanging            bool              // mu 保護
@@ -196,6 +197,9 @@ func (g *game) Update() error {
 		return toolbarErr
 	}
 	rawInput := g.updateRawKeys()
+	if g.updateCrop(toolbarHandled) {
+		return nil
+	}
 	if action := g.windowShortcut(rawInput); action != 0 {
 		return g.executeWindowShortcut(action)
 	}
@@ -257,31 +261,7 @@ func (g *game) Update() error {
 		g.clipboard.CancelKeys("遠端控制暫停或切換螢幕")
 		return nil
 	}
-	iw, ih := g.displayedWidth, g.displayedHeight
-	x, y := ebiten.CursorPosition()
-	// 游標由引擎的邏輯座標還原至最終畫布，與實際影像共用像素區域。
-	px, py := g.finalTransform.Apply(float64(x), float64(y))
-	ox, oy, vw, vh := g.viewport(iw, ih)
-	fx, fy := (px-ox)/vw, (py-oy)/vh
-	inside := !toolbarHandled && py >= float64(g.toolbarHeight()) && iw > 0 && ih > 0 && fx >= 0 && fx <= 1 && fy >= 0 && fy <= 1
-	fx, fy = math.Max(0, math.Min(1, fx)), math.Max(0, math.Min(1, fy))
-	if inside {
-		_ = g.sendControl(p2p.Control{Type: "move", X: fx, Y: fy})
-	}
-	for _, b := range []ebiten.MouseButton{ebiten.MouseButton0, ebiten.MouseButton1, ebiten.MouseButton2} {
-		down := ebiten.IsMouseButtonPressed(b)
-		if g.lastButtons[b] != down && (!down || inside) {
-			n := 1 // YourDesk protocol: 1=left, 2=right, 3=middle
-			if b == ebiten.MouseButton1 {
-				n = 3
-			}
-			if b == ebiten.MouseButton2 {
-				n = 2
-			}
-			_ = g.sendControl(p2p.Control{Type: "button", Button: n, Down: down, X: fx, Y: fy})
-			g.lastButtons[b] = down
-		}
-	}
+	// 同一幀的鍵盤狀態先交接，讓滑鼠按鍵與拖曳沿用目前修飾鍵。
 	if !rawInput {
 		// 貼上屏障等待獨立剪貼簿通道完成，UI 不等待傳輸。
 		if g.clipboard != nil && ebiten.IsKeyPressed(ebiten.KeyV) && !g.lastKeys[ebiten.KeyV] && (ebiten.IsKeyPressed(ebiten.KeyControl) || ebiten.IsKeyPressed(ebiten.KeyMeta)) {
@@ -316,6 +296,32 @@ func (g *game) Update() error {
 
 	}
 
+	iw, ih := g.displayedWidth, g.displayedHeight
+	x, y := ebiten.CursorPosition()
+	// 游標由引擎的邏輯座標還原至最終畫布，與實際影像共用像素區域。
+	px, py := g.finalTransform.Apply(float64(x), float64(y))
+	ox, oy, vw, vh := g.viewport(iw, ih)
+	fx, fy := (px-ox)/vw, (py-oy)/vh
+	inside := !toolbarHandled && py >= float64(g.toolbarHeight()) && iw > 0 && ih > 0 && fx >= 0 && fx <= 1 && fy >= 0 && fy <= 1
+	fx, fy = math.Max(0, math.Min(1, fx)), math.Max(0, math.Min(1, fy))
+	if inside {
+		_ = g.sendControl(p2p.Control{Type: "move", X: fx, Y: fy})
+	}
+	for _, b := range []ebiten.MouseButton{ebiten.MouseButton0, ebiten.MouseButton1, ebiten.MouseButton2} {
+		down := ebiten.IsMouseButtonPressed(b)
+		if g.lastButtons[b] != down && (!down || inside) {
+			n := 1 // YourDesk protocol: 1=left, 2=right, 3=middle
+			if b == ebiten.MouseButton1 {
+				n = 3
+			}
+			if b == ebiten.MouseButton2 {
+				n = 2
+			}
+			_ = g.sendControl(p2p.Control{Type: "button", Button: n, Down: down, X: fx, Y: fy})
+			g.lastButtons[b] = down
+		}
+	}
+
 	if _, delta := ebiten.Wheel(); delta != 0 && inside {
 		_ = g.sendControl(p2p.Control{Type: "wheel", Delta: delta})
 	}
@@ -331,6 +337,23 @@ func (g *game) DrawFinalScreen(screen ebiten.FinalScreen, _ *ebiten.Image, geoM 
 	if w < 1 || h < 1 {
 		return
 	}
+	// Metal 回到 screen render pass 時會清除畫面。裁切圖層須先和影像
+	// 合成，再一次提交最終畫布；一般串流保留直接繪製路徑。
+	if g.crop.visible() {
+		if g.crop.composite == nil || g.crop.composite.Bounds().Size() != image.Pt(w, h) {
+			if g.crop.composite != nil {
+				g.crop.composite.Dispose()
+			}
+			g.crop.composite = ebiten.NewImage(w, h)
+		}
+		g.drawFrame(g.crop.composite)
+		screen.DrawImage(g.crop.composite, &ebiten.DrawImageOptions{})
+		return
+	}
+	if g.crop.composite != nil {
+		g.crop.composite.Dispose()
+		g.crop.composite = nil
+	}
 	// 直接提交最終畫布，避免視窗動畫期間反覆配置全尺寸 GPU 中間影像。
 	g.drawFrame(screen)
 }
@@ -345,6 +368,7 @@ type viewerCanvas interface {
 func (g *game) drawFrame(screen viewerCanvas) {
 	g.finalWidth, g.finalHeight = screen.Bounds().Dx(), screen.Bounds().Dy()
 	defer g.drawToolbar(screen)
+	defer g.drawCrop(screen)
 	applied := false
 	g.mlApplied = false
 	var renderWidth, renderHeight int

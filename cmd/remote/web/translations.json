@@ -1,4 +1,6 @@
 {
+  "啟動": ["Active", "有効", "활성"],
+  "關閉": ["Off", "オフ", "꺼짐"],
   "低流量": [
     "Low bandwidth",
     "低通信量",
@@ -613,5 +615,65 @@
     "TX is upload; RX is download. Lower traffic is normal when the screen is still.",
     "TX は送信、RX は受信です。画面が静止している間に通信量が減るのは正常です。",
     "TX는 업로드, RX는 다운로드입니다. 화면이 정지하면 트래픽이 줄어드는 것은 정상입니다."
+  ],
+  "裁切": [
+    "Crop",
+    "切り抜き",
+    "자르기"
+  ],
+  "復原": [
+    "Restore",
+    "復元",
+    "복원"
+  ],
+  "裁切：拖曳調整，再按一次套用": [
+    "Crop: drag to adjust, click again to apply",
+    "切り抜き：ドラッグで調整、もう一度押して適用",
+    "자르기: 드래그로 조정하고 다시 눌러 적용"
+  ],
+  "拖曳框內移動、邊角調整尺寸；再次按裁切套用；Esc 取消": [
+    "Drag inside to move, edges to resize; click Crop to apply; Esc to cancel",
+    "枠内で移動、辺と角でサイズ変更。切り抜きで適用、Escでキャンセル",
+    "안쪽을 드래그하여 이동, 모서리로 크기 조정; 자르기로 적용; Esc로 취소"
+  ],
+  "復原：恢復全畫面串流": [
+    "Restore full-screen streaming",
+    "画面全体のストリーミングを復元",
+    "전체 화면 스트리밍 복원"
+  ],
+  "復原全畫面串流？": [
+    "Restore full-screen streaming?",
+    "画面全体のストリーミングを復元しますか？",
+    "전체 화면 스트리밍을 복원할까요?"
+  ],
+  "復原後將取消目前的裁切區域，恢復串流整個螢幕。": [
+    "This removes the crop and resumes streaming the entire screen.",
+    "切り抜きを解除し、画面全体のストリーミングに戻します。",
+    "자르기를 해제하고 전체 화면 스트리밍으로 돌아갑니다."
+  ],
+  "正在切換串流區域…": [
+    "Switching stream region…",
+    "ストリーミング領域を切り替え中…",
+    "스트리밍 영역 전환 중…"
+  ],
+  "等待新區域的完整影格…": [
+    "Waiting for a complete frame of the new region…",
+    "新しい領域の完全なフレームを待機中…",
+    "새 영역의 전체 프레임을 기다리는 중…"
+  ],
+  "等待遠端完整影格": [
+    "Waiting for a complete remote frame",
+    "リモートの完全なフレームを待機中",
+    "원격 전체 프레임을 기다리는 중"
+  ],
+  "遠端版本不支援區域串流，請更新 Host": [
+    "Update the Host to use region streaming",
+    "領域ストリーミングにはHostの更新が必要です",
+    "영역 스트리밍을 사용하려면 Host를 업데이트하세요"
+  ],
+  "尚未收到新區域影格，可按復原重試": [
+    "No new region frame yet; use Restore to retry",
+    "新しい領域のフレームが届きません。復元で再試行できます",
+    "새 영역 프레임이 아직 없습니다. 복원으로 다시 시도하세요"
   ]
 }
