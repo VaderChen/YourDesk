@@ -31,8 +31,8 @@ usage() {
   ./remoteRun.command --with-client
 
 預設 ROOM 為本機硬體 UID；可用 -room 或 YOURDESK_ROOM 覆寫。
-預設只啟動 Remote Viewer，Client 必須已在被控桌面執行。
---client-only 只啟動本機 Client，連到遠端 Server 等待其他 Viewer。
+預設只啟動 顯示區域，Client 必須已在被控桌面執行。
+--client-only 只啟動本機 Client，連到遠端 Server 等待其他 顯示區域。
 --with-client 會在本機同時啟動 Client，僅適合測試。
 EOF
 }
@@ -106,7 +106,7 @@ if [[ "$WITH_CLIENT" == "1" ]]; then
 fi
 
 if [[ "$CLIENT_ONLY" == "1" ]]; then
-  echo "啟動本機 Client（遠端 Server，等待 Viewer）：$SIGNAL_URL"
+  echo "啟動本機 Client（遠端 Server，等待 顯示區域）：$SIGNAL_URL"
   echo "ROOM: $ROOM"
   "$BIN/yourdesk-client" -signal "$SIGNAL_URL" -room "$ROOM" >"$CLIENT_LOG" 2>&1 &
   CLIENT_PID=$!

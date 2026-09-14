@@ -10,14 +10,14 @@ CLI Host / Remote 可使用 `-transport tailcat`。這一版是明確選用模�
 
 ## 單端協商
 
-| Host 開關 | Viewer 開關 | 本次傳輸 |
+| Host 開關 | 顯示區域 開關 | 本次傳輸 |
 | --- | --- | --- |
 | 關 | 關 | 原生 WebRTC P2P |
-| 開 | 關 | Tailcat；Viewer 接受已驗證的 Host offer |
-| 關 | 開 | Viewer 提出切換要求，Host 關閉原生 Peer 後發出新 Tailcat offer |
+| 開 | 關 | Tailcat；顯示區域 接受已驗證的 Host offer |
+| 關 | 開 | 顯示區域 提出切換要求，Host 關閉原生 Peer 後發出新 Tailcat offer |
 | 開 | 開 | Tailcat |
 
-原生 offer 附帶協商版本與支援模式。Viewer 要求綁定原 offer 的 SHA-256，並由既有 signaling HMAC 保護。升級訊息使用既有 KindError envelope 的 transportRequest 欄位，避免更動 Server 路由，也不會被誤認為最終 answer。Host 僅接受對應當前原生 offer 且已註冊的模式，最多升級一次；Viewer 忽略排隊中的原 offer，75 秒內等待新 offer，仍受外層連線逾時約束。
+原生 offer 附帶協商版本與支援模式。顯示區域 要求綁定原 offer 的 SHA-256，並由既有 signaling HMAC 保護。升級訊息使用既有 KindError envelope 的 transportRequest 欄位，避免更動 Server 路由，也不會被誤認為最終 answer。Host 僅接受對應當前原生 offer 且已註冊的模式，最多升級一次；顯示區域 忽略排隊中的原 offer，75 秒內等待新 offer，仍受外層連線逾時約束。
 
 不另開 Host 程序或平行生效的控制通道。設定頁顯示本機偏好，連線分析顯示工作階段實際模式。關閉本機開關表示不主動要求 Tailcat，並非拒絕已驗證對端要求的 Tailcat 通道。
 
@@ -36,7 +36,7 @@ CLI Host / Remote 可使用 `-transport tailcat`。這一版是明確選用模�
 
 `internal/peertransport` 提供 `Mode`、`Backend`、`Link` 與註冊介面。傳輸後端不處理滑鼠、畫面或檔案；只管理單一工作階段的封包通道與配對資料。原生模式回傳 nil，保留 Pion 的既有 STUN / ICE；其他模式透過 Pion UDP mux 使用私有 PacketConn。
 
-新增具備 datagram 語意的 Relay 後端時，實作 Host、Viewer、PacketConn、Offer 與可重複呼叫的 Close，再擴充模式選擇即可沿用 WebRTC。若未來採 TURN 等 Pion 自有的 Relay，應在 `newTransportPC` 增加相對應配置策略，不能直接把 TURN URL 當成 PacketConn 後端。
+新增具備 datagram 語意的 Relay 後端時，實作 `Host`、`Viewer`、`PacketConn`、`Offer` 與可重複呼叫的 `Close`，再擴充模式選擇即可沿用 WebRTC。若未來採 TURN 等 Pion 自有的 Relay，應在 `newTransportPC` 增加相對應配置策略，不能直接把 TURN URL 當成 PacketConn 後端。
 
 Tailcat 實作使用每個 Link 私有的 127.0.0.2 / 127.0.0.3 虛擬端點，不在這些位址建立 OS socket，也不修改系統路由。47824 為 Tailcat 虛擬 UDP 埠，與 TCP 47823 的既有 IP 直連握手、MCP 12345 分開。WebRTC SDP 只宣告虛擬端點；UDP mux 的所有封包皆經 Tailcat，不會另開系統 UDP 傳送這些候選資料。
 

@@ -26,7 +26,7 @@ BUILD_VERSION="1.$(date +%y.%m%d) build $(date +%H%M)"
 
 mkdir -p bin .local-run
 BUILD_STAGE="$(mktemp -d "$ROOT/.local-run/signed-build.XXXXXX")"
-echo "編譯 YourDesk Client 與 Viewer……"
+echo "編譯 YourDesk Client 與 顯示區域……"
 python3 scripts/ffmpeg.py darwin/arm64 go build -ldflags "-X 'yourdesk/internal/clientui.Version=$BUILD_VERSION'" -o "$BUILD_STAGE/yourdesk-client" ./cmd/client
 python3 scripts/ffmpeg.py darwin/arm64 go build -ldflags "-X 'yourdesk/internal/clientui.Version=$BUILD_VERSION'" -o "$BUILD_STAGE/yourdesk-remote" ./cmd/remote
 "$ROOT/scripts/sign-local.sh" "$BUILD_STAGE/"*.dylib "$BUILD_STAGE/yourdesk-client" "$BUILD_STAGE/yourdesk-remote"

@@ -10,7 +10,7 @@ YourDesk is a remote desktop app for macOS and Windows. Connect to another compu
 
 ## Features
 
-**1.26.0914 build 1419** adds region streaming, modifier-key mouse fixes and desktop site QR codes, with a compact Viewer toolbar. Windows cropping has user-reported validation; other cross-device cases remain under verification. See the [release notes](RELEASE-1.26.0914-build-1419.md).
+**1.26.0914 build 1419** adds region streaming, modifier-key mouse fixes and desktop site QR codes, with a compact display area toolbar. Windows cropping has user-reported validation; other cross-device cases remain under verification. See the [release notes](RELEASE-1.26.0914-build-1419.md).
 
 - **GUI and command-line modes:** choose remote desktop or an interactive terminal for your task. Terminals use independent windows and can connect to Linux CLI Hosts.
 - **Remote control through MCP AI agents:** AI agents can connect through MCP, operate the desktop or terminal, query site capabilities and disconnect when finished.

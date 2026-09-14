@@ -2,7 +2,7 @@
 
 ## 適用範圍
 
-Mac、Windows 等平台共用 Host 傳送層；與 Viewer 作業系統無關。JPEG、H.264、HEVC 都使用同一條限速路徑，包含退回 JPEG 的情況。Viewer 既有碼率設定透過串流協商傳給 Host，不需新增協定。
+Mac、Windows 等平台共用 Host 傳送層；與 顯示區域 作業系統無關。JPEG、H.264、HEVC 都使用同一條限速路徑，包含退回 JPEG 的情況。顯示區域 既有碼率設定透過串流協商傳給 Host，不需新增協定。
 
 ## 計算方式
 

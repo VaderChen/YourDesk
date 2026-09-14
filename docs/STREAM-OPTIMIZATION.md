@@ -10,7 +10,7 @@ AV1 更新：已補上 Windows／macOS 軟體編碼、macOS VideoToolbox 硬解�
 4. **區塊免複製**：RGBA 更新區域使用零起點、保留 stride 的只讀 view 交給同步編碼器；非 RGBA 保留通用轉換。支援非零來源起點。所有區塊編碼成功後才提交差分基準，失敗重試不遺失更新。
 5. **macOS H.264／HEVC**：偶數尺寸 RGBA 直接讀取來源，非 RGBA 或奇數尺寸重用補邊緩衝區；右／下邊緣延伸最後一列或像素。CVPixelBuffer 跨影格重用，尺寸改變或關閉時釋放，CompleteFrames 完成後才覆寫。
 6. **TurboJPEG 編碼／解碼**：正式軟體 JPEG 工廠優先使用 TurboJPEG，保留 Go JPEG 備援。編碼器重用 handle，RGBA 直接按 stride 讀取；解碼每張輸出獨立 RGBA，避免覆寫顯示端仍持有的資料。
-7. **觀看端解碼策略**：APP 將同一台機器的解碼證據經 Viewer 私有 stdin 管道傳送一次；偵測未完成時不阻塞連線。一般觀看視窗與背景串流診斷共用非阻塞的格式公告，每秒可採用新抵達的策略；使用者指定軟體 JPEG 時不公告影片 codec。密碼、MCP 與最佳化控制訊息分流，策略不送給遠端裝置。
+7. **觀看端解碼策略**：APP 將同一台機器的解碼證據經 顯示區域 私有 stdin 管道傳送一次；偵測未完成時不阻塞連線。一般觀看視窗與背景串流診斷共用非阻塞的格式公告，每秒可採用新抵達的策略；使用者指定軟體 JPEG 時不公告影片 codec。密碼、MCP 與最佳化控制訊息分流，策略不送給遠端裝置。
 
 ### 解碼策略的邊界與回退
 
@@ -26,20 +26,20 @@ CPU SIMD 由 libjpeg-turbo 自身依 CPU 能力選擇，不強制所有 x64 執�
 ## 後續最佳化：重複探測、接收端複製、靜止畫面與通道轉換
 
 - 主畫面的影片能力查詢等待背景 detector 結束後才啟動補充探測，並先套用已確認的本機策略；未知／取消／失敗仍保留原有背景回退，不等待結果才開啟 APP。
-- 解碼能力快取獨立於編碼能力：Viewer 的格式公告不再連帶啟動本機影片編碼器。完整能力查詢與解碼查詢共用同一份解碼快取；已驗證的同 codec／128×128 能力不重測。不跨尺寸推論，不把硬解失敗當成軟解也失敗。
+- 解碼能力快取獨立於編碼能力：顯示區域 的格式公告不再連帶啟動本機影片編碼器。完整能力查詢與解碼查詢共用同一份解碼快取；已驗證的同 codec／128×128 能力不重測。不跨尺寸推論，不把硬解失敗當成軟解也失敗。
 - 完整、零起點且緊密排列的獨立 RGBA 解碼結果，直接交給合成畫面持有，省去第二張完整影像配置／複製。區塊影像、非 RGBA、非零起點或不同 stride 保留原有合成路徑；解碼器仍須每張輸出獨立記憶體，不自行重用顯示端仍持有的緩衝。
 - 重送的完整 RGBA 與現有畫面逐位元組相同時，保留原畫面，不因這張重送觸發紋理上傳、超解析度提交或補幀。不同螢幕仍強制顯示更新；輸入、控制、視窗與必要繪圖流程不停止。未啟用補幀時不在每次繪圖解析補幀後端能力。
 - Mac VideoToolbox 編碼／解碼與 Windows DXGI／GDI 擷取共用紅藍通道交換：ARM64 使用 NEON、支援 SSE2 的 x64 使用 SSE2；剩餘像素及其他架構走純量，無 CGO 的 GDI 使用 Go 回退。alpha 維持 255，支援列 padding 與未對齊記憶體；不是色域／YUV 矩陣變更，不改畫質或 JPEG sampling。
 - 本輪僅做編譯檢查；新增像素轉換與合成邊界案例供後續驗證，未執行測試或效能 benchmark，不宣稱實測加速比例。尚未部署、發布；SYSTEM MCP 權限待辦未於本輪處理。
 
-本輪 macOS ARM64、Windows x64／ARM64 Client 與 Viewer（靜態 TurboJPEG）編譯通過；Linux x64／ARM64 無 CGO 共用套件編譯通過。像素轉換及 Viewer 測試程式僅編譯，未執行。影片探測合併不包含用途／尺寸不同的 JPEG 與超解析度探測；未改成整個視窗停止繪圖，也未移除解碼器內部所有複製。
+本輪 macOS ARM64、Windows x64／ARM64 Client 與 顯示區域（靜態 TurboJPEG）編譯通過；Linux x64／ARM64 無 CGO 共用套件編譯通過。像素轉換及 顯示區域 測試程式僅編譯，未執行。影片探測合併不包含用途／尺寸不同的 JPEG 與超解析度探測；未改成整個視窗停止繪圖，也未移除解碼器內部所有複製。
 
 ## TurboJPEG 建置與打包
 
 - 固定 libjpeg-turbo 3.2.0，下載官方來源封存並驗證 SHA-256。
 - 原始碼與靜態函式庫置於被忽略的 `.local-run/turbojpeg/`，不依賴 `try`。
 - CMake 建立對應架構的靜態庫；x64 SIMD 需要 NASM。此次本機已安裝 NASM 3.02。
-- `scripts/release.py` 的 macOS／Windows Client 與 Viewer 自動使用 `turbojpeg` build tag 並靜態連結，無須目標機另裝 TurboJPEG DLL／dylib。
+- `scripts/release.py` 的 macOS／Windows Client 與 顯示區域 自動使用 `turbojpeg` build tag 並靜態連結，無須目標機另裝 TurboJPEG DLL／dylib。
 - `runUITest.command` 亦改用同一建置入口，避免開發版默默退回 Go JPEG。
 - 未帶 tag 或 CGO 關閉的建置維持 Go JPEG。現有 Linux CLI 與 WinPE 發布路徑維持無 CGO，不宣稱已啟用 TurboJPEG。
 - 發布流程將 `LICENSE.md`、`README.ijg` 放入 `ThirdPartyLicenses/libjpeg-turbo`，macOS 放入 App Resources，Windows 安裝程式沿用既有 ThirdPartyLicenses 收錄。
@@ -64,15 +64,15 @@ Windows 交叉編譯由 release.environment 選取相應 MinGW／LLVM-MinGW 編�
 - TurboJPEG 正式工廠選擇、Go 解碼相容、129×129 非對齊子圖、獨立解碼輸出、毀損輸入拒絕及 CPU 後端失敗回退。
 - JPEG／H.264／HEVC 各 24 張合成影格，串行與雙緩衝解碼像素雜湊一致；兩種影片 codec 各含 21 張參考影格。
 
-上述 smoke test 已通過。正式 macOS Client 的 helper 亦完成 H.264 BGRA 128×128 硬體編解碼。macOS Client／Viewer、Windows x64 Client／Viewer、Windows ARM64 Client 靜態 TurboJPEG 建置通過；Linux x64／ARM64 無 CGO 共用套件編譯通過。Windows 尚無實機 smoke test，未執行完整安裝／簽署／發布驗證。
+上述 smoke test 已通過。正式 macOS Client 的 helper 亦完成 H.264 BGRA 128×128 硬體編解碼。macOS Client／顯示區域、Windows x64 Client／顯示區域、Windows ARM64 Client 靜態 TurboJPEG 建置通過；Linux x64／ARM64 無 CGO 共用套件編譯通過。Windows 尚無實機 smoke test，未執行完整安裝／簽署／發布驗證。
 
-後續接入 Viewer 解碼策略這一輪，依要求僅進行編譯檢查：macOS ARM64、Windows x64／ARM64 的 Client 與 Viewer（靜態 TurboJPEG）建置通過；新增的解碼證據判讀與策略驗證測試案例僅編譯，未執行。前段 smoke test 是接入前的紀錄，不代表已驗證本次新增的解碼策略或實機連線。
+後續接入 顯示區域 解碼策略這一輪，依要求僅進行編譯檢查：macOS ARM64、Windows x64／ARM64 的 Client 與 顯示區域（靜態 TurboJPEG）建置通過；新增的解碼證據判讀與策略驗證測試案例僅編譯，未執行。前段 smoke test 是接入前的紀錄，不代表已驗證本次新增的解碼策略或實機連線。
 
 ## 尚未做的事
 
 首張建立／編解碼時間不是持續效能 benchmark，因此不依它改寫 HEVC／H.264 排序，也不以不同畫質的輸出大小挑最快 codec。尚未動態切換 NV12 輸入、實作 capture → encoder 零複製、廣色域管理或套用自訂 YCbCr SIMD 矩陣；這些需要另外驗證格式與品質。
 
-策略目前送給 APP 自己啟動的 Host 與 Viewer；登入前系統服務、獨立 CLI Host，或未收到父程序策略的獨立 Viewer，保留既有能力探測。Viewer 不再啟動另一組完整 detector，以免每個觀看視窗重複占用硬體資源。TurboJPEG 與免複製等共用編解碼改善仍依其建置配置生效。
+策略目前送給 APP 自己啟動的 Host 與 顯示區域；登入前系統服務、獨立 CLI Host，或未收到父程序策略的獨立 顯示區域，保留既有能力探測。顯示區域 不再啟動另一組完整 detector，以免每個觀看視窗重複占用硬體資源。TurboJPEG 與免複製等共用編解碼改善仍依其建置配置生效。
 
 This software is based in part on the work of the Independent JPEG Group.
 

@@ -1,6 +1,6 @@
 # 訊號心跳 v2
 
-Client 預設在 WSS Upgrade 與 HTTPS POST `/signal/session` 請求 `YourDesk-Heartbeat-Protocol: heartbeat-v2`。Host 與 Viewer 各自協商，無須雙端同時升級。
+Client 預設在 WSS Upgrade 與 HTTPS POST `/signal/session` 請求 `YourDesk-Heartbeat-Protocol: heartbeat-v2`。Host 與 顯示區域 各自協商，無須雙端同時升級。
 
 只有成功握手（101／201）回覆相同協議、`YourDesk-Heartbeat-Interval: 60` 及有效 timeout 才啟用 v2。WebSocket timeout 固定為 10 秒 Pong 等待；HTTPS timeout 為 180 秒活動期限。這些是目前 v2 的固定契約，不接受任意伺服器數值作為計時器。
 
