@@ -34,6 +34,8 @@ import android.webkit.PermissionRequest;
 import androidx.camera.core.CameraSelector;
 import androidx.camera.core.ImageAnalysis;
 import androidx.camera.core.ImageProxy;
+import androidx.camera.core.Preview;
+import androidx.camera.view.PreviewView;
 import androidx.camera.lifecycle.ProcessCameraProvider;
 import androidx.core.content.ContextCompat;
 import com.google.mlkit.vision.barcode.BarcodeScanning;
@@ -99,6 +101,7 @@ public final class MainActivity extends Activity {
   private ProcessCameraProvider qrCameraProvider;
   private BarcodeScanner qrScanner;
   private boolean qrScanning;
+  private PreviewView qrPreview;
   private boolean desktopPageReady;
   // 返回鍵位於所有 WebView/影像層之上；記住按下狀態，避免子 View 在 DOWN/UP
   // 之間切換時吞掉事件，造成需要連按多次才返回。
@@ -193,6 +196,8 @@ public final class MainActivity extends Activity {
       }
     });
     root.addView(web, new FrameLayout.LayoutParams(-1, -1));
+    qrPreview = new PreviewView(this); qrPreview.setVisibility(View.GONE);
+    FrameLayout.LayoutParams qrLp = new FrameLayout.LayoutParams(-1, dp(220)); qrLp.gravity = Gravity.CENTER; root.addView(qrPreview, qrLp);
 
     nativeVideo = new TextureView(this);
     nativeVideo.setOpaque(true);
@@ -892,7 +897,9 @@ public final class MainActivity extends Activity {
               ImageAnalysis analysis = new ImageAnalysis.Builder().setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST).build();
               analysis.setAnalyzer(ContextCompat.getMainExecutor(MainActivity.this), image -> analyzeQr(image));
               qrCameraProvider.unbindAll();
-              qrCameraProvider.bindToLifecycle(ProcessLifecycleOwner.get(), CameraSelector.DEFAULT_BACK_CAMERA, analysis);
+              Preview preview = new Preview.Builder().build(); preview.setSurfaceProvider(qrPreview.getSurfaceProvider());
+              qrCameraProvider.bindToLifecycle(ProcessLifecycleOwner.get(), CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis);
+              qrPreview.setVisibility(View.VISIBLE);
             } catch (Exception e) { qrScanning = false; }
           }, ContextCompat.getMainExecutor(MainActivity.this));
         } catch (Exception e) { qrScanning = false; }
@@ -903,7 +910,7 @@ public final class MainActivity extends Activity {
       InputImage image = InputImage.fromMediaImage(proxy.getImage(), proxy.getImageInfo().getRotationDegrees());
       qrScanner.process(image).addOnSuccessListener(codes -> { for (com.google.mlkit.vision.barcode.common.Barcode code : codes) { String value = code.getRawValue(); if (value != null && value.startsWith("yourdesk://")) { qrScanning = false; web.evaluateJavascript("window.qrCodeDetected&&window.qrCodeDetected(" + org.json.JSONObject.quote(value) + ")", null); stopQrScanner(); break; } } }).addOnCompleteListener(t -> proxy.close());
     }
-    @JavascriptInterface public void stopQrScanner() { qrScanning = false; if (qrCameraProvider != null) { qrCameraProvider.unbindAll(); qrCameraProvider = null; } if (qrScanner != null) { qrScanner.close(); qrScanner = null; } }
+    @JavascriptInterface public void stopQrScanner() { qrScanning = false; if (qrPreview != null) qrPreview.setVisibility(View.GONE); if (qrCameraProvider != null) { qrCameraProvider.unbindAll(); qrCameraProvider = null; } if (qrScanner != null) { qrScanner.close(); qrScanner = null; } }
     @JavascriptInterface public void setSiteDialogVisible(boolean visible) {
       if (nativeScreen == null || nativeVideo == null) return;
       if (visible) { nativeScreen.setVisibility(View.GONE); nativeVideo.setVisibility(View.GONE); }
