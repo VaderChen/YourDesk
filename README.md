@@ -10,7 +10,7 @@ YourDesk 是支援 macOS 與 Windows 的遠端桌面工具。從連線、站台�
 
 ## 特色與功能
 
-目前回報的停滯／斷線問題只發生在 macOS 對 macOS；其他平台尚未觀察到相同問題。build 2323 升級 Pion WebRTC／SCTP 傳輸套件，調整壅塞與連線存活判斷，並加入可選的網路 Debug 與雙向封包測試。目前使用者回報單一連線與同時兩個遠端比先前版本穩定；**尚未完全確認 Mac 對 Mac 停滯／斷線問題已解決**，長時間傳檔仍待驗證。本版未加入背景自動重連／斷線續傳。詳見 [發行說明](docs/RELEASE-1.26.0913-build-2323.md)、[網路 Debug](docs/NETWORK-DEBUG.md) 與 [存活判斷](docs/STREAM-RECOVERY.md)。
+**已處理解碼佇列阻塞造成的串流穩定問題。**目前回報的停滯／斷線只發生在 macOS 對 macOS；其他平台尚未觀察到相同問題。Viewer 與背景診斷改用非阻塞影格交接，解碼佇列滿載時略過新影格，避免阻塞 WebRTC DataChannel 接收回呼。修正已同步至主分支，包含滿載與高壓回歸測試；已發布的 build 2323 不包含這筆後續修正。本次沒有加入背景自動重連／斷線續傳。詳見 [最新修正](docs/RELEASE-NEXT-DRAFT.md)、[串流穩定修正與存活判斷](docs/STREAM-RECOVERY.md) 及 [網路 Debug](docs/NETWORK-DEBUG.md)。
 
 - **GUI 與 CMD 雙模式**：支援遠端桌面與互動命令列，可依工作選擇模式；命令列使用獨立視窗，亦可連入 Linux CLI Host。
 - **MCP AI Agent 遠端操控**：AI Agent 可透過 MCP 連線遠端、操作桌面或命令列、查詢站台能力，完成工作後斷線。
