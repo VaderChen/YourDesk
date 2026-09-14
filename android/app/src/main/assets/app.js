@@ -52,7 +52,7 @@ document.getElementById('quick-form').onsubmit=event=>{event.preventDefault();op
  siteForm.onsubmit=e=>{e.preventDefault();let name=document.getElementById('site-name').value.trim(),room=document.getElementById('site-room').value.trim(),secret=document.getElementById('site-secret').value;
   if(siteTab==='qrcode'){try{const u=new URL(document.getElementById('site-qr').value.trim());if(u.protocol!=='yourdesk:'||u.hostname!=='site')throw Error();name=u.searchParams.get('name')||'';room=u.searchParams.get('room')||'';if(!u.searchParams.get('signal')||!room)throw Error();secret='';}catch{document.getElementById('site-status').textContent='QR Code 格式無效';return;}}
   if(!name)name=room; if(!room){document.getElementById('site-status').textContent='請輸入遠端 ID 或 IP:Port';return;}
-  const exists=sites.findIndex(s=>s.id===room); const item={name,note:'',id:room,online:false,terminal:true,desktop:true}; if(exists>=0)sites[exists]=item;else sites.unshift(item);
+  const exists=sites.findIndex(s=>s.id===room); if(exists>=0){document.getElementById('site-status').textContent='此站台已存在，測試資料不會覆蓋現有站台';return;} const item={name,note:'',id:room,online:false,terminal:true,desktop:true}; sites.unshift(item);
   if(secret&&window.YourDesk?.rememberCredentials)window.YourDesk.rememberCredentials(room,secret); siteDialog.hidden=true;render();
  };
  document.getElementById('notice-close').onclick=()=>{document.getElementById('notice').hidden=true;};render();
