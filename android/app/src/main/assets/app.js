@@ -42,4 +42,16 @@ function render(){
 }
 document.getElementById('search').oninput=render;
 document.getElementById('quick-form').onsubmit=event=>{event.preventDefault();openConnection(document.getElementById('address').value.trim(),'shell');};
-document.getElementById('add').onclick=()=>notice('manage');document.getElementById('notice-close').onclick=()=>{document.getElementById('notice').hidden=true;};render();
+ const siteDialog=document.getElementById('site-dialog'),siteForm=document.getElementById('site-form');
+ const siteTabs=siteForm.querySelectorAll('[data-tab]'); let siteTab='manual';
+ function selectSiteTab(tab){siteTab=tab;siteTabs.forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));document.getElementById('site-manual').hidden=tab!=='manual';document.getElementById('site-qrcode').hidden=tab!=='qrcode';document.getElementById('site-name').required=tab==='manual';document.getElementById('site-room').required=tab==='manual';document.getElementById('site-secret').required=tab==='manual';}
+ siteTabs.forEach(b=>b.onclick=()=>selectSiteTab(b.dataset.tab));
+ document.getElementById('add').onclick=()=>{siteForm.reset();selectSiteTab('manual');document.getElementById('site-status').textContent='';siteDialog.hidden=false;};
+ document.getElementById('site-cancel').onclick=()=>{siteDialog.hidden=true;};
+ siteForm.onsubmit=e=>{e.preventDefault();let name=document.getElementById('site-name').value.trim(),room=document.getElementById('site-room').value.trim(),secret=document.getElementById('site-secret').value;
+  if(siteTab==='qrcode'){try{const u=new URL(document.getElementById('site-qr').value.trim());if(u.protocol!=='yourdesk:'||u.hostname!=='site')throw Error();name=u.searchParams.get('name')||'';room=u.searchParams.get('room')||'';if(!u.searchParams.get('signal')||!room)throw Error();secret='';}catch{document.getElementById('site-status').textContent='QR Code 格式無效';return;}}
+  if(!name)name=room; if(!room){document.getElementById('site-status').textContent='請輸入遠端 ID 或 IP:Port';return;}
+  const exists=sites.findIndex(s=>s.id===room); const item={name,note:'',id:room,online:false,terminal:true,desktop:true}; if(exists>=0)sites[exists]=item;else sites.unshift(item);
+  if(secret&&window.YourDesk?.rememberCredentials)window.YourDesk.rememberCredentials(room,secret); siteDialog.hidden=true;render();
+ };
+ document.getElementById('notice-close').onclick=()=>{document.getElementById('notice').hidden=true;};render();
