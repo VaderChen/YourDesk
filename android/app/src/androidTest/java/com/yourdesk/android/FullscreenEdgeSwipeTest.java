@@ -56,6 +56,30 @@ public class FullscreenEdgeSwipeTest {
   private Rect originalBounds;
   private int originalBars;
 
+  @Test public void nativePointerRejectsOutsideAndReentry() throws Exception {
+    ui(() -> {
+      View screen = (View) field("nativeScreen");
+      float x = screen.getWidth() / 2f, y = screen.getHeight() / 2f;
+      long now = SystemClock.uptimeMillis();
+      int[] actions = {MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE, MotionEvent.ACTION_MOVE, MotionEvent.ACTION_UP};
+      float[] xs = {x, -20, x, x};
+      for (int i = 0; i < actions.length; i++) {
+        MotionEvent event = MotionEvent.obtain(now, now + i, actions[i], xs[i], y, 0);
+        try {
+          invoke("handleDesktopTouch", new Class[]{View.class, MotionEvent.class}, screen, event);
+          if (i == 0) assertSame("有效按下取得手勢", screen, field("desktopTouchOwner"));
+          else assertNull("越界後不得重新取得手勢", field("desktopTouchOwner"));
+        } finally { event.recycle(); }
+      }
+      MainActivity.Bridge bridge = activity.new Bridge();
+      for (String type : new String[]{"move", "button", "wheel"}) {
+        assertEquals("背景 WebView 不得送出滑鼠事件", "native pointer only",
+            bridge.sendControlJSON("{\"type\":\"" + type + "\"}"));
+      }
+      return null;
+    });
+  }
+
   @Before public void showLocalDesktop() throws Exception {
     Intent intent = new Intent(instrumentation.getTargetContext(), MainActivity.class)
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);

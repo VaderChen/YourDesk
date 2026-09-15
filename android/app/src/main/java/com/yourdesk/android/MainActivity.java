@@ -6,6 +6,8 @@ import android.content.Context;
 import android.content.pm.ActivityInfo;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.ImageFormat;
+import android.graphics.YuvImage;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -67,6 +69,7 @@ import com.yourdesk.android.video.MediaCodecVideoDecoder;
 /** Android Viewer：WebView 負責介面，原生畫面元件負責合成 JPEG 差分影格。 */
 public final class MainActivity extends Activity {
   private WebView web;
+  private View contentRoot;
   private DeltaImageView nativeScreen;
   private TextureView nativeVideo;
   private Surface videoSurface;
@@ -101,6 +104,7 @@ public final class MainActivity extends Activity {
   private ProcessCameraProvider qrCameraProvider;
   private BarcodeScanner qrScanner;
   private boolean qrScanning;
+  private long lastCameraJpegMs;
   private PreviewView qrPreview;
   private boolean desktopPageReady;
   // 返回鍵位於所有 WebView/影像層之上；記住按下狀態，避免子 View 在 DOWN/UP
@@ -154,12 +158,17 @@ public final class MainActivity extends Activity {
     Log.i("YourDeskVideo", "Android 解碼器候選=" + DecoderSupport.probe());
 
     FrameLayout root = new FrameLayout(this);
+    contentRoot = root;
     // 所有圖層共用系統安全區，避免狀態列、瀏海與導覽列覆蓋內容。
     ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
       // 全螢幕的暫顯系統列應覆蓋畫面，不重新縮小影像；瀏海安全區仍保留。
       Insets bars = insets.getInsets((desktopFullscreen ? 0 : WindowInsetsCompat.Type.systemBars())
           | WindowInsetsCompat.Type.displayCutout());
-      root.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+      // Shell 必須讓出鍵盤空間；GUI 維持影像尺寸，讓鍵盤覆蓋。
+      int bottom = inTerminal
+          ? Math.max(bars.bottom, insets.getInsets(WindowInsetsCompat.Type.ime()).bottom)
+          : bars.bottom;
+      root.setPadding(bars.left, bars.top, bars.right, bottom);
       root.post(this::clampBackPosition);
       return insets;
     });
@@ -168,6 +177,9 @@ public final class MainActivity extends Activity {
     surface.setBackgroundColor(Color.BLACK);
     root.addView(surface, new FrameLayout.LayoutParams(-1, -1));
 
+    if ((getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0) {
+      WebView.setWebContentsDebuggingEnabled(true);
+    }
     web = new WebView(this);
     web.setFocusable(true);
     web.setFocusableInTouchMode(true);
@@ -226,6 +238,7 @@ public final class MainActivity extends Activity {
       @Override public void onSurfaceTextureUpdated(android.graphics.SurfaceTexture texture) { }
     });
     nativeVideo.setOnTouchListener(this::handleDesktopTouch);
+    nativeVideo.setClickable(true);
     nativeVideo.setVisibility(View.GONE);
     FrameLayout.LayoutParams videoLp = new FrameLayout.LayoutParams(-1, -1);
     videoLp.gravity = Gravity.TOP | Gravity.LEFT;
@@ -238,6 +251,7 @@ public final class MainActivity extends Activity {
     // DeltaImageView 自行以等比例矩形繪製；不能使用 FIT_XY，否則來源畫面會被拉伸。
     nativeScreen.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
     nativeScreen.setOnTouchListener(this::handleDesktopTouch);
+    nativeScreen.setClickable(true);
     nativeScreen.setVisibility(View.GONE);
     // 保留 WebView 上方的標題列與返回鍵；內容區才由原生畫面覆蓋。
     FrameLayout.LayoutParams screenLp = new FrameLayout.LayoutParams(-1, -1);
@@ -296,7 +310,7 @@ public final class MainActivity extends Activity {
     root.addView(desktopTools, toolsLp);
 
     setContentView(root);
-    ViewCompat.requestApplyInsets(root);
+    ViewCompat.requestApplyInsets(contentRoot);
     web.loadUrl("https://appassets.androidplatform.net/assets/index.html");
   }
 
@@ -314,8 +328,17 @@ public final class MainActivity extends Activity {
     else showDesktopKeyboard();
   }
 
+  // Shell 需要系統重新分配鍵盤上方的可用高度；GUI 保留完整畫面。
+  private void updateKeyboardLayout() {
+    getWindow().setSoftInputMode(inTerminal
+        ? WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+        : WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING);
+    ViewCompat.requestApplyInsets(contentRoot);
+  }
+
   private void showDesktopKeyboard() {
     if (web == null) return;
+    updateKeyboardLayout();
     final int request = ++keyboardRequestGeneration;
     web.setFocusableInTouchMode(true);
     web.requestFocus();
@@ -323,7 +346,7 @@ public final class MainActivity extends Activity {
       if (request != keyboardRequestGeneration || (!inDesktop && !inTerminal)
           || (inDesktop && desktopFullscreen)) return;
       InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-      web.evaluateJavascript("document.getElementById('keyboard-proxy')?.focus()",
+      web.evaluateJavascript("document.getElementById('keyboard-proxy')?.focus();document.getElementById('input-proxy')?.focus()",
           ignored -> { if (request == keyboardRequestGeneration)
             imm.showSoftInput(web, InputMethodManager.SHOW_FORCED); });
       // WebView 首次建立輸入連線時 callback 可能尚未完成，補一次同一 token 的顯示請求。
@@ -394,9 +417,12 @@ public final class MainActivity extends Activity {
       if (screen == null) continue;
       FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) screen.getLayoutParams();
       int gravity = Gravity.TOP | Gravity.LEFT;
-      // CENTER 加上非零 margin 會額外偏移半個 margin，甚至讓底部超出父容器。
-      if (lp.topMargin != top || lp.gravity != gravity) {
-        lp.topMargin = top;
+      // View 填滿可用區，JPEG 與影片共用各自的 contain 矩形作繪製與命中判斷。
+      lp.width = -1;
+      lp.height = -1;
+      lp.leftMargin = 0;
+      lp.topMargin = top;
+      {
         lp.gravity = gravity;
         screen.setLayoutParams(lp);
       }
@@ -483,41 +509,69 @@ public final class MainActivity extends Activity {
     return super.dispatchTouchEvent(event);
   }
 
-  private boolean handleDesktopTouch(View v, MotionEvent e) {
-    if (!inDesktop) return false;
-    float x;
-    float y;
-    if (v instanceof DeltaImageView) {
-      float[] point = ((DeltaImageView) v).mapTouch(e.getX(), e.getY());
-      x = point[0];
-      y = point[1];
-    } else if (v == nativeVideo) {
-      float[] point = mapVideoTouch(e.getX(), e.getY());
-      x = point[0];
-      y = point[1];
-    } else {
-      float width = Math.max(1f, v.getWidth());
-      float height = Math.max(1f, v.getHeight());
-      x = clamp(e.getX() / width);
-      y = clamp(e.getY() / height);
-    }
-    int action = e.getActionMasked();
+  private View desktopTouchOwner;
+  private int desktopPointerId = -1;
+  private float desktopTouchX, desktopTouchY;
+
+  private void releaseDesktopTouch() {
+    if (desktopTouchOwner == null) return;
+    desktopTouchOwner = null;
+    desktopPointerId = -1;
+    sendDesktopPointer("button", false, desktopTouchX, desktopTouchY);
+  }
+
+  private void sendDesktopPointer(String type, boolean down, float x, float y) {
     try {
-      org.json.JSONObject c = new org.json.JSONObject();
-      if (action == MotionEvent.ACTION_DOWN) {
-        c.put("type", "button").put("button", 1).put("down", true).put("x", x).put("y", y);
-      } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
-        c.put("type", "button").put("button", 1).put("down", false).put("x", x).put("y", y);
-      } else if (action == MotionEvent.ACTION_MOVE) {
-        c.put("type", "move").put("x", x).put("y", y);
-      } else {
-        return true;
-      }
+      org.json.JSONObject c = new org.json.JSONObject().put("type", type).put("x", x).put("y", y);
+      if (type.equals("button")) c.put("button", 1).put("down", down);
       viewer.sendControlJSON(c.toString());
     } catch (Exception ignored) {
-      // 連線中止時觸控事件不應讓 UI thread 崩潰。
+      // 連線中止時不讓 UI thread 崩潰。
+    }
+  }
+
+  private boolean handleDesktopTouch(View v, MotionEvent e) {
+    int action = e.getActionMasked();
+    if (action == MotionEvent.ACTION_DOWN) releaseDesktopTouch();
+    int index = action == MotionEvent.ACTION_DOWN ? e.getActionIndex() : e.findPointerIndex(desktopPointerId);
+    boolean allowed = inDesktop && v.isShown() && hasWindowFocus() && index >= 0;
+    Rect bounds = new Rect();
+    if (allowed) {
+      float x = e.getX(index), y = e.getY(index);
+      allowed = v.getLocalVisibleRect(bounds) && x >= bounds.left && x < bounds.right
+          && y >= bounds.top && y < bounds.bottom;
+    }
+    for (View overlay : new View[]{desktopTools, nativeBack}) {
+      if (overlay != null && overlay.isShown() && overlay.getGlobalVisibleRect(bounds)
+          && bounds.contains((int) e.getRawX(), (int) e.getRawY())) allowed = false;
+    }
+    float[] point = null;
+    if (allowed) {
+      if (v instanceof DeltaImageView) point = ((DeltaImageView) v).mapTouch(e.getX(index), e.getY(index));
+      else if (v == nativeVideo) point = mapVideoTouch(e.getX(index), e.getY(index));
+    }
+    if (point == null || action == MotionEvent.ACTION_CANCEL) {
+      // 越界只在最後有效位置釋放；再次進入必須重新按下。
+      releaseDesktopTouch();
+      return true;
+    }
+    if (action == MotionEvent.ACTION_DOWN) {
+      desktopTouchOwner = v;
+      desktopPointerId = e.getPointerId(index);
+      desktopTouchX = point[0]; desktopTouchY = point[1];
+      sendDesktopPointer("button", true, desktopTouchX, desktopTouchY);
+    } else if (desktopTouchOwner == v) {
+      desktopTouchX = point[0]; desktopTouchY = point[1];
+      if (action == MotionEvent.ACTION_UP || (action == MotionEvent.ACTION_POINTER_UP
+          && e.getPointerId(e.getActionIndex()) == desktopPointerId)) releaseDesktopTouch();
+      else if (action == MotionEvent.ACTION_MOVE) sendDesktopPointer("move", false, desktopTouchX, desktopTouchY);
     }
     return true;
+  }
+
+  @Override public void onWindowFocusChanged(boolean hasFocus) {
+    super.onWindowFocusChanged(hasFocus);
+    if (!hasFocus) releaseDesktopTouch();
   }
 
   private static float clamp(float value) {
@@ -528,6 +582,7 @@ public final class MainActivity extends Activity {
   private volatile int generation;
 
   private void clearComposedFrame() {
+    releaseDesktopTouch();
     if (composedFrame != null && !composedFrame.isRecycled()) composedFrame.recycle();
     composedFrame = null;
     composedWidth = composedHeight = 0;
@@ -558,16 +613,15 @@ public final class MainActivity extends Activity {
   }
 
   private float[] mapVideoTouch(float x, float y) {
-    if (videoWidth <= 0 || videoHeight <= 0 || nativeVideo == null) {
-      return new float[]{clamp(x / Math.max(1f, nativeVideo == null ? 1 : nativeVideo.getWidth())),
-          clamp(y / Math.max(1f, nativeVideo == null ? 1 : nativeVideo.getHeight()))};
-    }
+    if (videoWidth <= 0 || videoHeight <= 0 || nativeVideo == null
+        || nativeVideo.getWidth() <= 0 || nativeVideo.getHeight() <= 0) return null;
     float scale = Math.min(nativeVideo.getWidth() / (float) videoWidth,
         nativeVideo.getHeight() / (float) videoHeight);
     float drawnWidth = videoWidth * scale;
     float drawnHeight = videoHeight * scale;
     float left = (nativeVideo.getWidth() - drawnWidth) * 0.5f;
     float top = (nativeVideo.getHeight() - drawnHeight) * 0.5f;
+    if (x < left || x >= left + drawnWidth || y < top || y >= top + drawnHeight) return null;
     return new float[]{clamp((x - left) / Math.max(1f, drawnWidth)),
         clamp((y - top) / Math.max(1f, drawnHeight))};
   }
@@ -619,6 +673,7 @@ public final class MainActivity extends Activity {
     hideDesktopKeyboard();
     inTerminal = false;
     inDesktop = false;
+    updateKeyboardLayout();
     if (nativeScreen != null) nativeScreen.setVisibility(View.GONE);
     if (nativeBack != null) nativeBack.setVisibility(View.GONE);
     if (desktopTools != null) desktopTools.setVisibility(View.GONE);
@@ -848,13 +903,14 @@ public final class MainActivity extends Activity {
           (int) Math.ceil(destination.top + dirty.bottom * scale));
     }
 
-    /** 將觸控座標換算回等比例畫面；黑邊會對應到最近的畫面邊界。 */
+    /** 將觸控座標換算回等比例畫面；黑邊不接受控制事件。 */
     float[] mapTouch(float x, float y) {
       Bitmap bitmap = frame;
       if (bitmap == null || bitmap.isRecycled() || getWidth() <= 0 || getHeight() <= 0) {
-        return new float[]{clamp(x / Math.max(1f, getWidth())), clamp(y / Math.max(1f, getHeight()))};
+        return null;
       }
       computeDestination(bitmap, destination);
+      if (!destination.contains(x, y)) return null;
       return new float[]{clamp((x - destination.left) / Math.max(1f, destination.width())),
           clamp((y - destination.top) / Math.max(1f, destination.height()))};
     }
@@ -886,6 +942,29 @@ public final class MainActivity extends Activity {
   }
 
   final class Bridge {
+    @JavascriptInterface public String loadSites() {
+      return getPreferences(0).getString("siteLibrary", "[]");
+    }
+    @JavascriptInterface public boolean saveSites(String json) {
+      try {
+        org.json.JSONArray input = new org.json.JSONArray(json);
+        if (input.length() > 2000) return false;
+        org.json.JSONArray clean = new org.json.JSONArray();
+        java.util.HashSet<String> ids = new java.util.HashSet<>();
+        for (int i = 0; i < input.length(); i++) {
+          org.json.JSONObject site = input.getJSONObject(i);
+          String id = site.getString("id").trim();
+          String name = site.getString("name").trim();
+          if (id.isEmpty() || name.isEmpty() || !ids.add(id)) return false;
+          clean.put(new org.json.JSONObject().put("id", id).put("name", name)
+              .put("note", site.optString("note", "")).put("signal", site.optString("signal", ""))
+              .put("online", false).put("terminal", site.optBoolean("terminal", true))
+              .put("desktop", site.optBoolean("desktop", true)));
+        }
+        return getPreferences(0).edit().putString("siteLibrary", clean.toString()).commit();
+      } catch (Exception e) { return false; }
+    }
+
     @JavascriptInterface public void startQrScanner() {
       if (qrScanning) return;
       qrScanning = true;
@@ -898,9 +977,8 @@ public final class MainActivity extends Activity {
               ImageAnalysis analysis = new ImageAnalysis.Builder().setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST).build();
               analysis.setAnalyzer(ContextCompat.getMainExecutor(MainActivity.this), image -> analyzeQr(image));
               qrCameraProvider.unbindAll();
-              Preview preview = new Preview.Builder().build(); preview.setSurfaceProvider(qrPreview.getSurfaceProvider());
-              qrCameraProvider.bindToLifecycle(ProcessLifecycleOwner.get(), CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis);
-              qrPreview.setVisibility(View.VISIBLE);
+              qrCameraProvider.bindToLifecycle(ProcessLifecycleOwner.get(), CameraSelector.DEFAULT_BACK_CAMERA, analysis);
+              qrPreview.setVisibility(View.GONE);
             } catch (Exception e) { qrScanning = false; }
           }, ContextCompat.getMainExecutor(MainActivity.this));
         } catch (Exception e) { qrScanning = false; }
@@ -908,8 +986,30 @@ public final class MainActivity extends Activity {
     }
     private void analyzeQr(ImageProxy proxy) {
       if (!qrScanning || qrScanner == null || proxy.getImage() == null) { proxy.close(); return; }
+      long nowMs = android.os.SystemClock.uptimeMillis();
+      if (nowMs - lastCameraJpegMs > 350) {
+        lastCameraJpegMs = nowMs;
+        Bitmap source = null, thumbnail = null;
+        try {
+          source = proxy.toBitmap();
+          float scale = Math.min(1f, 640f / Math.max(source.getWidth(), source.getHeight()));
+          Matrix transform = new Matrix();
+          transform.postScale(scale, scale);
+          transform.postRotate(proxy.getImageInfo().getRotationDegrees());
+          thumbnail = Bitmap.createBitmap(source, 0, 0, source.getWidth(), source.getHeight(), transform, true);
+          java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream();
+          thumbnail.compress(Bitmap.CompressFormat.JPEG, 45, output);
+          String data = "data:image/jpeg;base64," + Base64.encodeToString(output.toByteArray(), Base64.NO_WRAP);
+          web.evaluateJavascript("window.cameraFrame&&window.cameraFrame(" + org.json.JSONObject.quote(data) + ")", null);
+        } catch (RuntimeException e) {
+          Log.w("YourDeskCamera", "相機縮圖轉換失敗", e);
+        } finally {
+          if (thumbnail != null && thumbnail != source) thumbnail.recycle();
+          if (source != null) source.recycle();
+        }
+      }
       InputImage image = InputImage.fromMediaImage(proxy.getImage(), proxy.getImageInfo().getRotationDegrees());
-      qrScanner.process(image).addOnSuccessListener(codes -> { for (com.google.mlkit.vision.barcode.common.Barcode code : codes) { String value = code.getRawValue(); if (value != null && value.startsWith("yourdesk://")) { qrScanning = false; web.evaluateJavascript("window.qrCodeDetected&&window.qrCodeDetected(" + org.json.JSONObject.quote(value) + ")", null); stopQrScanner(); break; } } }).addOnCompleteListener(t -> proxy.close());
+      qrScanner.process(image).addOnSuccessListener(codes -> { for (com.google.mlkit.vision.barcode.common.Barcode code : codes) { String value = code.getRawValue(); if (value != null && value.toLowerCase(java.util.Locale.ROOT).contains("yourdesk:")) { qrScanning = false; web.evaluateJavascript("window.qrCodeDetected&&window.qrCodeDetected(" + org.json.JSONObject.quote(value) + ")", null); stopQrScanner(); break; } } }).addOnCompleteListener(t -> proxy.close());
     }
     @JavascriptInterface public void stopQrScanner() { qrScanning = false; if (qrPreview != null) qrPreview.setVisibility(View.GONE); if (qrCameraProvider != null) { qrCameraProvider.unbindAll(); qrCameraProvider = null; } if (qrScanner != null) { qrScanner.close(); qrScanner = null; } }
     @JavascriptInterface public void setSiteDialogVisible(boolean visible) {
@@ -1003,12 +1103,22 @@ public final class MainActivity extends Activity {
     }
 
     @JavascriptInterface public String sendControlJSON(String payload) {
-      try { viewer.sendControlJSON(payload); return "ok"; }
+      try {
+        String type = new org.json.JSONObject(payload).optString("type");
+        // WebView 僅處理鍵盤；指標事件必須由原生影像邊界檢查後送出。
+        if (type.equals("move") || type.equals("button") || type.equals("wheel")) return "native pointer only";
+        viewer.sendControlJSON(payload);
+        return "ok";
+      }
       catch (Exception e) { return e.getMessage() == null ? "send failed" : e.getMessage(); }
     }
 
     @JavascriptInterface public String readFrameJSON() {
       try { return viewer.readFrameJSON(); } catch (Exception e) { return ""; }
+    }
+
+    @JavascriptInterface public void toggleKeyboard() {
+      runOnUiThread(MainActivity.this::toggleDesktopKeyboard);
     }
 
     @JavascriptInterface public void showKeyboard() {
@@ -1026,6 +1136,7 @@ public final class MainActivity extends Activity {
         generation++;
         inTerminal = false;
         inDesktop = false;
+        updateKeyboardLayout();
         desktopPageReady = false;
         if (nativeScreen != null) nativeScreen.setVisibility(View.GONE);
         if (nativeBack != null) nativeBack.setVisibility(View.GONE);
@@ -1067,6 +1178,7 @@ public final class MainActivity extends Activity {
               terminal = ready;
               inTerminal = mode.equals("shell");
               inDesktop = mode.equals("desktop");
+              updateKeyboardLayout();
               if (inDesktop) {
                 clearComposedFrame();
                 desktopPageReady = false;

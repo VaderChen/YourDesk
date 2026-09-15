@@ -5,7 +5,7 @@ const status=document.getElementById('status');
 const inputProxy=document.getElementById('input-proxy'); inputProxy?.addEventListener('input',()=>{const v=inputProxy.value;if(v&&active)send(new TextEncoder().encode(v));inputProxy.value='';});
 const adjustFont=delta=>{term.options.fontSize=Math.max(8,Math.min(32,(term.options.fontSize||14)+delta));fit.fit();if(active)call('resize',size()).catch(fail);};
 document.getElementById('font-down').onclick=()=>adjustFont(-1);
-document.getElementById('font-up').onclick=()=>adjustFont(1);document.getElementById('keyboard').onclick=()=>{if(inputProxy){inputProxy.focus();inputProxy.click();}window.YourDesk?.showKeyboard?.();};
+document.getElementById('font-up').onclick=()=>adjustFont(1);document.getElementById('keyboard').onclick=()=>window.YourDesk?.toggleKeyboard?.();
 let attempt=0,timer;let next=0,ack=0,active=false,closed=false;const pending=new Map();
 function call(method,args={}){return new Promise((resolve,reject)=>{const id=++next;pending.set(id,{resolve,reject});window.YourDesk.request(JSON.stringify({id,method,...args}));});}
 window.shellReply=out=>{const p=pending.get(out.id);if(!p)return;pending.delete(out.id);out.error?p.reject(new Error(out.error)):p.resolve(out.result);};
@@ -27,8 +27,9 @@ async function startShell(){
 let writes=Promise.resolve();
 function send(bytes){writes=writes.then(async()=>{for(let i=0;i<bytes.length;i+=2048){if(!active)return;await call('write',{data:btoa(String.fromCharCode(...bytes.slice(i,i+2048)))});}}).catch(fail);}
 term.onData(data=>{if(active)send(new TextEncoder().encode(data));});term.onBinary(data=>{if(active)send(Uint8Array.from(data,c=>c.charCodeAt(0)&255));});
-const resizeViewport=()=>{const h=window.visualViewport?.height||window.innerHeight;document.body.style.height=h+'px';fit.fit();if(active)call('resize',size()).catch(fail);};
+// 原生 WebView 因鍵盤改變高度時，也必須更新先前設定的 body 高度。
+const resizeViewport=()=>{const h=Math.min(window.visualViewport?.height||window.innerHeight,window.innerHeight);document.body.style.height=h+'px';fit.fit();if(active)call('resize',size()).catch(fail);};
 window.visualViewport?.addEventListener('resize',resizeViewport);
-let resizeTimer;window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{fit.fit();if(active)call('resize',size()).catch(fail);},150);});requestAnimationFrame(()=>fit.fit());
+let resizeTimer;window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(resizeViewport,150);});requestAnimationFrame(resizeViewport);
 
 requestAnimationFrame(startShell);

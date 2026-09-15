@@ -17,30 +17,7 @@ const send=c=>{
   const result=window.YourDesk.sendControlJSON(JSON.stringify(c));
   if(result!=='ok')desktopStatus.textContent='控制傳送失敗';
 };
-const point=e=>{
-  const r=screenImage.getBoundingClientRect();
-  return {x:Math.max(0,Math.min(1,(e.clientX-r.left)/Math.max(1,r.width))),y:Math.max(0,Math.min(1,(e.clientY-r.top)/Math.max(1,r.height)))};
-};
-let activePointer=null;
-screenImage.addEventListener('pointerdown',e=>{
-  if(activePointer)return;
-  activePointer={id:e.pointerId,button:e.button+1};
-  screenImage.setPointerCapture(e.pointerId);
-  send({type:'button',button:activePointer.button,down:true,...point(e)});
-  e.preventDefault();
-});
-screenImage.addEventListener('pointermove',e=>{
-  if(activePointer && activePointer.id!==e.pointerId)return;
-  send({type:'move',...point(e)});
-});
-const release=e=>{
-  if(!activePointer || activePointer.id!==e.pointerId)return;
-  send({type:'button',button:activePointer.button,down:false,...point(e)});
-  activePointer=null;
-};
-for(const type of ['pointerup','pointercancel','lostpointercapture'])screenImage.addEventListener(type,release);
-screenImage.addEventListener('contextmenu',e=>e.preventDefault());
-screenImage.addEventListener('wheel',e=>{e.preventDefault();send({type:'wheel',delta:e.deltaY});},{passive:false});
+// 滑鼠與觸控僅由實際繪製影像的原生 View 處理，背景 WebView 不轉送。
 window.addEventListener('keydown',e=>{send({type:'key',key:e.key,down:true});e.preventDefault();});
 window.addEventListener('keyup',e=>send({type:'key',key:e.key,down:false}));
 const reportLayout=()=>window.YourDesk.desktopLayout?.(screenImage.getBoundingClientRect().top,window.innerWidth);

@@ -6,7 +6,10 @@ const strings={
  ko:{brand:'YourDesk',address:'원격 ID 또는 IP',connect:'연결 ↗',add:'＋ 사이트 추가',all:'모든 사이트',search:'이름, ID 또는 메모 검색',empty:'일치하는 사이트 없음',preview:'',count:'{n}개 사이트',close:'닫기',pending:'원격 연결은 아직 구현되지 않았습니다.',manage:'사이트 관리는 아직 구현되지 않았습니다. 예제 데이터입니다.',delete:'삭제',edit:'편집',terminal:'터미널',desktop:'원격 데스크톱',online:'온라인',offline:'오프라인'}
 };
 const t=key=>(strings[language.value]||strings['zh-Hant'])[key]||key;
-const sites=[];
+const sites=(()=>{
+ try { const saved=JSON.parse(window.YourDesk?.loadSites?.()||'[]'); return Array.isArray(saved)?saved:[]; }
+ catch { return []; }
+})();
 const paths={desktop:'<rect x="3" y="3" width="18" height="13" rx="1"/><path d="M8 21h8M10 16v5m4-5v5"/>',terminal:'<rect x="3" y="4" width="18" height="16" rx="1"/><path d="m6 8 4 4-4 4m7 0h4"/>',edit:'<path d="m4 15 12-12 5 5-12 12H4zm10-10 5 5"/>',delete:'<path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7"/>'};
 const icon=key=>`<svg viewBox="0 0 24 24" aria-hidden="true">${paths[key]}</svg>`;
 const requested=(navigator.language||'zh-Hant').toLowerCase(); const autoLanguage=requested.startsWith('zh')?'zh-Hant':strings[requested.slice(0,2)]?requested.slice(0,2):'en'; const language={value:autoLanguage}; const languageSelect=document.getElementById('language-select'); const languageOptions=document.getElementById('language-options'); languageSelect.onclick=()=>{languageOptions.hidden=!languageOptions.hidden;}; languageOptions.querySelectorAll('button').forEach(b=>b.onclick=()=>{language.value=b.dataset.value==='auto'?autoLanguage:b.dataset.value;languageSelect.textContent=b.textContent;languageOptions.hidden=true;render();});
@@ -37,16 +40,21 @@ function render(){
 document.getElementById('search').oninput=render;
 document.getElementById('quick-form').onsubmit=event=>{event.preventDefault();openConnection(document.getElementById('address').value.trim(),'shell');};
  const siteDialog=document.getElementById('site-dialog'),siteForm=document.getElementById('site-form');
- const siteTabs=siteForm.querySelectorAll('[data-tab]'); let siteTab='manual'; let cameraStream=null; let scanTimer=null; let scanner=null;
+ const siteTabs=siteForm.querySelectorAll('[data-tab]'); let siteTab='manual'; let cameraStream=null; let scanTimer=null; let scanner=null; let scannedSite=null;
  async function selectSiteTab(tab){siteTab=tab;siteTabs.forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));document.getElementById('site-manual').hidden=tab!=='manual';document.getElementById('site-qrcode').hidden=tab!=='qrcode';document.getElementById('site-name').required=tab==='manual';document.getElementById('site-room').required=tab==='manual';document.getElementById('site-secret').required=tab==='manual';if(tab==='qrcode'){window.YourDesk?.requestCameraPermission?.();window.YourDesk?.startQrScanner?.();document.getElementById('site-status').textContent='正在啟動相機掃描…';}else{window.YourDesk?.stopQrScanner?.();if(cameraStream){cameraStream.getTracks().forEach(t=>t.stop());cameraStream=null;document.getElementById('site-camera').srcObject=null;}}}
- window.qrCodeDetected=value=>{document.getElementById('site-qr').value=value;document.getElementById('site-status').textContent='已讀取 QR Code，請按儲存站台';};
+ window.cameraFrame=value=>{document.getElementById('site-camera').src=value;};
+ window.qrCodeDetected=value=>{try{let raw=String(value??'').trim().replace(/[\r\n\t]/g,'');if(/^yourdesk%3A/i.test(raw))raw=decodeURIComponent(raw);const u=new URL(raw);const name=u.searchParams.get('name')||'';const room=u.searchParams.get('room')||'';const signal=u.searchParams.get('signal')||'';if(!room||!signal)throw Error();scannedSite={name,room,signal,raw};document.getElementById('site-qr').value=raw;document.getElementById('site-status').textContent='已讀取 QR Code，請按儲存站台';}catch(e){scannedSite=null;document.getElementById('site-status').textContent='QR Code 內容已讀取，但格式無法解析';}};
  siteTabs.forEach(b=>b.onclick=()=>selectSiteTab(b.dataset.tab));
- document.getElementById('add').onclick=()=>{siteForm.reset();selectSiteTab('manual');document.getElementById('site-status').textContent='';siteDialog.hidden=false;window.YourDesk?.setSiteDialogVisible?.(true);};
+ document.getElementById('add').onclick=()=>{siteForm.reset();scannedSite=null;selectSiteTab('manual');document.getElementById('site-status').textContent='';siteDialog.hidden=false;window.YourDesk?.setSiteDialogVisible?.(true);};
  document.getElementById('site-cancel').onclick=()=>{siteDialog.hidden=true;selectSiteTab('manual');window.YourDesk?.setSiteDialogVisible?.(false);};
- siteForm.onsubmit=e=>{e.preventDefault();let name=document.getElementById('site-name').value.trim(),room=document.getElementById('site-room').value.trim(),secret=document.getElementById('site-secret').value;
-  if(siteTab==='qrcode'){try{const u=new URL(document.getElementById('site-qr').value.trim());if(u.protocol!=='yourdesk:'||u.hostname!=='site')throw Error();name=u.searchParams.get('name')||'';room=u.searchParams.get('room')||'';if(!u.searchParams.get('signal')||!room)throw Error();secret='';}catch{document.getElementById('site-status').textContent='QR Code 格式無效';return;}}
+ siteForm.onsubmit=e=>{e.preventDefault();let name=document.getElementById('site-name').value.trim(),room=document.getElementById('site-room').value.trim(),secret=document.getElementById('site-secret').value;let signal='';
+  if(siteTab==='qrcode'){if(scannedSite&&scannedSite.raw===document.getElementById('site-qr').value.trim()){name=scannedSite.name;room=scannedSite.room;signal=scannedSite.signal;secret='';}else{try{const u=new URL(document.getElementById('site-qr').value.trim());name=u.searchParams.get('name')||'';room=u.searchParams.get('room')||'';signal=u.searchParams.get('signal')||'';if(!signal||!room)throw Error();secret='';}catch{document.getElementById('site-status').textContent='QR Code 格式無效';return;}}}
   if(!name)name=room; if(!room){document.getElementById('site-status').textContent='請輸入遠端 ID 或 IP:Port';return;}
-  const exists=sites.findIndex(s=>s.id===room); if(exists>=0){document.getElementById('site-status').textContent='此站台已存在，測試資料不會覆蓋現有站台';return;} const item={name,note:'',id:room,online:false,terminal:true,desktop:true}; sites.unshift(item);
-  if(secret&&window.YourDesk?.rememberCredentials)window.YourDesk.rememberCredentials(room,secret); siteDialog.hidden=true;render();
+  const exists=sites.findIndex(s=>s.id===room); if(exists>=0){document.getElementById('site-status').textContent='此站台已存在，測試資料不會覆蓋現有站台';return;} const item={name,note:'',id:room,signal,online:false,terminal:true,desktop:true};
+  try {
+   if(window.YourDesk?.saveSites?.(JSON.stringify([item,...sites]))!==true)throw Error();
+  } catch { document.getElementById('site-status').textContent='站台儲存失敗，請重試';return; }
+  sites.unshift(item);
+  if(secret&&window.YourDesk?.rememberCredentials)window.YourDesk.rememberCredentials(room,secret); siteDialog.hidden=true;selectSiteTab('manual');window.YourDesk?.setSiteDialogVisible?.(false);render();
  };
  document.getElementById('notice-close').onclick=()=>{document.getElementById('notice').hidden=true;};render();
