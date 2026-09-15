@@ -5,6 +5,7 @@ package clipboard
 import (
 	"context"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -16,7 +17,9 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
+	"yourdesk/internal/authlog"
 )
 
 func nativePullSupported() bool { _, err := os.Stat("/sbin/mount_webdav"); return err == nil }
@@ -91,6 +94,10 @@ type davResponses struct {
 }
 
 func nativePublishOffer(o *pullOffer) error {
+	permissionError := errors.New("無法存取檔案貼上所需的網路卷宗；請在「系統設定 → 隱私權與安全性 → 檔案與檔案夾」允許 YourDesk 存取網路卷宗，然後重新複製檔案")
+	if o.s.pull.permissionDeniedOffer == o.id {
+		return permissionError
+	}
 	listener, err := net.Listen("tcp4", "127.0.0.1:0")
 	if err != nil {
 		return err
@@ -106,6 +113,8 @@ func nativePublishOffer(o *pullOffer) error {
 	for i, e := range o.entries {
 		entries[e.Name] = i
 	}
+	// 每份清單每種方法只記錄一次，避免 Finder 中繼資料輪詢造成日誌洪水。
+	var observedMethods atomic.Uint32
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.HasPrefix(r.URL.Path, prefix) {
 			http.NotFound(w, r)
@@ -121,6 +130,12 @@ func nativePublishOffer(o *pullOffer) error {
 		e := pullEntry{Directory: true}
 		if !isRoot {
 			e = o.entries[index]
+		}
+		if authlog.IsEnabled() {
+			bit := map[string]uint32{"OPTIONS": 1, "PROPFIND": 2, "HEAD": 4, "GET": 8}[r.Method]
+			if bit != 0 && observedMethods.Or(bit)&bit == 0 {
+				traceClipboard("mac-dav-request", o.id, map[string]any{"method": r.Method, "root": isRoot, "directory": e.Directory, "range": r.Header.Get("Range") != ""})
+			}
 		}
 		w.Header().Set("DAV", "1")
 		w.Header().Set("Allow", "OPTIONS, PROPFIND, HEAD, GET")
@@ -184,6 +199,7 @@ func nativePublishOffer(o *pullOffer) error {
 	pullMounts.roots[mount] = true
 	pullMounts.Unlock()
 	cleanup := func() {
+		traceClipboard("mac-mount-closed", o.id, nil)
 		pullMounts.Lock()
 		delete(pullMounts.roots, mount)
 		pullMounts.Unlock()
@@ -201,9 +217,25 @@ func nativePublishOffer(o *pullOffer) error {
 	}()
 	ctx, cancel := context.WithTimeout(o.s.clipCtx, 20*time.Second)
 	defer cancel()
+	started := time.Now()
+	traceClipboard("mac-mount-start", o.id, nil)
 	output, err := exec.CommandContext(ctx, "/sbin/mount_webdav", "-S", "-o", "rdonly,nobrowse", "-v", "YourDesk", "http://"+listener.Addr().String()+prefix, mount).CombinedOutput()
+	traceClipboard("mac-mount-finished", o.id, map[string]any{"success": err == nil, "elapsedMS": time.Since(started).Milliseconds(), "errorClass": authlog.ErrorClass(err)})
 	if err != nil {
 		return fmt.Errorf("無法建立 Finder 延遲貼上掛載：%w：%s", err, strings.TrimSpace(string(output)))
+	}
+	// 掛載成功不代表本 App 已獲准存取網路卷宗。先實際列舉目錄，讓
+	// macOS 在需要時要求授權；只讀取清單，不預先下載遠端檔案內容。
+	// 若未取得授權，pboard 可能拒收 file URL，但 writeObjects 仍回報成功。
+	traceClipboard("mac-mount-access-start", o.id, nil)
+	_, err = os.ReadDir(mount)
+	traceClipboard("mac-mount-access-finished", o.id, map[string]any{"success": err == nil, "permissionDenied": errors.Is(err, os.ErrPermission)})
+	if err != nil {
+		if errors.Is(err, os.ErrPermission) {
+			o.s.pull.permissionDeniedOffer = o.id
+			return permissionError
+		}
+		return fmt.Errorf("無法讀取 Finder 貼上掛載：%w", err)
 	}
 	var roots []string
 	for _, e := range o.entries {
@@ -212,11 +244,15 @@ func nativePublishOffer(o *pullOffer) error {
 		}
 	}
 	if nativeRevision() != o.revision {
+		traceClipboard("offer-rejected", o.id, map[string]any{"reason": "clipboard-changed-during-mount"})
 		return fmt.Errorf("掛載期間本機已複製新內容，不覆寫剪貼簿")
 	}
 	if err = writeContent(content{Kind: "files", Paths: roots}); err != nil {
+		traceClipboard("mac-pasteboard-write", o.id, map[string]any{"success": false, "roots": len(roots)})
 		return err
 	}
+	traceClipboard("mac-pasteboard-write", o.id, map[string]any{"success": true, "roots": len(roots)})
+	traceNativeFileClipboard(o.id, len(roots))
 	o.s.pull.Lock()
 	o.s.pull.cleanup = append(o.s.pull.cleanup, pullLease{offer: o, close: cleanup})
 	o.s.pull.Unlock()

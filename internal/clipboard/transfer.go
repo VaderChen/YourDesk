@@ -131,8 +131,10 @@ func (s *Sync) transfer(parent context.Context, force bool) (resultErr error) {
 		return nil
 	}
 	if value.Kind == "files" {
+		traceClipboard("source-files-observed", "", map[string]any{"revision": revision, "roots": len(value.Paths), "remotePull": s.remotePull.Load()})
 		for _, name := range value.Paths {
 			if isPullPath(name) {
+				traceClipboard("source-files-skipped", "", map[string]any{"reason": "received-offer"})
 				return nil
 			}
 		}

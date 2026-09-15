@@ -213,7 +213,8 @@ def mac_bundle(folder, version):
                 CFBundleDisplayName='YourDesk', CFBundleExecutable='YourDesk', CFBundlePackageType='APPL',
                 CFBundleShortVersionString=numeric, CFBundleVersion=numeric + '.' + version[-4:],
                 CFBundleGetInfoString=version, NSHighResolutionCapable=True, LSMinimumSystemVersion='12.0',
-                NSScreenCaptureUsageDescription='YourDesk 需要擷取螢幕以提供遠端桌面。')
+                NSScreenCaptureUsageDescription='YourDesk 需要擷取螢幕以提供遠端桌面。',
+                NSNetworkVolumesUsageDescription='YourDesk 需要存取網路卷宗，讓 Finder 在您貼上時讀取遠端檔案。')
     icon = os.environ.get('YOURDESK_MAC_ICON_PATH')
     if icon:
         shutil.copy2(icon, resources / 'AppIcon.icns')

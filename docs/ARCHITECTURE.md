@@ -2,11 +2,11 @@
 
 Windows 裝置 ID 已改用 MachineGuid，無效時以 SMBIOS UUID 備援，不再使用 CPU 特徵值；更新影響見 [Windows 裝置 ID](WINDOWS-DEVICE-ID.md)。
 
-**繁體中文** · [English](docs/README.en.md) · [日本語](docs/README.ja.md) · [한국어](docs/README.ko.md)
+**繁體中文** · [English](README.en.md) · [日本語](README.ja.md) · [한국어](README.ko.md)
 
 YourDesk 是以 Go 開發的 P2P 遠端桌面，提供內嵌 HTML／JavaScript／CSS 的原生管理介面、常駐 Tray 的 Client，以及獨立 遠端顯示。桌面影像與鍵鼠控制透過 WebRTC DTLS 加密直傳，不使用 TURN 中繼。
 
-![YourDesk 介面預覽](images/cap001.png)
+![YourDesk 介面預覽](../images/cap001.png)
 
 ## 下載與啟動
 
@@ -101,6 +101,8 @@ macOS 被控端依系統雙擊時間與游標位置累積連點次數，按下�
 
 檔案與目錄採「複製 → 建立本機不可變快照 → 公布清單 → 貼上時讀取內容」。建立快照及列出右鍵選單不會主動傳送整份檔案。遠端顯示 的 Ctrl／Cmd+V 等待清單公布完成後送出按鍵；Windows 右鍵貼上使用 OLE `FileGroupDescriptorW`／`FileContents`／`IStream` 與非同步資料物件，macOS Finder 使用系統內建的唯讀 WebDAV 掛載，無需另裝驅動程式。WebDAV 僅監聽隨機的 127.0.0.1 連接埠，使用隨機路徑；HEAD／PROPFIND 只提供中繼資料，GET 才讀取內容。系統或第三方程式若主動預覽檔案並要求內容，也視為讀取需求，不能將這類系統讀取誤當作只有使用者按下貼上才可能發生。
 
+macOS 在發布檔案 URL 前實際列舉掛載目錄，確認 App 可存取網路卷宗並在需要時觸發系統授權。列舉只取中繼資料，檔案內容仍按需讀取。拒絕存取時保留原剪貼簿並提示授權；同一清單不反覆建立掛載，授權後重新複製。掛載成功或本程序 `writeObjects` 回傳成功都不等於系統剪貼簿已接受檔案 URL；診斷證據與實機結果見 [剪貼簿調查](CLIPBOARD-DIAGNOSIS.md)。
+
 每個讀取要求最多預讀 256 KiB，透過獨立 clipboard 通道分成 16 KiB 小片段回覆，並限制並行讀取數與待送緩衝。檔案取消每片固定等待 8 ms 的節流；沒有畫面積壓時使用 256 KiB 待送緩衝，有積壓時縮為 64 KiB，鍵鼠仍優先。這是緩衝上限而非固定傳輸速度，實際速度仍受網路延遲、頻寬及磁碟影響。接收端只指定快照 ID、項目索引與位移；來源端不接受遠端傳入本機檔案路徑。內容來自已完成的本機快照，來源檔案之後變動不影響快照。貼上開始後再複製其他內容，不取消已取得舊快照的檔案讀取。純文字與圖片維持原本同步流程；舊 control 通道仍僅提供文字備援。檔案／目錄的按需讀取需兩端皆更新，不退回自動傳送整包檔案。
 
 單一快照最高 2 GiB（含封存資訊），最多保留 8 份快照；定期及建立下一份時回收已被取代、閒置超過十分鐘的舊快照與清單，連線結束則清理本機快照與 Finder 掛載。Windows 虛擬項目的相對路徑需短於 260 個 UTF-16 字元；符號連結、特殊檔案、虛擬附件及不相容路徑仍不支援。建立快照期間來源被修改或剪貼簿被換掉，會記錄錯誤，不公布不完整項目。檔案由作業系統直接貼到使用者選定的位置，不再先完整下載到 Downloads。
@@ -157,7 +159,7 @@ macOS 須在「系統設定 → 隱私權與安全性」允許 YourDesk 的螢�
 
 需要 Go 1.24 以上、Python 3.9 以上與 zsh。macOS 使用 Xcode Command Line Tools、Developer ID 及可用的 notarytool Keychain profile，以 `YOURDESK_NOTARY_PROFILE` 指定。Windows 交叉編譯需要對應 MinGW 工具鏈。
 
-詳細內容見[建置與打包](docs/BUILD.md)及[架構說明](docs/ARCHITECTURE.md)。編譯／語法檢查不代表已驗證實機連線、GPU 效能或完整下載安裝流程。
+詳細內容見[建置與打包](BUILD.md)及[架構說明](ARCHITECTURE.md)。編譯／語法檢查不代表已驗證實機連線、GPU 效能或完整下載安裝流程。
 
 ### Windows 硬體加速
 

@@ -10,7 +10,7 @@ YourDesk 是支援 macOS 與 Windows 的遠端桌面工具。從連線、站台�
 
 ## 特色與功能
 
-**1.26.0914 build 1419：裁切串流、滑鼠組合鍵與桌面站台 QR Code。**裁切框預設置中、寬高各半，可拖曳調整；復原前以 WebView 確認。修正 macOS 裁切黑畫面及修飾鍵滑鼠操作，簡化工具列並改善連線狀態顏色。Windows 裁切已有使用者實測回報，其餘跨機情境仍持續驗證。詳見 [本版說明](docs/RELEASE-1.26.0914-build-1419.md)、[滑鼠組合鍵](docs/INPUT-MODIFIERS.md) 與 [站台 QR Code](docs/SITE-QR.md)。
+**1.26.0915 build 1524：修正近端 Mac 無法貼上遠端檔案。**發布檔案清單前先確認網路卷宗存取，避免 Finder 的「貼上」反灰或沒有反應；使用者已實測恢復可用。這項修正只需更新近端 Mac，若系統詢問網路卷宗權限，請允許後重新複製。詳見 [本版說明](docs/RELEASE-1.26.0915-build-1524.md) 與 [剪貼簿調查](docs/CLIPBOARD-DIAGNOSIS.md)。
 
 - **GUI 與 CMD 雙模式**：支援遠端桌面與互動命令列，可依工作選擇模式；命令列使用獨立視窗，亦可連入 Linux CLI Host。
 - **MCP AI Agent 遠端操控**：AI Agent 可透過 MCP 連線遠端、操作桌面或命令列、查詢站台能力，完成工作後斷線。
@@ -55,7 +55,7 @@ IP 白名單預設開啟且只允許 `127.0.0.1`；名單內免 Token、名單�
 2. 在快速連線輸入遠端 ID，或選擇已儲存的站台。
 3. 輸入連線密碼後，即可開始操作遠端桌面。
 
-macOS 首次使用需允許「螢幕錄製」與「輔助使用」權限。Windows 需要 WebView2 Runtime。目前不支援 Intel Mac，亦未提供 Linux 桌面版。
+macOS 首次使用需允許「螢幕錄製」與「輔助使用」權限。接收遠端檔案時，若詢問「網路卷宗」存取，請允許；曾拒絕時可到「系統設定 → 隱私權與安全性 → 檔案與檔案夾」開啟 YourDesk 的網路卷宗權限，再重新複製檔案。Windows 需要 WebView2 Runtime。目前不支援 Intel Mac，亦未提供 Linux 桌面版。
 
 也可使用 IP 直接連線；請先在被控端的「網路安全」設定中啟用。連線採加密直連，需要雙方網路允許直接連通。
 
@@ -81,7 +81,7 @@ macOS 首次使用需允許「螢幕錄製」與「輔助使用」權限。Windo
 
 畫面處理使用 FSR、QuickSRNet／SESR 與 RIFE。感謝原作者提供相關技術；[FSR](docs/FSR-LICENSE.txt)、[超解析度模型](internal/superres/MODEL_LICENSE.txt)及 [RIFE](internal/frameinterp/MODEL_LICENSE.txt) 的完整授權亦隨套件附上。
 
-**剪貼簿同步改善：Mac 對 Mac 的文字、圖片及雙向檔案複製已由使用者實機確認可用。**
+**本版已修正近端 Mac 無法貼上遠端檔案的問題，使用者已確認恢復可用。**
 
 ## 遠端命令列
 

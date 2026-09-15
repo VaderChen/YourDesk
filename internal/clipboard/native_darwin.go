@@ -11,6 +11,19 @@ package clipboard
 static long long yd_clip_revision(void) {
  @autoreleasepool { return [NSPasteboard generalPasteboard].changeCount; }
 }
+typedef struct { long long revision; int items,fileURLs,remote; } YDClipFileState;
+// 僅檢查格式宣告；不讀取延遲提供的內容，也不觸發檔案傳輸。
+static YDClipFileState yd_clip_file_state(void) {
+ @autoreleasepool {
+  NSPasteboard *board=[NSPasteboard generalPasteboard];
+  YDClipFileState state={.revision=board.changeCount,.remote=[board.types containsObject:@"com.apple.is-remote-clipboard"]};
+  for (NSPasteboardItem *item in board.pasteboardItems) {
+   state.items++;
+   if ([item.types containsObject:NSPasteboardTypeFileURL]) state.fileURLs++;
+  }
+  return state;
+ }
+}
 static void *yd_clip_read(int *kind, int *length, int textOnly) {
  @autoreleasepool {
   NSPasteboard *board=[NSPasteboard generalPasteboard];
@@ -87,7 +100,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"unsafe"
+	"yourdesk/internal/authlog"
 )
+
+func traceNativeFileClipboard(offer string, expected int) {
+	if !authlog.IsEnabled() {
+		return
+	}
+	state := C.yd_clip_file_state()
+	traceClipboard("mac-pasteboard-formats", offer, map[string]any{
+		"revision": int64(state.revision), "items": int(state.items),
+		"fileURLs": int(state.fileURLs), "expected": expected, "remoteClipboard": state.remote != 0,
+	})
+}
 
 func nativeRevision() int64            { return int64(C.yd_clip_revision()) }
 func readContent() (content, error)    { return readNativeContent(false) }
