@@ -6,11 +6,24 @@ android { namespace = "com.yourdesk.android"; compileSdk = 35
         applicationId = "com.yourdesk.android"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 29824441
+        versionName = "0.26.0915 build 1801"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // 目前產品只支援 64 位元 ARM Android 手機；排除其他 ABI 的 native library。
         ndk { abiFilters.add("arm64-v8a") }
+    }
+
+    // 預覽版 APK 使用可辨識的產品與版本檔名。
+}
+
+tasks.register("releasePreviewApk") {
+    dependsOn("assembleRelease")
+    doLast {
+        copy {
+            from(layout.buildDirectory.file("outputs/apk/release/app-release-unsigned.apk"))
+            into(layout.buildDirectory.dir("outputs/apk/release"))
+            rename { "YourDesk-0.26.0915-build-1801-preview.apk" }
+        }
     }
 }
 dependencies {

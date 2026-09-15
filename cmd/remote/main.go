@@ -302,7 +302,7 @@ func (g *game) Update() error {
 	px, py := g.finalTransform.Apply(float64(x), float64(y))
 	ox, oy, vw, vh := g.viewport(iw, ih)
 	fx, fy := (px-ox)/vw, (py-oy)/vh
-	inside := !toolbarHandled && py >= float64(g.toolbarHeight()) && iw > 0 && ih > 0 && fx >= 0 && fx <= 1 && fy >= 0 && fy <= 1
+	inside := ebiten.IsFocused() && !toolbarHandled && iw > 0 && ih > 0 && vw > 0 && vh > 0 && px >= ox && px <= ox+vw && py >= oy && py <= oy+vh && py >= float64(g.toolbarHeight()) && fx >= 0 && fx <= 1 && fy >= 0 && fy <= 1
 	fx, fy = math.Max(0, math.Min(1, fx)), math.Max(0, math.Min(1, fy))
 	if inside {
 		_ = g.sendControl(p2p.Control{Type: "move", X: fx, Y: fy})
