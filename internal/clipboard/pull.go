@@ -49,8 +49,10 @@ type pullLease struct {
 	close func()
 }
 type pullState struct {
-	latestOffer string
-	reaped      time.Time
+	// 原生發布持有 Sync.nativeMu；授權遭拒的同一清單不反覆建立掛載。
+	permissionDeniedOffer string
+	latestOffer           string
+	reaped                time.Time
 	sync.Mutex
 	snapshots map[string]*pullSnapshot
 	current   string
@@ -167,6 +169,7 @@ func (s *Sync) offerFiles(ctx context.Context, revision int64, paths []string) e
 	s.mu.Lock()
 	s.acks[snap.id] = ack
 	s.mu.Unlock()
+	traceClipboard("offer-send", snap.id, map[string]any{"entries": len(snap.entries)})
 	defer func() { s.mu.Lock(); delete(s.acks, snap.id); s.mu.Unlock() }()
 	if err = s.sendPacket(ctx, packet{Type: "offer-start", ID: snap.id}); err != nil {
 		return err
@@ -267,12 +270,14 @@ func (s *Sync) handlePull(ctx context.Context, m packet) bool {
 	switch m.Type {
 	case "offer-start":
 		if !s.remotePull.Load() || !validPullID(m.ID) {
+			traceClipboard("offer-rejected", "", map[string]any{"reason": "capability-or-id", "remotePull": s.remotePull.Load()})
 			return true
 		}
 		s.nativeMu.Lock()
 		revision := nativeRevision()
 		s.nativeMu.Unlock()
 		s.pull.receiving = &pullOffer{id: m.ID, s: s, revision: revision}
+		traceClipboard("offer-received", m.ID, map[string]any{"revision": revision})
 		return true
 	case "offer-entry":
 		o := s.pull.receiving
@@ -293,17 +298,22 @@ func (s *Sync) handlePull(ctx context.Context, m packet) bool {
 		}
 		o.last.Store(time.Now().UnixNano())
 		err := validatePullEntries(o.entries)
+		traceClipboard("offer-complete", o.id, map[string]any{"entries": len(o.entries), "valid": err == nil})
 		s.pull.Lock()
 		if len(s.pull.cleanup) >= 64 {
 			err = errors.New("尚未釋放的貼上清單過多，請稍後重試")
+			traceClipboard("offer-rejected", o.id, map[string]any{"reason": "lease-limit"})
 		}
 		s.pull.Unlock()
 		if err == nil {
 			s.nativeMu.Lock()
 			if nativeRevision() != o.revision {
 				err = errors.New("本機已複製新內容，不覆寫剪貼簿")
+				traceClipboard("offer-rejected", o.id, map[string]any{"reason": "local-clipboard-changed"})
 			} else {
+				traceClipboard("publish-start", o.id, nil)
 				err = nativePublishOffer(o)
+				traceClipboard("publish-finished", o.id, map[string]any{"success": err == nil})
 			}
 			if err == nil {
 				s.observed = nativeRevision()

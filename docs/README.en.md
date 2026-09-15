@@ -10,7 +10,7 @@ YourDesk is a remote desktop app for macOS and Windows. Connect to another compu
 
 ## Features
 
-**1.26.0914 build 1419** adds region streaming, modifier-key mouse fixes and desktop site QR codes, with a compact display area toolbar. Windows cropping has user-reported validation; other cross-device cases remain under verification. See the [release notes](RELEASE-1.26.0914-build-1419.md).
+**1.26.0915 build 1524 fixes remote-file paste on a local Mac.** The app checks network-volume access before publishing files to Finder. The user confirmed that pasting works again. Only the receiving Mac needs this fix; allow Network Volumes access if prompted, then copy again. See the [release notes](RELEASE-1.26.0915-build-1524.md).
 
 - **GUI and command-line modes:** choose remote desktop or an interactive terminal for your task. Terminals use independent windows and can connect to Linux CLI Hosts.
 - **Remote control through MCP AI agents:** AI agents can connect through MCP, operate the desktop or terminal, query site capabilities and disconnect when finished.
@@ -54,7 +54,7 @@ Download the latest package from [GitHub Releases](https://github.com/VaderChen/
 2. Enter the remote ID or select a saved connection.
 3. Enter the connection password to start.
 
-On macOS, allow Screen Recording and Accessibility permissions. Windows requires WebView2 Runtime. Intel Macs and Linux desktop packages are currently unsupported. Direct IP connections are also available after enabling them in the remote computer's security settings. Connections are encrypted and require networks that permit direct connectivity.
+On macOS, allow Screen Recording and Accessibility permissions. When receiving remote files, allow Network Volumes access if prompted. If previously denied, enable it for YourDesk under System Settings → Privacy & Security → Files and Folders, then copy the files again. Windows requires WebView2 Runtime. Intel Macs and Linux desktop packages are currently unsupported. Direct IP connections are also available after enabling them in the remote computer's security settings. Connections are encrypted and require networks that permit direct connectivity.
 
 ## Enhancement and interpolation
 
@@ -74,7 +74,7 @@ Check for updates in About. After downloading, a red 10-second countdown lets yo
 
 Thanks to the authors of FSR, QuickSRNet/SESR and RIFE. Full [FSR](FSR-LICENSE.txt), [super-resolution](../internal/superres/MODEL_LICENSE.txt) and [RIFE](../internal/frameinterp/MODEL_LICENSE.txt) licenses are included with the packages.
 
-**Clipboard synchronization improved: the user confirmed that Mac-to-Mac text, image and bidirectional file copy work on real devices.**
+**This release fixes remote-file paste on a local Mac; the user confirmed that pasting works again.**
 
 ## Remote terminal
 
