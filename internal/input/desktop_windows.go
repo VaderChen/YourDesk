@@ -35,8 +35,11 @@ func onInputDesktop(inject func() error) error {
 			runtime.LockOSThread()
 			binding := desktopBinding{
 				open: func() (inputDesktop, error) {
-					// READOBJECTS | WRITEOBJECTS；不切換使用者可見桌面、不變更權限。
-					h, _, err := openInputDesktop.Call(0, 0, 0x0001|0x0080)
+					// READOBJECTS | WRITEOBJECTS | JOURNALPLAYBACK。
+					// SendInput 需要 JOURNALPLAYBACK；缺少時即使綁定成功，
+					// 鍵鼠注入仍會回報 ERROR_ACCESS_DENIED。
+					// 僅要求目前帳號可用的存取權，不切換使用者可見桌面。
+					h, _, err := openInputDesktop.Call(0, 0, 0x0001|0x0080|0x0020)
 					if h == 0 {
 						return inputDesktop{}, inputAPIError("OpenInputDesktop", err)
 					}

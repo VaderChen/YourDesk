@@ -112,7 +112,16 @@ WinPE 不使用 Installer，固定封裝為 `dist/winpe-x64/YourDesk-<版本>-wi
 
 ## WOA 工具鏈
 
-使用官方 LLVM-MinGW macOS universal 套件，解壓後可將 bin 加入 PATH，或設定 YOURDESK_LLVM_MINGW 為工具鏈根目錄。亦會搜尋 ~/.local/share/yourdesk/toolchains/llvm-mingw。本機已安裝 20260908 UCRT 版並核對官方 SHA-256。WOA 採原生 ARM64 編譯，不以 x64 模擬版替代；圖示資源也使用 ARM64 windres。建置產物為 dist/windows-arm64/，安裝包檔名使用 windows-arm64-setup.exe。Installer 本體使用 NSIS 引導程式，安裝的 YourDesk 三個 EXE 為原生 ARM64；仍須 WOA 實機確認硬體加速與周邊輸入相容性。
+使用官方 LLVM-MinGW macOS universal 套件，解壓後可將 bin 加入 PATH，或設定 YOURDESK_LLVM_MINGW 為工具鏈根目錄。亦會搜尋 ~/.local/share/yourdesk/toolchains/llvm-mingw。工具鏈不隨原始碼提供；新電腦或新的使用者帳號須另外安裝，不能以純 Go 模組的交叉編譯成功判定桌面版工具已齊備。
+
+已驗證的工具鏈為 `20260908 UCRT`，官方 macOS universal 封存的 SHA-256 為 `d1dc5d1ecf3a3ced5ed5544c72f1acd0c8e84eb3024d520ecc6b143eec62a149`。安裝步驟：
+
+1. 使用 Homebrew 安裝 `cmake nasm pkgconf nsis`；NASM 用於 x64 SIMD，NSIS 用於安裝包。
+2. 從下方官方發行頁下載 `llvm-mingw-20260908-ucrt-macos-universal.tar.xz`，使用 `shasum -a 256` 核對上述雜湊。
+3. 將封存內的工具鏈目錄放到 `~/.local/share/yourdesk/toolchains/llvm-mingw`，確認該目錄下直接包含 `bin/`。安裝至此預設位置後，雙擊 `buildWin.command` 不需另外設定環境變數。
+4. 執行 `./buildWin.command`，完成後使用 `python3 scripts/release.py pack --no-build` 產生安裝包。首次建置會下載並編譯 TurboJPEG、FFmpeg 及 libaom，後續使用本機快取。
+
+WOA 採原生 ARM64 編譯，不以 x64 模擬版替代；圖示資源也使用 ARM64 windres。建置產物為 dist/windows-arm64/，安裝包檔名使用 windows-arm64-setup.exe。Installer 本體使用 NSIS 引導程式，安裝的 YourDesk 三個 EXE 為原生 ARM64；仍須 WOA 實機確認硬體加速與周邊輸入相容性。
 
 工具鏈來源：[LLVM-MinGW 官方發行頁](https://github.com/mstorsjo/llvm-mingw/releases)。本機已完成三個 ARM64 EXE 及 NSIS Installer 的編譯確認，尚未執行 WOA 實機功能測試。
 
