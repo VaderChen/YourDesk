@@ -8,6 +8,7 @@
 #include <wrl/client.h>
 #include <memory>
 #include <new>
+#include "../winmedia/readback.h"
 using Microsoft::WRL::ComPtr;
 #define CAP_CHECK(expr) do { HRESULT status=(expr); if(FAILED(status)) return status; } while(0)
 
@@ -59,7 +60,7 @@ struct yd_dxgi_capture {
   }
   context->CopyResource(staging.Get(),texture.Get());
   D3D11_MAPPED_SUBRESOURCE mapped{};
-  CAP_CHECK(context->Map(staging.Get(),0,D3D11_MAP_READ,0,&mapped));
+  CAP_CHECK(yd_map_read(device.Get(),context.Get(),staging.Get(),&mapped));
   struct Unmap {ID3D11DeviceContext *context;ID3D11Resource *resource;~Unmap(){context->Unmap(resource,0);}} unmap{context.Get(),staging.Get()};
   if(!mapped.pData || mapped.RowPitch<(UINT)w*4)return E_FAIL;
   for(int y=0;y<h;y++){

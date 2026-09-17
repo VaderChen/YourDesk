@@ -85,6 +85,8 @@ func runWindow(ctx context.Context, address string, connected <-chan struct{}, u
 		lastMCP := -1
 		lastVisible := false
 		lastIncoming := false
+		var lastIncomingProcess *process
+		var lastIncomingGeneration uint64
 		lastIncomingCheck := time.Time{}
 		for {
 			select {
@@ -94,10 +96,22 @@ func runWindow(ctx context.Context, address string, connected <-chan struct{}, u
 					incoming := app.incomingConnected()
 					app.mu.Lock()
 					app.incomingActive = incoming
+					hostProcess := app.children["host"]
+					var generation uint64
+					if hostProcess != nil {
+						generation = hostProcess.incomingGeneration
+					}
 					app.mu.Unlock()
-					if incoming != lastIncoming {
+					if incoming != lastIncoming || (incoming && (hostProcess != lastIncomingProcess || generation != lastIncomingGeneration)) {
+						restart := incoming && lastIncoming
 						lastIncoming = incoming
-						window.Dispatch(func() { updateIncomingTray(window.Window(), incoming) })
+						lastIncomingProcess, lastIncomingGeneration = hostProcess, generation
+						window.Dispatch(func() {
+							if restart {
+								updateIncomingTray(window.Window(), false)
+							}
+							updateIncomingTray(window.Window(), incoming)
+						})
 					}
 				}
 				count, visible := app.mcpSessionCount()

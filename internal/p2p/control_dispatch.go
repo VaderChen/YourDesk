@@ -1,6 +1,9 @@
 package p2p
 
-import "log/slog"
+import (
+	"log/slog"
+	"yourdesk/internal/authlog"
+)
 
 // 控制事件仍依接收順序執行，確保舊版文字剪貼簿寫入完成後才貼上。
 // 命令回覆、ping 與剪貼簿額度由接收回呼先處理，不等原生剪貼簿或輸入 API。
@@ -10,21 +13,13 @@ func (p *Peer) dispatchControl(c Control, handler func(Control)) {
 	}
 	p.controlDispatchOnce.Do(func() {
 		p.controlInbox = make(chan Control, 128)
-		go func() {
-			for {
-				select {
-				case <-p.Done():
-					return
-				case c := <-p.controlInbox:
-					select {
-					case <-p.Done():
-						return
-					default:
-					}
-					handler(c)
-				}
-			}
-		}()
+		go runControlWorker(p.Done(), p.controlInbox, handler, func() {
+			slog.Error("控制事件處理超過 30 秒，結束停滯連線")
+			authlog.Event("control-worker-stalled", nil)
+			authlog.Stacks()
+			p.markClosed()
+			go p.pc.Close()
+		})
 	})
 	select {
 	case <-p.Done():

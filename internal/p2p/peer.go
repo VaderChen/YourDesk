@@ -99,6 +99,7 @@ type Peer struct {
 	livenessOnce        sync.Once
 	sentBytes           atomic.Uint64
 	receivedBytes       atomic.Uint64
+	receivedMessages    atomic.Uint64
 	transportMode       peertransport.Mode
 	commandsOnce        sync.Once
 	commands            commandState
@@ -567,6 +568,7 @@ func (p *Peer) sendData(dc *webrtc.DataChannel, data []byte) error {
 func (p *Peer) onMessage(dc *webrtc.DataChannel, handler func(webrtc.DataChannelMessage)) {
 	dc.OnMessage(func(m webrtc.DataChannelMessage) {
 		p.receivedBytes.Add(uint64(len(m.Data)))
+		p.receivedMessages.Add(1)
 		if handler != nil {
 			handler(m)
 		}

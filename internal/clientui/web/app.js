@@ -188,7 +188,7 @@ function applySiteDeviceStatus(icon, site) {
  const key=`viewer:${site?.id}`,stage=state.sessions?.[key]?.stage;
  const online=siteOnline(site);
  const connected=stage==='connected';
- const connecting=!connected && (['waiting','password','authenticating'].includes(stage) || (!stage && Object.hasOwn(state.running||{},key)));
+ const connecting=!connected && (['waiting','password','authenticating','reconnecting'].includes(stage) || (!stage && Object.hasOwn(state.running||{},key)));
  const status=connected?'connected':connecting?'connecting':online===true?'online':'offline';
  for(const name of ['connected','connecting','online','offline'])icon.classList.toggle(name,name===status);
  const label=connected?'遠端桌面已連線':connecting?'遠端桌面連線中':online===true?'Client 在線上':online===false?'Client 不在線上':'無法確認 Client 狀態';
@@ -797,6 +797,9 @@ function applyPreferences(preferences) {
  $('#ui-key-mapping').checked=!values.disableKeyMapping;
  $('#ui-fit-window').checked=!!values.fitWindow;
  $('#ui-close-on-disconnect').checked=!!values.closeWindowOnDisconnect;
+ $('#ui-close-when-idle').checked=!!values.closeWhenIdle;
+ $('#ui-auto-reconnect').checked=!!values.autoReconnect;
+ if(values.autoReconnect)$('#ui-close-on-disconnect').checked=false;
  $('#ui-enhancement').checked=!!values.imageEnhancement;
  $('#ui-interpolation').checked=!!values.interpolation;
  $('#ui-interpolation-method').value=values.interpolationMethod||'';
@@ -849,7 +852,7 @@ async function savePreferences() {
  for(const id of ['#ui-source-fps','#ui-bitrate-limit','#ui-gop']){if(!$(id).checkValidity()){$(id).reportValidity();return}}
   const previous = state.preferences;
  if(!$('#ui-enhancement-budget').checkValidity()){$('#ui-enhancement-budget').reportValidity();return}
-	const preferences = { tailcatEnabled:$('#tailcat-mode').checked, mcpOpenDisplay:$('#ui-mcp-open-display').checked, mcpWhitelistEnabled:$('#ui-mcp-whitelist-enabled').checked, mcpWhitelist:[...new Set($('#ui-mcp-whitelist').value.split(/\r?\n/).map(v=>v.trim()).filter(Boolean))], mcpEnabled:$('#ui-mcp-enabled').checked, fitWindow:$('#ui-fit-window').checked, closeWindowOnDisconnect:$('#ui-close-on-disconnect').checked, sourceFPSLimit:Number($('#ui-source-fps').value), bitrateLimitMbps:Number($('#ui-bitrate-limit').value), keyframeInterval:Number($('#ui-gop').value), interpolation: $('#ui-interpolation').checked, interpolationMethod: $('#ui-interpolation-method').value, coreMLModel: $('#ui-coreml-model').value || 'quicksrnet-small', enhancementStrategy: $('#ui-enhancement-strategy').value, enhancementBitrateMbps: Number($('#ui-enhancement-budget').value), superResolution: $('#ui-super-resolution').value, imageEnhancement: $('#ui-enhancement').checked, language: $('#ui-language').value, theme: $('#ui-theme').value, codec: $('#stream-codec').value, codecGoal: $('#stream-codec-goal').value, disableHints: !$('#ui-hints').checked, disableKeyMapping:!$('#ui-key-mapping').checked, directListen: $('#direct-listen').checked };
+	const preferences = { tailcatEnabled:$('#tailcat-mode').checked, mcpOpenDisplay:$('#ui-mcp-open-display').checked, mcpWhitelistEnabled:$('#ui-mcp-whitelist-enabled').checked, mcpWhitelist:[...new Set($('#ui-mcp-whitelist').value.split(/\r?\n/).map(v=>v.trim()).filter(Boolean))], mcpEnabled:$('#ui-mcp-enabled').checked, fitWindow:$('#ui-fit-window').checked, autoReconnect:$('#ui-auto-reconnect').checked, closeWhenIdle:$('#ui-close-when-idle').checked, closeWindowOnDisconnect:$('#ui-close-on-disconnect').checked, sourceFPSLimit:Number($('#ui-source-fps').value), bitrateLimitMbps:Number($('#ui-bitrate-limit').value), keyframeInterval:Number($('#ui-gop').value), interpolation: $('#ui-interpolation').checked, interpolationMethod: $('#ui-interpolation-method').value, coreMLModel: $('#ui-coreml-model').value || 'quicksrnet-small', enhancementStrategy: $('#ui-enhancement-strategy').value, enhancementBitrateMbps: Number($('#ui-enhancement-budget').value), superResolution: $('#ui-super-resolution').value, imageEnhancement: $('#ui-enhancement').checked, language: $('#ui-language').value, theme: $('#ui-theme').value, codec: $('#stream-codec').value, codecGoal: $('#stream-codec-goal').value, disableHints: !$('#ui-hints').checked, disableKeyMapping:!$('#ui-key-mapping').checked, directListen: $('#direct-listen').checked };
   $('#ui-mcp-whitelist-enabled').disabled=true;$('#ui-mcp-whitelist').disabled=true;
  $('#ui-mcp-enabled').disabled=true;
  $('#ui-language').disabled = true;
@@ -891,7 +894,9 @@ $('#ui-theme').addEventListener('change', savePreferences);
 $('#ui-hints').addEventListener('change', savePreferences);
 $('#ui-key-mapping').addEventListener('change',savePreferences);
 $('#ui-fit-window').addEventListener('change',savePreferences);
-$('#ui-close-on-disconnect').addEventListener('change',savePreferences);
+$('#ui-close-on-disconnect').addEventListener('change',()=>{if($('#ui-close-on-disconnect').checked)$('#ui-auto-reconnect').checked=false;savePreferences();});
+$('#ui-auto-reconnect').addEventListener('change',()=>{if($('#ui-auto-reconnect').checked)$('#ui-close-on-disconnect').checked=false;savePreferences();});
+$('#ui-close-when-idle').addEventListener('change',savePreferences);
  $('#ui-enhancement').addEventListener('change',savePreferences);
  $('#ui-interpolation').addEventListener('change',savePreferences);
  $('#ui-interpolation-method').addEventListener('change',savePreferences);
