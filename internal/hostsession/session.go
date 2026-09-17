@@ -310,6 +310,8 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 				return
 			case <-ticker.C:
 				if peer.Connected() {
+					stopAwake := keepSessionAwake()
+					defer stopAwake()
 					if options.OnState != nil {
 						options.OnState("connected")
 					}

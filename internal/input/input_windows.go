@@ -95,10 +95,14 @@ func (Native) Wheel(delta float64) error {
 	return send(input{typ: inputMouse, data: d})
 }
 func send(i input) error {
+	return onInputDesktop(func() error { return sendNative(i) })
+}
+
+// 呼叫端必須已在輸入桌面的固定執行緒上。
+func sendNative(i input) error {
 	r, _, e := sendInput.Call(1, uintptr(unsafe.Pointer(&i)), unsafe.Sizeof(i))
-	_ = r
 	if r != 1 {
-		return e
+		return inputAPIError("SendInput", e)
 	}
 	return nil
 }
@@ -117,6 +121,10 @@ var getSystemMetrics = windows.NewLazySystemDLL("user32.dll").NewProc("GetSystem
 var rawLockState = windows.NewLazySystemDLL("user32.dll").NewProc("GetKeyState")
 
 func (Native) RawKey(e rawkey.Event) error {
+	return onInputDesktop(func() error { return rawKeyOnDesktop(e) })
+}
+
+func rawKeyOnDesktop(e rawkey.Event) error {
 	code, err := rawkey.TranslateEvent(e, "windows")
 	if err != nil {
 		return err
@@ -166,5 +174,5 @@ func sendRawScan(code int, down bool) error {
 		}
 	}
 	binary.LittleEndian.PutUint32(d[4:8], flags)
-	return send(input{typ: inputKeyboard, data: d})
+	return sendNative(input{typ: inputKeyboard, data: d})
 }
