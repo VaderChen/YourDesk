@@ -90,9 +90,7 @@ func (g *game) sendControl(c p2p.Control) error {
 	if known {
 		c.Display = &selected
 	}
-	err := g.clipboard.SendControl(c)
-	g.inputDiagnostic.record(c.Type, err)
-	return err
+	return g.clipboard.SendControl(c)
 }
 
 func (g *game) displayStatus() (int, int, bool) {

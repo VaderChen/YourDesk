@@ -1,15 +1,7 @@
-# Mac 顯示區域鍵鼠無法控制的診斷
+# Mac 連線 Windows 的鍵鼠失效問題
 
-目前回報：Mac 筆電剛連上 Windows 即無法使用鍵鼠，但影像正常；桌上型 Mac 連同一台 Windows 正常，Fn＋F12 無法恢復。原因尚未確認，不能直接歸因於 Windows 休眠或觸控板座標。
+2026-09-18 使用者更新後確認測試有效。原症狀為 Mac 筆電連上 Windows 後畫面正常，但鍵鼠無法控制；同一台 Windows 由桌上型 Mac 操作正常，Fn＋F12 無法恢復。
 
-開啟「封包分析」後，顯示區域每 5 秒產生一筆 `viewer-input` 事件；關閉時不記錄。日誌位於 macOS 的 `~/Library/Caches/YourDesk/Logs/`。應取得故障筆電的 viewer 日誌，不能以另一台 Mac 的紀錄代替。
+已確認 Windows Host 的輸入桌面權限缺少 `DESKTOP_JOURNALPLAYBACK`，補上後恢復鍵鼠注入。此修正需更新被控 Windows Host；詳見 [Windows 調查結果](WINDOWS-IDLE-INPUT.md)。本次確認不擴大為所有長時間閒置、鎖定或 GPU 停滯情境均已解決。
 
-- `focused`、`controlEnabled`、`popupOpen`、`cropBlocksInput`：確認本機是否允許控制。
-- `displayInputReady`、`displayPending`、`displayCount`、`display`／`displayedDisplay`、`viewID`／`displayedViewID`、`viewChanging`：確認輸入是否因螢幕或裁切切換而暫停。
-- `rawSupported`、`rawAvailable`、`rawActive`：確認原始鍵盤擷取是否啟用。
-- `queuedMove`、`queuedButton`、`queuedKey`、`queuedWheel`：這段取樣期間交給輸入佇列的數量，**不代表封包已送出或 Windows 已執行**。
-- `queueFailed`：交給輸入佇列失敗的次數。
-
-測試時將顯示區域取得焦點，移動滑鼠並按幾個無敏感內容的測試按鍵，持續至少 10 秒。比對同時段控制通道流量與 Windows Host 的輸入錯誤紀錄，再判斷問題位於本機攔截、佇列、傳輸或遠端注入。日誌不記錄按鍵內容、游標座標或剪貼簿內容。
-
-此變更只增加診斷，尚未宣稱修復上述問題。
+排查期間新增的 `viewer-input` 定期日誌及相關計數已移除；保留既有封包分析與正常錯誤回報。歷史日誌檔不因更新而刪除。
