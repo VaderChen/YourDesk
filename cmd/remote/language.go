@@ -11,6 +11,8 @@ import (
 //go:embed web/translations.json
 var viewerTranslations string
 var viewerCloseWindowOnDisconnect atomic.Bool
+var viewerAutoReconnect atomic.Bool
+var viewerCloseWhenIdle atomic.Bool
 var viewerFitWindow atomic.Bool
 var viewerDisableKeyMapping atomic.Bool
 var viewerImageEnhancement atomic.Bool
@@ -30,6 +32,8 @@ func refreshViewerLanguage(previous string) string {
 	if dir, err := os.UserConfigDir(); err == nil {
 		if data, err := os.ReadFile(filepath.Join(dir, "YourDesk", "preferences.json")); err == nil {
 			var preferences struct {
+				AutoReconnect           bool   `json:"autoReconnect"`
+				CloseWhenIdle           bool   `json:"closeWhenIdle"`
 				CloseWindowOnDisconnect bool   `json:"closeWindowOnDisconnect"`
 				FitWindow               bool   `json:"fitWindow"`
 				SourceFPSLimit          *int   `json:"sourceFPSLimit"`
@@ -55,7 +59,9 @@ func refreshViewerLanguage(previous string) string {
 					mbps = 12
 				}
 				viewerStreamingLimits.Store(&streamingLimits{fps, mbps})
-				viewerCloseWindowOnDisconnect.Store(preferences.CloseWindowOnDisconnect)
+				viewerAutoReconnect.Store(preferences.AutoReconnect)
+				viewerCloseWindowOnDisconnect.Store(preferences.CloseWindowOnDisconnect && !preferences.AutoReconnect)
+				viewerCloseWhenIdle.Store(preferences.CloseWhenIdle)
 				viewerFitWindow.Store(preferences.FitWindow)
 				viewerDisableKeyMapping.Store(preferences.DisableKeyMapping)
 				viewerImageEnhancement.Store(preferences.ImageEnhancement)

@@ -21,6 +21,7 @@
 #include <memory>
 #include <cstring>
 #include <cstdio>
+#include "readback.h"
 using Microsoft::WRL::ComPtr;
 static thread_local char ydFailure[1024]{};
 static HRESULT traceFailure(HRESULT hr,const char *step){
@@ -97,7 +98,7 @@ struct GPU {
  }
  HRESULT read(unsigned char *out,int stride){
   if(!staging)CHECK(texture(dw,dh,format,0,D3D11_USAGE_STAGING,D3D11_CPU_ACCESS_READ,&staging));
-  context->CopyResource(staging.Get(),target.Get());D3D11_MAPPED_SUBRESOURCE map{};CHECK(context->Map(staging.Get(),0,D3D11_MAP_READ,0,&map));
+  context->CopyResource(staging.Get(),target.Get());D3D11_MAPPED_SUBRESOURCE map{};CHECK(yd_map_read(device.Get(),context.Get(),staging.Get(),&map));
   int rows=format==DXGI_FORMAT_NV12?dh*3/2:dh;int bytes=format==DXGI_FORMAT_NV12?dw:dw*4;
   if(map.RowPitch<(UINT)bytes){context->Unmap(staging.Get(),0);return E_FAIL;}
   for(int y=0;y<rows;y++)memcpy(out+y*stride,(unsigned char*)map.pData+y*map.RowPitch,bytes);
@@ -523,7 +524,7 @@ extern "C" int yd_media_probe_decode(int codec,int format,int w,int h,const unsi
    if(desc.Width<(UINT)w||desc.Height<(UINT)h||desc.Format!=(format==0?DXGI_FORMAT_B8G8R8A8_UNORM:DXGI_FORMAT_NV12))return E_FAIL;
    ComPtr<ID3D11Texture2D> staging;CHECK(gpu.texture(desc.Width,desc.Height,desc.Format,0,D3D11_USAGE_STAGING,D3D11_CPU_ACCESS_READ,&staging));
    gpu.context->CopySubresourceRegion(staging.Get(),0,0,0,0,texture.Get(),sub,nullptr);
-   D3D11_MAPPED_SUBRESOURCE mapped{};CHECK(gpu.context->Map(staging.Get(),0,D3D11_MAP_READ,0,&mapped));
+   D3D11_MAPPED_SUBRESOURCE mapped{};CHECK(yd_map_read(gpu.device.Get(),gpu.context.Get(),staging.Get(),&mapped));
    bool valid=mapped.pData&&mapped.RowPitch>=(UINT)(format==0?w*4:w);
    gpu.context->Unmap(staging.Get(),0);if(!valid)return E_FAIL;
   }else{

@@ -5,6 +5,7 @@ package video
 import (
 	"image"
 	"image/draw"
+	"log/slog"
 	"sync"
 	"yourdesk/internal/optimization"
 	"yourdesk/internal/softwarevideo"
@@ -156,7 +157,9 @@ func (d *windowsDecoder) Decode(payload []byte) (image.Image, error) {
 				d.mode = "hardware"
 				return pixels, nil
 			}
+			err = e
 		}
+		slog.Warn("Windows 硬體解碼失敗，改用軟體解碼", "codec", d.codec, "error", err)
 		d.software = true
 		if d.session != nil {
 			d.session.Close()

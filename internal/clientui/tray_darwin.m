@@ -17,6 +17,9 @@ extern void ydTrayDisconnectIncoming(uintptr_t handle);
 @property(nonatomic, retain) NSPopover *connectionPopover;
 @property(nonatomic, retain) NSMenuItem *mcpItem;
 @property(nonatomic, retain) NSMenuItem *incomingItem;
+@property(nonatomic, retain) NSMenuItem *durationItem;
+@property(nonatomic, retain) NSTimer *durationTimer;
+@property(nonatomic, assign) NSTimeInterval incomingStarted;
 @property(nonatomic, retain) NSImage *normalIcon;
 @property(nonatomic, retain) NSPopover *mcpPopover;
 @property(nonatomic, assign) uintptr_t callback;
@@ -56,6 +59,10 @@ extern void ydTrayDisconnectIncoming(uintptr_t handle);
 - (void)showMCP:(id)sender {ydTrayShowMCP(self.callback);}
 - (void)closeMCPNotice { [self.mcpPopover close]; }
 - (void)quitProgram:(id)sender { ydTrayQuit(self.callback); }
+- (void)updateDuration:(NSTimer *)timer {
+    unsigned long long seconds=(unsigned long long)MAX(0, NSProcessInfo.processInfo.systemUptime-self.incomingStarted);
+    self.durationItem.title=[NSString stringWithFormat:@"連線時間 %02llu:%02llu:%02llu",seconds/3600,(seconds/60)%60,seconds%60];
+}
 - (BOOL)respondsToSelector:(SEL)selector {
     return [super respondsToSelector:selector] ||
         [self.previousWindowDelegate respondsToSelector:selector] ||
@@ -75,6 +82,7 @@ extern void ydTrayDisconnectIncoming(uintptr_t handle);
     [_previousMainMenu release];
     [_trayMenu release];
     [_incomingItem release];
+    [_durationTimer invalidate];[_durationTimer release];[_durationItem release];
     [_window release];
     [_statusItem release];
     [_previousWindowDelegate release];
@@ -111,6 +119,8 @@ void *yd_tray_install(void *nativeWindow, uintptr_t handle) {
         NSMenuItem *mcp=[menu addItemWithTitle:@"開啟 MCP 遠端畫面" action:@selector(showMCP:) keyEquivalent:@""];mcp.target=controller;mcp.hidden=YES;controller.mcpItem=mcp;
         NSMenuItem *incoming=[menu addItemWithTitle:@"關閉遠端連線" action:@selector(disconnectIncoming:) keyEquivalent:@""];incoming.target=controller;incoming.hidden=YES;controller.incomingItem=incoming;
         [menu addItem:[NSMenuItem separatorItem]];
+        NSMenuItem *duration=[menu addItemWithTitle:@"連線時間 00:00:00" action:nil keyEquivalent:@""];
+        duration.enabled=NO;duration.hidden=YES;controller.durationItem=duration;
         NSMenuItem *quit = [menu addItemWithTitle:@"關閉程式" action:@selector(quitProgram:) keyEquivalent:@""];
         quit.target = controller;
         controller.trayMenu = menu;
@@ -160,6 +170,7 @@ void *yd_tray_install(void *nativeWindow, uintptr_t handle) {
 void yd_tray_remove(void *tray) {
     @autoreleasepool {
         YDTrayController *controller = (YDTrayController *)tray;
+        [controller.durationTimer invalidate];controller.durationTimer=nil;
         controller.window.delegate = controller.previousWindowDelegate;
         NSApp.delegate = controller.previousAppDelegate;
         NSApp.mainMenu = controller.previousMainMenu;
@@ -281,4 +292,14 @@ void yd_mcp_tray(void *nativeWindow, int count, int notify, int visible) {
  }
 }
 
-void yd_incoming_tray(void *window,int connected){@autoreleasepool {YDTrayController *c=(YDTrayController *)[(NSWindow *)window delegate];c.incomingItem.hidden=!connected;}}
+void yd_incoming_tray(void *window,int connected){@autoreleasepool {
+ YDTrayController *c=(YDTrayController *)[(NSWindow *)window delegate];
+ c.incomingItem.hidden=!connected;c.durationItem.hidden=!connected;
+ if(connected && !c.durationTimer){
+  c.incomingStarted=NSProcessInfo.processInfo.systemUptime;
+  [c updateDuration:nil];
+  c.durationTimer=[NSTimer timerWithTimeInterval:1 target:c selector:@selector(updateDuration:) userInfo:nil repeats:YES];
+  // 選單展開時也要更新，不只在預設 run loop 模式計時。
+  [[NSRunLoop mainRunLoop] addTimer:c.durationTimer forMode:NSRunLoopCommonModes];
+ }else if(!connected){[c.durationTimer invalidate];c.durationTimer=nil;}
+}}

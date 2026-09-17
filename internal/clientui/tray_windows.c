@@ -4,6 +4,7 @@
 #include <shellapi.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <wchar.h>
 extern void ydTrayQuit(uintptr_t handle);
 extern void ydTrayShowMCP(uintptr_t handle);
 extern void ydTrayDisconnectIncoming(uintptr_t handle);
@@ -12,9 +13,13 @@ extern void ydTrayDisconnectIncoming(uintptr_t handle);
 #define YD_SHOW 1001
 #define YD_QUIT 1002
 #define YD_MCP 1003
+#define YD_DURATION 1005
+#define YD_DURATION_TIMER 0x5944
 static const wchar_t *YD_PROPERTY = L"YourDeskTrayController";
 typedef struct {
     int incomingConnected;
+    ULONGLONG incomingStarted;
+    HMENU activeMenu;
     int mcpCount;
  int mcpVisible;
     HICON normalIcon, mcpIcon;
@@ -24,6 +29,10 @@ typedef struct {
     UINT taskbarCreated;
     uintptr_t callback;
 } YDTray;
+static void yd_duration_title(YDTray *tray,wchar_t *title,size_t size) {
+ unsigned long long seconds=(GetTickCount64()-tray->incomingStarted)/1000;
+ swprintf(title,size,L"連線時間 %02llu:%02llu:%02llu",seconds/3600,(seconds/60)%60,seconds%60);
+}
 static void yd_show(YDTray *tray) {
     ShowWindow(tray->window, SW_RESTORE);
     SetForegroundWindow(tray->window);
@@ -31,6 +40,13 @@ static void yd_show(YDTray *tray) {
 static LRESULT CALLBACK yd_window_proc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
     YDTray *tray = (YDTray *)GetPropW(window, YD_PROPERTY);
     if (!tray) return DefWindowProcW(window, message, wParam, lParam);
+    if(message==WM_TIMER && wParam==YD_DURATION_TIMER){
+        if(tray->activeMenu && tray->incomingConnected){
+            wchar_t title[80];yd_duration_title(tray,title,80);
+            ModifyMenuW(tray->activeMenu,YD_DURATION,MF_BYCOMMAND|MF_STRING|MF_GRAYED,YD_DURATION,title);
+        }
+        return 0;
+    }
     if (message == WM_CLOSE) { ShowWindow(window, SW_HIDE); return 0; }
     if (message == tray->taskbarCreated) { Shell_NotifyIconW(NIM_ADD, &tray->icon); return 0; }
     if (message == YD_TRAY_MESSAGE) {
@@ -43,9 +59,12 @@ static LRESULT CALLBACK yd_window_proc(HWND window, UINT message, WPARAM wParam,
             if(tray->mcpCount>0)AppendMenuW(menu,MF_STRING,YD_MCP,tray->mcpVisible?L"隱藏 MCP 遠端畫面":L"開啟 MCP 遠端畫面");
             if(tray->incomingConnected)AppendMenuW(menu,MF_STRING,YD_DISCONNECT_INCOMING,L"關閉遠端連線");
             AppendMenuW(menu, MF_SEPARATOR, 0, NULL);
+            if(tray->incomingConnected){wchar_t title[80];yd_duration_title(tray,title,80);AppendMenuW(menu,MF_STRING|MF_GRAYED,YD_DURATION,title);}
+            tray->activeMenu=menu;
             AppendMenuW(menu, MF_STRING, YD_QUIT, L"\u95dc\u9589\u7a0b\u5f0f");
             SetForegroundWindow(window);
             UINT selection = TrackPopupMenu(menu, TPM_RETURNCMD | TPM_RIGHTBUTTON, point.x, point.y, 0, window, NULL);
+            tray->activeMenu=NULL;
             DestroyMenu(menu);
             if (selection == YD_SHOW) yd_show(tray);
             if(selection==YD_DISCONNECT_INCOMING)ydTrayDisconnectIncoming(tray->callback);
@@ -85,6 +104,7 @@ void *yd_tray_install(void *nativeWindow, uintptr_t handle) {
 }
 void yd_tray_remove(void *value) {
     YDTray *tray = (YDTray *)value;
+    KillTimer(tray->window,YD_DURATION_TIMER);
     Shell_NotifyIconW(NIM_DELETE, &tray->icon);
     SetWindowLongPtrW(tray->window, GWLP_WNDPROC, (LONG_PTR)tray->previous);
     RemovePropW(tray->window, YD_PROPERTY);
@@ -145,4 +165,9 @@ void yd_mcp_tray(void *nativeWindow,int count,int notify,int visible){
  if(notify && count>0){update.uFlags=NIF_INFO;update.dwInfoFlags=NIIF_INFO;lstrcpynW(update.szInfoTitle,L"YourDesk · MCP 正在操作",64);lstrcpynW(update.szInfo,L"可從 Tray 選單開啟遠端畫面",256);Shell_NotifyIconW(NIM_MODIFY,&update);}
 }
 
-void yd_incoming_tray(void *window,int connected){YDTray *t=(YDTray*)GetPropW((HWND)window,YD_PROPERTY);if(t)t->incomingConnected=connected;}
+void yd_incoming_tray(void *window,int connected){
+ YDTray *t=(YDTray*)GetPropW((HWND)window,YD_PROPERTY);if(!t)return;
+ if(connected && !t->incomingConnected){t->incomingStarted=GetTickCount64();SetTimer(t->window,YD_DURATION_TIMER,1000,NULL);}
+ if(!connected){KillTimer(t->window,YD_DURATION_TIMER);if(t->activeMenu)DeleteMenu(t->activeMenu,YD_DURATION,MF_BYCOMMAND);}
+ t->incomingConnected=connected;
+}

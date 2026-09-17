@@ -96,6 +96,8 @@ type Preferences struct {
 	MCPWhitelist            []string `json:"mcpWhitelist"`
 	MCPOpenDisplay          bool     `json:"mcpOpenDisplay"`
 	MCPEnabled              bool     `json:"mcpEnabled"`
+	AutoReconnect           bool     `json:"autoReconnect"`
+	CloseWhenIdle           bool     `json:"closeWhenIdle"`
 	CloseWindowOnDisconnect bool     `json:"closeWindowOnDisconnect"`
 	FitWindow               bool     `json:"fitWindow"`
 	SourceFPSLimit          int      `json:"sourceFPSLimit"`
@@ -974,6 +976,10 @@ func (s *server) start(kind, siteID, binary string, args []string) error {
 						case "error":
 							p.failureMessage = event.Message
 							s.notice = event.Message
+						case "reconnecting":
+							p.stage = "reconnecting"
+						case "reconnected":
+							p.stage = "connected"
 						case "disconnected":
 							p.stage = "disconnected"
 						case "authenticated":
@@ -1195,6 +1201,9 @@ func (s *server) viewerBinary() string {
 }
 
 func (p Preferences) validate() error {
+	if p.AutoReconnect && p.CloseWindowOnDisconnect {
+		return errors.New("自動重連與斷線後自動關閉視窗不可同時啟用")
+	}
 	if p.MCPWhitelistEnabled && len(p.MCPWhitelist) == 0 {
 		return errors.New("請至少加入一個允許的 IP 位址")
 	}

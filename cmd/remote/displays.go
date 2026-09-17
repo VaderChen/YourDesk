@@ -2,6 +2,7 @@ package main
 
 import (
 	"runtime"
+	"time"
 	"yourdesk/internal/p2p"
 )
 
@@ -67,6 +68,14 @@ func (g *game) displayInputReady() bool {
 }
 
 func (g *game) sendControl(c p2p.Control) error {
+	down := c.Down
+	if c.RawKey != nil {
+		down = c.RawKey.Down
+	}
+	g.mu.RLock()
+	width, height := g.width, g.height
+	g.mu.RUnlock()
+	g.idleClose.Input(time.Now(), c.Type, c.X*float64(width), c.Y*float64(height), down)
 	c.Platform = runtime.GOOS
 	c.DisableMapping = g.disableKeyMapping
 	if c.RawKey != nil {

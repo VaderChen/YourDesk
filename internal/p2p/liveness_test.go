@@ -54,7 +54,7 @@ func TestLivenessUsesReceiveProgress(t *testing.T) {
 		var flowing, closed atomic.Bool
 		flowing.Store(true)
 		go monitorLiveness(ctx, func() bool { return true }, func(context.Context) error { return errors.New("ping delayed") }, func() { closed.Store(true) }, func() bool { return flowing.Load() })
-		time.Sleep(2 * time.Minute)
+		time.Sleep(time.Minute)
 		synctest.Wait()
 		if closed.Load() {
 			t.Fatal("closed while application data still arrived")
@@ -70,5 +70,57 @@ func TestLivenessUsesReceiveProgress(t *testing.T) {
 		if !closed.Load() {
 			t.Fatal("silent dead connection not closed")
 		}
+	})
+}
+
+// 持續收到零星資料，也不能讓失效控制通道永遠維持 connected。
+func TestLivenessReceiveProgressHasLimit(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		var closed atomic.Bool
+		go monitorLiveness(ctx, func() bool { return true }, func(context.Context) error { return errors.New("no heartbeat") }, func() { closed.Store(true) }, func() bool { return true })
+		time.Sleep(94 * time.Second)
+		synctest.Wait()
+		if closed.Load() {
+			t.Fatal("closed before heartbeat grace expired")
+		}
+		time.Sleep(time.Second)
+		synctest.Wait()
+		if !closed.Load() {
+			t.Fatal("receive traffic masked dead control channel")
+		}
+	})
+}
+
+func TestLivenessHealthyHeartbeatWithoutTraffic(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		go monitorLiveness(ctx, func() bool { return true }, func(context.Context) error { return nil }, func() { t.Error("idle healthy session closed") }, func() bool { return false })
+		time.Sleep(time.Hour)
+		synctest.Wait()
+	})
+}
+
+func TestLivenessBlockedSendStillTimesOut(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		release := make(chan struct{})
+		var calls atomic.Int32
+		var closed atomic.Bool
+		go monitorLiveness(ctx, func() bool { return true }, func(context.Context) error {
+			calls.Add(1)
+			<-release // 模擬底層 Send 忽略 context。
+			return nil
+		}, func() { closed.Store(true) })
+		time.Sleep(45 * time.Second)
+		synctest.Wait()
+		if !closed.Load() || calls.Load() != 1 {
+			t.Fatalf("closed=%v calls=%d", closed.Load(), calls.Load())
+		}
+		close(release)
+		synctest.Wait()
 	})
 }

@@ -16,12 +16,18 @@ func (p *Peer) startLiveness() {
 			go func() {
 				ticker := time.NewTicker(10 * time.Second)
 				defer ticker.Stop()
+				previous := p.trafficSnapshot()
 				for {
 					select {
 					case <-p.Done():
 						authlog.Event("peer_closed", nil)
 						return
 					case <-ticker.C:
+						current := p.trafficSnapshot()
+						if authlog.IsEnabled() {
+							authlog.Event("application-traffic", current.since(previous))
+						}
+						previous = current
 						p.diagnosticTransport()
 					}
 				}
@@ -48,6 +54,8 @@ func (p *Peer) startLiveness() {
 				return err
 			}, func() {
 				slog.Error("P2P 控制通道超過恢復寬限仍無回應，結束失效連線")
+				authlog.Event("heartbeat-failed", nil)
+				authlog.Stacks()
 				_ = p.Close()
 			}, func() bool {
 				_, received := p.TrafficBytes()
@@ -60,6 +68,9 @@ func (p *Peer) startLiveness() {
 }
 
 func monitorLiveness(ctx context.Context, ready func() bool, ping func(context.Context) error, failed func(), progress ...func() bool) {
+	ctx, cancelMonitor := context.WithCancel(ctx)
+	defer cancelMonitor()
+	ping = boundedLivenessPing(ctx, ping)
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 	misses := 0
@@ -98,7 +109,8 @@ func monitorLiveness(ctx context.Context, ready func() bool, ping func(context.C
 			lastProgress = now
 		}
 		slog.Warn("P2P 存活確認失敗", "consecutive", misses, "error", err)
-		if now.Sub(firstFailure) >= 30*time.Second && now.Sub(lastProgress) >= 30*time.Second {
+		// 零星資料不能永遠掩蓋無法往返的控制通道。
+		if now.Sub(firstFailure) >= 90*time.Second || (now.Sub(firstFailure) >= 30*time.Second && now.Sub(lastProgress) >= 30*time.Second) {
 			failed()
 			return
 		}
