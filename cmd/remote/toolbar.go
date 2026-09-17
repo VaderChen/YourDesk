@@ -84,12 +84,10 @@ func (g *game) updateToolbar() (bool, error) {
 	}
 	g.updateQuality()
 	if nativeTitlebarControls() {
-		x, y := ebiten.CursorPosition()
-		px, py := g.finalTransform.Apply(float64(x), float64(y))
+		px, py := g.pointerPosition()
 		return nativeTitlebarPopupOpen() || nativeTitlebarVisible() && px >= 0 && px < float64(g.finalWidth) && py >= 0 && py < 52*g.toolbarScale(), nil
 	}
-	x, y := ebiten.CursorPosition()
-	px, py := g.finalTransform.Apply(float64(x), float64(y))
+	px, py := g.pointerPosition()
 	hovered := -1
 	if ebiten.IsFocused() {
 		for i := 0; i < 7; i++ {

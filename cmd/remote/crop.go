@@ -213,8 +213,7 @@ func (g *game) updateCrop(toolbar bool) bool {
 	if c.streamSize != image.Pt(g.displayedWidth, g.displayedHeight) {
 		g.initializeCrop()
 	}
-	x, y := ebiten.CursorPosition()
-	px, py := g.finalTransform.Apply(float64(x), float64(y))
+	px, py := g.pointerPosition()
 	ox, oy, w, h := g.viewport(g.displayedWidth, g.displayedHeight)
 	p := image.Pt(int(math.Round((px-ox)/w*float64(c.size.X))), int(math.Round((py-oy)/h*float64(c.size.Y))))
 	p.X = max(0, min(c.size.X, p.X))
