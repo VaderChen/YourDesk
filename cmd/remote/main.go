@@ -145,6 +145,7 @@ func (g *game) toggleFullscreen() {
 }
 
 func (g *game) Update() (err error) {
+	pollNativePointer()
 	defer func() {
 		connected := g.peer != nil && !g.disconnected && g.peer.Connected()
 		if err == nil && g.idleClose.Expired(time.Now(), viewerCloseWhenIdle.Load(), connected) {
@@ -312,9 +313,7 @@ func (g *game) Update() (err error) {
 	}
 
 	iw, ih := g.displayedWidth, g.displayedHeight
-	x, y := ebiten.CursorPosition()
-	// 游標由引擎的邏輯座標還原至最終畫布，與實際影像共用像素區域。
-	px, py := g.finalTransform.Apply(float64(x), float64(y))
+	px, py := g.pointerPosition()
 	ox, oy, vw, vh := g.viewport(iw, ih)
 	fx, fy := (px-ox)/vw, (py-oy)/vh
 	inside := ebiten.IsFocused() && !toolbarHandled && iw > 0 && ih > 0 && vw > 0 && vh > 0 && px >= ox && px <= ox+vw && py >= oy && py <= oy+vh && py >= float64(g.toolbarHeight()) && fx >= 0 && fx <= 1 && fy >= 0 && fy <= 1
