@@ -33,7 +33,6 @@ import (
 )
 
 type game struct {
-	inputDiagnostic                           inputDiagnostic
 	connection                                *viewerConnection
 	reconnect                                 *viewerReconnect
 	idleClose                                 idleclose.Monitor
@@ -146,7 +145,6 @@ func (g *game) toggleFullscreen() {
 }
 
 func (g *game) Update() (err error) {
-	defer g.reportInputDiagnostic()
 	pollNativePointer()
 	defer func() {
 		connected := g.peer != nil && !g.disconnected && g.peer.Connected()
