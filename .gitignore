@@ -50,3 +50,5 @@ sites.json
 /android/
 /androidcore/
 /client
+# Release 附加更新重點：只在本機封裝時提供，不提交原始碼。
+/release_*.note
