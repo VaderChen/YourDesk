@@ -25,11 +25,9 @@ import (
 func nativePullSupported() bool { _, err := os.Stat("/sbin/mount_webdav"); return err == nil }
 
 type davReader struct {
-	offer       *pullOffer
-	index       int
-	position    int64
-	cache       []byte
-	cacheOffset int64
+	offer    *pullOffer
+	index    int
+	position int64
 }
 
 func (r *davReader) Read(p []byte) (int, error) {
@@ -39,18 +37,32 @@ func (r *davReader) Read(p []byte) (int, error) {
 	if r.position >= r.offer.entries[r.index].Size {
 		return 0, io.EOF
 	}
-	if len(r.cache) == 0 || r.position < r.cacheOffset || r.position >= r.cacheOffset+int64(len(r.cache)) {
-		r.cache = make([]byte, pullReadSize)
-		r.cacheOffset = r.position
-		n, e := r.offer.read(r.index, r.position, r.cache)
-		if e != nil {
-			return 0, e
-		}
-		r.cache = r.cache[:n]
+	// Finder 所需的小段完成即可交付，不先等待整個 256 KiB 預讀區塊。
+	// 保持單一同步請求與既有傳輸背壓，避免預取增加串流壅塞。
+	if len(p) > 32*1024 {
+		p = p[:32*1024]
 	}
-	n := copy(p, r.cache[r.position-r.cacheOffset:])
+	n, err := r.offer.read(r.index, r.position, p)
 	r.position += int64(n)
-	return n, nil
+	return n, err
+}
+
+// 交付資料後最多每 100 ms 刷出 HTTP 緩衝；不另開 goroutine 操作 writer。
+// 不提供 ReaderFrom，確保 ServeContent 的複製經過 Write。
+type davProgressWriter struct {
+	http.ResponseWriter
+	lastFlush time.Time
+}
+
+func (w *davProgressWriter) Write(p []byte) (int, error) {
+	n, err := w.ResponseWriter.Write(p)
+	if n > 0 && err == nil && time.Since(w.lastFlush) >= 100*time.Millisecond {
+		if f, ok := w.ResponseWriter.(http.Flusher); ok {
+			f.Flush()
+			w.lastFlush = time.Now()
+		}
+	}
+	return n, err
 }
 func (r *davReader) Seek(off int64, whence int) (int64, error) {
 	switch whence {
@@ -188,7 +200,7 @@ func nativePublishOffer(o *pullOffer) error {
 			// 預先提供型態，HEAD／中繼資料查詢不嗅探內容、不啟動傳輸。
 			w.Header().Set("Content-Type", "application/octet-stream")
 			w.Header().Set("ETag", strconv.Quote(o.id+"-"+name))
-			http.ServeContent(w, r, path.Base(name), created, &davReader{offer: o, index: index})
+			http.ServeContent(&davProgressWriter{ResponseWriter: w}, r, path.Base(name), created, &davReader{offer: o, index: index})
 		default:
 			http.Error(w, "唯讀", http.StatusForbidden)
 		}
