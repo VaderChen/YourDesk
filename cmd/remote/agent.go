@@ -107,7 +107,7 @@ func (g *game) agentAction(r agentremote.Request) (out agentremote.Response) {
 		out.Height = h
 		return
 	}
-	if !g.controlEnabled {
+	if !g.controlEnabled || g.systemShortcut != nil {
 		out.Error = "遠端控制已停用，請在遠端顯示中啟用"
 		return
 	}

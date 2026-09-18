@@ -54,10 +54,19 @@ func (g *game) updateToolbar() (bool, error) {
 	selected, count, pending := g.displayStatus()
 	nativeSetDisplays(selected, count, pending)
 	if action := nativeTitlebarAction(); action != 0 {
+		if g.systemShortcut != nil {
+			if action == shortcutLocal || action == shortcutRemote || action == shortcutCancel {
+				g.systemShortcut.decision = action
+			}
+			return true, nil
+		}
 		if action >= 100 {
 			g.selectDisplay(action - 100)
 		}
 		switch action {
+		case 50, 51, 52, 53, 55:
+			g.titlebarSystemShortcut(action)
+			return true, nil
 		case 1:
 			g.mode = viewOriginal
 		case 2:

@@ -30,7 +30,7 @@ button{font:inherit;color:var(--ink);border:0;background:transparent;cursor:defa
 <div class="codec-status"><button id="codec-status" class="icon" data-tip="編碼狀態" aria-label="編碼狀態"><i class="fa" aria-hidden="true">&#xf2db;</i></button></div>
 <div class="fps" tabindex="0" data-tip="畫面增強" aria-label="畫面增強"><b>FPS</b><output id="viewer-fps">0</output></div>
 <div class="traffic" tabindex="0" data-tip="TX 為上傳、RX 為下載；畫面靜止時流量降低屬正常。" aria-label="此連線的傳送與接收速度"><span><b>TX</b><output id="traffic-tx">0.0 KB/s</output></span><span><b>RX</b><output id="traffic-rx">0.0 KB/s</output></span></div>
-<div class="actions"><button class="icon" data-menu="quality" data-tip="畫質：低流量／標準／高畫質" aria-label="畫質" aria-haspopup="menu"><i class="fa" aria-hidden="true">&#xf03e;</i></button><button class="icon" data-menu="scale" data-tip="縮放與全螢幕" aria-label="縮放與全螢幕" aria-haspopup="menu"><i class="fa" aria-hidden="true">&#xf424;</i></button></div>
+<div class="actions"><button class="icon" data-menu="shortcuts" data-tip="系統快捷鍵" aria-label="系統快捷鍵" aria-haspopup="menu"><i class="fa" aria-hidden="true">&#xf11c;</i></button><button class="icon" data-menu="quality" data-tip="畫質：低流量／標準／高畫質" aria-label="畫質" aria-haspopup="menu"><i class="fa" aria-hidden="true">&#xf03e;</i></button><button class="icon" data-menu="scale" data-tip="縮放與全螢幕" aria-label="縮放與全螢幕" aria-haspopup="menu"><i class="fa" aria-hidden="true">&#xf424;</i></button></div>
 </header><script>
  'use strict';
 const bridge=message=>window.windowsTitlebarBridge ? window.windowsTitlebarBridge(message) : window.webkit.messageHandlers.titlebar.postMessage(message);
@@ -52,7 +52,7 @@ document.addEventListener('keydown',event=>{
  if(command&&!event.altKey&&event.key.toLowerCase()==='w')action=5;
  if(mac&&event.metaKey&&!event.ctrlKey&&!event.altKey&&event.key.toLowerCase()==='q')action=13;
  if(!mac&&event.altKey&&!event.ctrlKey&&!event.metaKey&&event.key==='F4')action=5;
- if(action){event.preventDefault();bridge(action);}
+ if(action){event.preventDefault();if(!window.systemShortcutOpen)bridge(action===13?51:(!mac&&event.altKey?52:50));}
 },true);
 document.addEventListener('click',event=>{const button=event.target.closest('button');hideTip();if(!button||button.getAttribute('aria-disabled')==='true')return;if(button.dataset.menu){const r=button.getBoundingClientRect();bridge({menu:button.dataset.menu,x:r.x,y:r.bottom});}else if(button.dataset.action){bridge(Number(button.dataset.action));}});
 window.showCloseConfirmation=()=>{

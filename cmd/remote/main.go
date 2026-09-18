@@ -54,6 +54,7 @@ type game struct {
 	remoteVersion                             atomic.Value
 	windowFit                                 windowFitState
 	localShortcut                             int
+	systemShortcut                            *systemShortcutDialog
 	enhancementIndicatorUntil                 time.Time
 	renderedFrames                            atomic.Uint64
 	lastRenderFrame                           *image.RGBA
@@ -160,6 +161,7 @@ func (g *game) Update() (err error) {
 		select {
 		case <-g.peer.Done():
 			if !g.disconnected {
+				g.cancelSystemShortcut()
 				g.disconnected = true
 				g.releaseRawKeys("遠端連線已結束")
 				g.clipboard.CancelKeys("遠端連線已結束")
@@ -212,12 +214,18 @@ func (g *game) Update() (err error) {
 	if toolbarErr != nil {
 		return toolbarErr
 	}
+	if blocked, err := g.updateSystemShortcut(); blocked {
+		return err
+	}
 	rawInput := g.updateRawKeys()
 	if g.updateCrop(toolbarHandled) {
 		return nil
 	}
 	if action := g.windowShortcut(rawInput); action != 0 {
 		return g.executeWindowShortcut(action)
+	}
+	if g.systemShortcut != nil {
+		return nil
 	}
 	// 此組合鍵由本機處理，不把切換組合鍵傳到遠端。
 	fullscreenKey := ebiten.IsKeyPressed(ebiten.KeyF)

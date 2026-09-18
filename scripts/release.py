@@ -24,6 +24,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DIST = ROOT / 'dist'
 DEFAULT_TARGETS = 'darwin/arm64,windows/x64,windows/arm64,winpe/x64,linux/x64,linux/arm64'
 SUPPORTED_TARGETS = {'darwin/arm64', 'windows/amd64', 'windows/arm64', 'winpe/amd64', 'linux/amd64', 'linux/arm64'}
+RELEASE_NOTE_LANGUAGES = ('zh-Hant', 'en', 'ja', 'ko')
 
 
 def internal_target(target):
@@ -53,6 +54,23 @@ def manifest(folder):
         if item.is_file() and not item.is_symlink() and item.name != 'SHA256SUMS':
             lines.append(f'{hashlib.sha256(item.read_bytes()).hexdigest()}  {item.relative_to(folder)}\n')
     (folder / 'SHA256SUMS').write_text(''.join(lines))
+
+
+def copy_release_notes(release):
+    """每次 Release 將四種語言的使用者更新重點放到資產根目錄。"""
+    for language in RELEASE_NOTE_LANGUAGES:
+        source = ROOT / f'release_{language}.note'
+        if not source.is_file():
+            raise ValueError(f'缺少 {source.name}；每次 Release 必須提供更新重點')
+        lines = [line.strip() for line in source.read_text(encoding='utf-8').splitlines() if line.strip()]
+        if not 1 <= len(lines) <= 3:
+            raise ValueError(f'{source.name} 必須只包含 1 至 3 個更新重點')
+        (release / source.name).write_text('\n'.join(lines) + '\n', encoding='utf-8')
+
+
+def copy_notes_to_folder(folder, release):
+    for language in RELEASE_NOTE_LANGUAGES:
+        shutil.copy2(release / f'release_{language}.note', folder / f'release_{language}.note')
 
 
 def version_name(version):
@@ -163,6 +181,25 @@ def notary_profile():
     if not profile:
         raise ValueError('請設定 YOURDESK_NOTARY_PROFILE，指定本機 Keychain 的公證設定')
     return profile
+
+
+def verify_notary_profile():
+    profile = notary_profile()
+    result = subprocess.run(
+        ['xcrun', 'notarytool', 'history', '--keychain-profile', profile, '--output-format', 'json'],
+        cwd=ROOT, capture_output=True, text=True)
+    if result.returncode == 0:
+        return
+    detail = (result.stderr or result.stdout).strip()
+    if 'No Keychain password item found for profile:' in detail:
+        command = shlex.join(['xcrun', 'notarytool', 'store-credentials', profile])
+        raise ValueError(
+            f'找不到 Keychain 公證設定 {profile!r}，尚未開始建置或清理 dist。\n'
+            f'請在本機終端機執行：\n  {command}\n'
+            '依提示輸入 Apple 公證認證資料並儲存到 Keychain，再重新執行建置。\n'
+            '若已使用其他 profile 名稱，請以 YOURDESK_NOTARY_PROFILE 指定。\n'
+            '詳見 docs/BUILD.md 的「macOS 公證憑證設定」。')
+    raise ValueError(f'Apple 公證設定 {profile!r} 驗證失敗（exit {result.returncode}）：\n{detail}')
 
 
 def notarize(target):
@@ -387,7 +424,7 @@ def build(version, targets):
             environment(target, not target.startswith('linux/'))
     if 'darwin/arm64' in selected:
         signing_identity()
-        capture(['xcrun', 'notarytool', 'history', '--keychain-profile', notary_profile(), '--output-format', 'json'])
+        verify_notary_profile()
     reset_dist()
     with tempfile.TemporaryDirectory(prefix='.yourdesk-build-', dir=DIST) as temporary:
         stage = Path(temporary)
@@ -459,7 +496,10 @@ def windows_installer(folder, stem, version, arch):
     output = folder / (stem + '-setup.exe')
     with tempfile.TemporaryDirectory(prefix='.installer-', dir=folder) as temporary:
         staged = Path(temporary) / output.name
+        marker = Path(temporary) / 'YourDesk.installed'
+        marker.touch()
         run([compiler, '-V2', f'-DPAYLOAD_DIR={folder.resolve()}',
+             f'-DMARKER_FILE={marker.resolve()}',
              f'-DOUTPUT_FILE={staged.resolve()}', f'-DAPP_VERSION={version}',
              f'-DNUMERIC_VERSION={numeric}', f'-DAPP_ARCH={arch}',
              ROOT / 'scripts/windows-installer.nsi'])
@@ -474,6 +514,7 @@ def windows_portable_zip(folder, stem, version):
     programs = ('YourDesk.exe', 'yourdesk-client.exe', 'yourdesk-remote.exe')
     windows_runtime.validate(folder, programs)
     payload = (*programs, *windows_runtime.FFMPEG_DLLS,
+               'release_zh-Hant.note', 'release_en.note', 'release_ja.note', 'release_ko.note',
                'LICENSE.md', 'LICENSE.en.md', 'LICENSE.ja.md', 'LICENSE.ko.md',
                'ThirdPartyLicenses')
     with tempfile.TemporaryDirectory(prefix='yourdesk-portable-') as temporary:
@@ -500,6 +541,7 @@ def windows_portable_zip(folder, stem, version):
 def pack(release, targets=None):
     metadata = json.loads((release / 'release.json').read_text())
     version = metadata['version']
+    copy_release_notes(release)
     selected = list(dict.fromkeys(internal_target(t) for t in (targets if targets is not None else metadata['targets'])))
     if not selected or any(t not in SUPPORTED_TARGETS for t in selected):
         raise ValueError('封裝目標不支援；macOS 僅支援 arm64，請重新建置')
@@ -510,12 +552,15 @@ def pack(release, targets=None):
         if not folder.exists() and legacy != folder and legacy.is_dir() and not legacy.is_symlink():
             legacy.rename(folder)
         write_instructions(folder, system, version)
+        copy_notes_to_folder(folder, release)
         stem = f'YourDesk-{version_name(version)}-{folder.name}'
         if system == 'darwin':
             with tempfile.TemporaryDirectory(prefix='yourdesk-dmg-') as temporary:
                 stage = Path(temporary)
                 app = stage / 'YourDesk.app'
                 shutil.copytree(folder / 'YourDesk.app', app)
+                for language in RELEASE_NOTE_LANGUAGES:
+                    shutil.copy2(folder / f'release_{language}.note', app / 'Contents' / 'Resources' / f'release_{language}.note')
                 shutil.copy2(folder / 'README.txt', stage / 'README.txt')
                 copy_project_licenses(stage)
                 identity = signing_identity()

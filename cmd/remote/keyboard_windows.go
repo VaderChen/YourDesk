@@ -14,6 +14,10 @@ import (
 
 var rawOnce sync.Once
 var rawEnabled, rawReady atomic.Bool
+var rawShortcutGuard atomic.Bool
+
+func nativeSystemShortcutGuard(enabled bool) { rawShortcutGuard.Store(enabled) }
+
 var rawMu sync.Mutex
 var rawQueue []rawkey.Event
 var rawHookCallback uintptr
@@ -40,6 +44,22 @@ func startRawHook() {
 				pass := func() uintptr { v, _, _ := next.Call(0, uintptr(code), wparam, lparam); return v }
 				if code < 0 {
 					return pass()
+				}
+				// 原生對話框建立及放鍵等待期間，也不能讓重複快捷鍵落到本機。
+				if rawShortcutGuard.Load() {
+					hwnd, _, _ := foreground.Call()
+					var pid uint32
+					process.Call(hwnd, uintptr(unsafe.Pointer(&pid)))
+					e := (*struct {
+						VK, Scan, Flags, Time uint32
+						Extra                 uintptr
+					})(unsafe.Pointer(lparam))
+					ctrl, _, _ := asyncState.Call(0x11)
+					shift, _, _ := asyncState.Call(0x10)
+					if pid == uint32(os.Getpid()) && e.Flags&0x10 == 0 &&
+						(e.VK == 0x73 && e.Flags&0x20 != 0 || e.VK == 0x57 && ctrl&0x8000 != 0 || e.VK == 0x1b && ctrl&0x8000 != 0 && shift&0x8000 != 0) {
+						return 1
+					}
 				}
 				if !rawEnabled.Load() || nativeTitlebarPopupOpen() {
 					clear(held[:])
@@ -152,4 +172,25 @@ func captureRawKeys(enabled bool) []rawkey.Event {
 	result := rawQueue
 	rawQueue = nil
 	return result
+}
+
+func nativeSystemShortcutReleased(key string, mods uint64) bool {
+	keys := []uintptr{map[string]uintptr{"q": 0x51, "w": 0x57, "f4": 0x73, "escape": 0x1b, "delete": 0x2e}[key]}
+	for _, m := range []struct {
+		bit uint64
+		vk  uintptr
+	}{{1, 0x10}, {2, 0x11}, {4, 0x12}, {8, 0x5b}, {8, 0x5c}} {
+		if mods&m.bit != 0 {
+			keys = append(keys, m.vk)
+		}
+	}
+	for _, vk := range keys {
+		if vk != 0 {
+			value, _, _ := keyboardDLL.NewProc("GetAsyncKeyState").Call(vk)
+			if value&0x8000 != 0 {
+				return false
+			}
+		}
+	}
+	return true
 }

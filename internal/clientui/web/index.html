@@ -55,7 +55,7 @@
             <div class="preference-row"><label for="ui-key-mapping">MacOS/Windows 按鍵映射</label><input id="ui-key-mapping" class="preference-switch" type="checkbox" role="switch" checked></div>
             <div class="preference-row" data-tooltip="調整視窗大小，完整顯示遠端畫面；全螢幕不受影響。"><label for="ui-fit-window">調整畫面滿版</label><input id="ui-fit-window" class="preference-switch" type="checkbox" role="switch"></div>
             <div class="preference-row" data-tooltip="斷線後自動關閉桌面或命令列視窗；關閉時保留畫面與輸出。"><label for="ui-close-on-disconnect">斷線後自動關閉視窗</label><input id="ui-close-on-disconnect" class="preference-switch" type="checkbox" role="switch"></div>
-            <div class="preference-row" data-tooltip="實驗功能：斷線後保留視窗並在背景重連，連續失敗三次才關閉。與斷線後自動關閉視窗互斥。"><label for="ui-auto-reconnect">斷線後自動重連（實驗功能）</label><input id="ui-auto-reconnect" class="preference-switch" type="checkbox" role="switch"></div>
+            <div class="preference-row" data-tooltip="斷線後保留視窗並在背景重連，連續失敗三次才關閉。與斷線後自動關閉視窗互斥。"><label for="ui-auto-reconnect"><span>斷線後自動重連</span> <span class="experimental-badge">實驗性功能</span></label><input id="ui-auto-reconnect" class="preference-switch" type="checkbox" role="switch"></div>
             <div class="preference-row" data-tooltip="啟用後，遠端桌面連續 15 分鐘沒有滑鼠或鍵盤操作就關閉連線與視窗；心跳與畫面更新不算操作。"><label for="ui-close-when-idle">長時間未操作自動關閉</label><input id="ui-close-when-idle" class="preference-switch" type="checkbox" role="switch"></div>
           </section>
           <section id="settings-panel-security" role="tabpanel" aria-labelledby="settings-tab-security" tabindex="0" hidden>
@@ -134,6 +134,7 @@
 <dialog id="release-dialog" aria-labelledby="release-title">
  <div class="modal-heading"><h2 id="release-title">發現新版本</h2><button type="button" class="icon-button" id="release-close" aria-label="關閉">×</button></div>
  <p id="release-version"></p>
+ <ul id="release-notes" hidden></ul>
  <p id="release-status" role="status" aria-live="polite"></p>
  <div id="release-progress-area" hidden><progress id="release-progress" max="100" value="0" aria-label="下載進度"></progress><p id="release-progress-label" data-no-i18n></p></div>
  <p id="release-path" data-no-i18n></p>

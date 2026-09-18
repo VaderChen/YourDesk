@@ -4,6 +4,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"yourdesk/internal/p2p"
 	"yourdesk/internal/rawkey"
+	"yourdesk/internal/shortcut"
 )
 
 func (g *game) releaseRawKeys(reason string) {
@@ -40,6 +41,10 @@ func (g *game) updateRawKeys() bool {
 			continue
 		}
 		if event.Down && !event.Repeat {
+			if request, ok := shortcut.Match(event.Platform, rawkey.Name(event.Platform, event.Code), event.Modifiers); ok {
+				g.beginSystemShortcut(request)
+				break
+			}
 			if action := localWindowShortcut(event.Platform, rawkey.Name(event.Platform, event.Code), event.Modifiers); action != 0 {
 				g.localShortcut = action
 				g.releaseRawKeys("本機視窗快捷鍵")

@@ -158,7 +158,7 @@ func runWindowsTitlebar() {
 		switch message.Action {
 		case 7, 8, 9:
 			C.yd_win_command(C.int(message.Action))
-		case 1, 2, 3, 4, 5, 6, 10, 11, 12, 13, 14, 16, 17:
+		case 1, 2, 3, 4, 5, 6, 10, 11, 12, 13, 14, 16, 17, 40, 41, 42, 50, 51, 52, 53, 55:
 			C.yd_win_command(0)
 			select {
 			case winChrome.actions <- message.Action:
@@ -351,6 +351,18 @@ func nativeShowCloseConfirmation() {
 	windowsDispatch(func(w webview.WebView) { w.Eval("window.showCloseConfirmation()") })
 }
 
+func nativeShowSystemShortcut(label string, secure, remote bool) bool {
+	if !winChrome.ready.Load() {
+		return false
+	}
+	data, _ := json.Marshal(map[string]any{"label": label, "secure": secure, "remoteAvailable": remote})
+	windowsDispatch(func(w webview.WebView) { w.Eval("window.showSystemShortcut(" + string(data) + ")") })
+	return true
+}
+func nativeCancelSystemShortcut() {
+	windowsDispatch(func(w webview.WebView) { w.Eval("window.closeWindowsPopup()") })
+}
+
 // 系統選單直接浮在桌面上，不受 WebView 背景與裁切區限制。
 func showWindowsNativeMenu(message windowsTitlebarMessage) {
 	winChrome.mu.Lock()
@@ -377,6 +389,11 @@ func showWindowsNativeMenu(message windowsTitlebarMessage) {
 		C.yd_win_menu_add(menu, value, C.int(action), C.int(mark))
 	}
 	switch message.NativeMenu {
+	case "shortcuts":
+		add("Ctrl+W", 50, false)
+		add("Alt+F4", 52, false)
+		add("Ctrl+Shift+Esc", 53, false)
+		add("Ctrl+Alt+Del", 55, false)
 	case "quality":
 		for i, label := range []string{"低流量", "標準", "高畫質"} {
 			add(text(label), 10+i, state.Quality == i)

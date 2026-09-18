@@ -20,6 +20,7 @@ import (
 
 const updateInterval = 12 * time.Hour
 const maxUpdateSize int64 = 2 << 30
+const installerMarker = "YourDesk.installed"
 
 type releaseAsset struct {
 	Name   string `json:"name"`
@@ -28,19 +29,22 @@ type releaseAsset struct {
 	Digest string `json:"digest"`
 }
 type updateStatus struct {
-	InstallAt       int64        `json:"installAt"`
-	Available       bool         `json:"available"`
-	Version         string       `json:"version"`
-	Message         string       `json:"message"`
-	CheckedAt       time.Time    `json:"checkedAt"`
-	NotifiedVersion string       `json:"notifiedVersion"`
-	Asset           releaseAsset `json:"asset"`
-	Downloading     bool         `json:"downloading"`
-	DownloadBytes   int64        `json:"downloadBytes"`
-	DownloadPath    string       `json:"downloadPath"`
-	DownloadError   string       `json:"downloadError"`
-	OpenError       string       `json:"openError"`
-	Opening         bool         `json:"opening"`
+	InstallAt       int64               `json:"installAt"`
+	Available       bool                `json:"available"`
+	Version         string              `json:"version"`
+	Message         string              `json:"message"`
+	CheckedAt       time.Time           `json:"checkedAt"`
+	NotifiedVersion string              `json:"notifiedVersion"`
+	Asset           releaseAsset        `json:"asset"`
+	Notes           map[string][]string `json:"notes,omitempty"`
+	ShowNotes       bool                `json:"showNotes,omitempty"`
+	NotesTest       bool                `json:"notesTest,omitempty"`
+	Downloading     bool                `json:"downloading"`
+	DownloadBytes   int64               `json:"downloadBytes"`
+	DownloadPath    string              `json:"downloadPath"`
+	DownloadError   string              `json:"downloadError"`
+	OpenError       string              `json:"openError"`
+	Opening         bool                `json:"opening"`
 }
 type updateManager struct {
 	decision    chan bool
@@ -58,6 +62,16 @@ func newUpdateManager(ctx context.Context, dir string) *updateManager {
 	u := &updateManager{ctx: ctx, path: filepath.Join(dir, "updates.json"), notify: make(chan struct{}, 1)}
 	// 本機啟動器每次從下載前開始，且不讀寫正式更新紀錄。
 	u.forceUpdate = os.Getenv("YOURDESK_TEST_UPDATE") == "1"
+	if os.Getenv("YOURDESK_TEST_UPDATE_NOTES") == "1" {
+		u.forceUpdate = true
+		u.state = updateStatus{
+			Version:   currentVersion(),
+			Notes:     map[string][]string{"zh-Hant": {"這是更新完成後顯示的更新重點。", "最多顯示三項內容。"}, "en": {"These highlights appear after the update completes.", "Up to three items are shown."}, "ja": {"更新完了後に表示される更新内容です。", "最大3項目を表示します。"}, "ko": {"업데이트 완료 후 표시되는 주요 내용입니다.", "최대 3개 항목을 표시합니다."}},
+			ShowNotes: true,
+			NotesTest: true,
+		}
+		return u
+	}
 	if u.forceUpdate {
 		return u
 	}
@@ -67,6 +81,7 @@ func newUpdateManager(ctx context.Context, dir string) *updateManager {
 			u.state = updateStatus{}
 		}
 	}
+	localNotes := readLocalReleaseNotes()
 	u.state.Downloading = false
 	u.state.InstallAt = 0
 	u.state.Opening = false
@@ -75,9 +90,41 @@ func newUpdateManager(ctx context.Context, dir string) *updateManager {
 	} else {
 		u.state.DownloadBytes = u.state.Asset.Size
 	}
-	// 安裝新版本後，不再沿用舊版本的可更新狀態。
+	// 安裝新版本後，將上一版下載的更新重點留給新版首次啟動顯示一次。
+	showNotes := u.state.Available && versionKey(u.state.Version) == versionKey(currentVersion()) && (len(localNotes) > 0 || len(u.state.Notes) > 0)
+	if showNotes && len(localNotes) > 0 {
+		u.state.Notes = localNotes
+	}
 	u.state.Available = versionKey(u.state.Version) != "" && versionKey(currentVersion()) != "" && versionKey(u.state.Version) > versionKey(currentVersion())
+	u.state.ShowNotes = showNotes
 	return u
+}
+
+func readLocalReleaseNotes() map[string][]string {
+	executable, err := os.Executable()
+	if err != nil {
+		return nil
+	}
+	notes := make(map[string][]string)
+	for _, language := range []string{"zh-Hant", "en", "ja", "ko"} {
+		for _, dir := range []string{filepath.Dir(executable), filepath.Join(filepath.Dir(executable), "..", "Resources")} {
+			data, err := os.ReadFile(filepath.Join(dir, "release_"+language+".note"))
+			if err != nil {
+				continue
+			}
+			for _, line := range strings.Split(string(data), "\n") {
+				line = strings.TrimSpace(line)
+				if line != "" && len(notes[language]) < 3 {
+					notes[language] = append(notes[language], line)
+				}
+			}
+			break
+		}
+	}
+	if len(notes) == 0 {
+		return nil
+	}
+	return notes
 }
 func (u *updateManager) snapshot() updateStatus { u.mu.Lock(); defer u.mu.Unlock(); return u.state }
 func (u *updateManager) saveLocked() {
@@ -199,8 +246,17 @@ func fetchRelease(ctx context.Context) (updateStatus, error) {
 	if result.Available {
 		result.Message = "發現新版本，可前往下載。"
 	}
+	if result.Available {
+		result.Notes = fetchReleaseNotes(ctx, release.Assets)
+	}
 	system := runtime.GOOS
+	// Windows 安裝版與 Portable 版必須更新到同一種封裝；安裝版由
+	// 安裝目錄內的空識別檔判斷。x64 Portable 沒有安裝程式標記，選 ZIP。
+	installer := runningFromInstaller()
 	extensions := []string{"-setup.exe", ".zip"}
+	if system == "windows" && runtime.GOARCH == "amd64" && !installer {
+		extensions = []string{".zip", "-setup.exe"}
+	}
 	if system == "darwin" {
 		system = "macos"
 		extensions = []string{".dmg"}
@@ -231,6 +287,53 @@ func fetchRelease(ctx context.Context) (updateStatus, error) {
 		result.Message = "新版尚未提供此系統的安裝包。"
 	}
 	return result, nil
+}
+
+func fetchReleaseNotes(ctx context.Context, assets []releaseAsset) map[string][]string {
+	notes := make(map[string][]string)
+	for _, language := range []string{"zh-Hant", "en", "ja", "ko"} {
+		name := "release_" + language + ".note"
+		for _, asset := range assets {
+			if asset.Name != name || !validReleaseAsset(asset) || asset.Size > 64*1024 {
+				continue
+			}
+			request, err := http.NewRequestWithContext(ctx, "GET", asset.URL, nil)
+			if err != nil {
+				break
+			}
+			request.Header.Set("User-Agent", "YourDesk")
+			response, err := (&http.Client{Timeout: 8 * time.Second}).Do(request)
+			if err != nil {
+				break
+			}
+			data, readErr := io.ReadAll(io.LimitReader(response.Body, 64*1024+1))
+			response.Body.Close()
+			if readErr != nil || response.StatusCode != http.StatusOK || int64(len(data)) > 64*1024 {
+				break
+			}
+			lines := make([]string, 0, 3)
+			for _, line := range strings.Split(string(data), "\n") {
+				line = strings.TrimSpace(line)
+				if line != "" && len(lines) < 3 {
+					lines = append(lines, line)
+				}
+			}
+			if len(lines) > 0 {
+				notes[language] = lines
+			}
+			break
+		}
+	}
+	return notes
+}
+
+func runningFromInstaller() bool {
+	executable, err := os.Executable()
+	if err != nil {
+		return false
+	}
+	info, err := os.Stat(filepath.Join(filepath.Dir(executable), installerMarker))
+	return err == nil && info.Mode().IsRegular()
 }
 func validReleaseAsset(asset releaseAsset) bool {
 	parsed, err := url.Parse(asset.URL)
@@ -469,6 +572,14 @@ func (s *server) handleUpdates(w http.ResponseWriter, r *http.Request) bool {
 		s.updater.saveLocked()
 		s.updater.mu.Unlock()
 		respond(w, 200, map[string]bool{"ok": true})
+	case r.URL.Path == "/api/updates/notes/ack" && r.Method == "POST":
+		s.updater.mu.Lock()
+		s.updater.state.Notes = nil
+		s.updater.state.ShowNotes = false
+		s.updater.saveLocked()
+		s.updater.mu.Unlock()
+		removeLocalReleaseNotes()
+		respond(w, 200, map[string]bool{"ok": true})
 	case r.URL.Path == "/api/updates/install-now" && r.Method == "POST":
 		s.updater.mu.Lock()
 		if s.updater.decision != nil {
@@ -512,4 +623,16 @@ func (s *server) handleUpdates(w http.ResponseWriter, r *http.Request) bool {
 		return false
 	}
 	return true
+}
+
+func removeLocalReleaseNotes() {
+	executable, err := os.Executable()
+	if err != nil {
+		return
+	}
+	for _, dir := range []string{filepath.Dir(executable), filepath.Join(filepath.Dir(executable), "..", "Resources")} {
+		for _, language := range []string{"zh-Hant", "en", "ja", "ko"} {
+			_ = os.Remove(filepath.Join(dir, "release_"+language+".note"))
+		}
+	}
 }

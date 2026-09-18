@@ -8,6 +8,8 @@ int yd_fullscreen_requested(void);
 void yd_toggle_fullscreen(void);
 int yd_fullscreen_transitioning(void);
 void yd_confirm_crop(void);
+void yd_system_shortcut(const char *label, int secure, int remote);
+void yd_cancel_system_shortcut(void);
 void yd_set_crop(int state, const char *message);
 int yd_titlebar_overlay(void);
 int yd_titlebar_visible(void);
@@ -106,3 +108,19 @@ func nativeSetCrop(state int, message string) {
 }
 
 func nativeConfirmCrop() { C.yd_confirm_crop() }
+
+func nativeShowSystemShortcut(label string, secure, remote bool) bool {
+	value := C.CString(label)
+	defer C.free(unsafe.Pointer(value))
+	flag := C.int(0)
+	if secure {
+		flag = 1
+	}
+	available := C.int(0)
+	if remote {
+		available = 1
+	}
+	C.yd_system_shortcut(value, flag, available)
+	return true
+}
+func nativeCancelSystemShortcut() { C.yd_cancel_system_shortcut() }

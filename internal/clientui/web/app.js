@@ -1165,13 +1165,21 @@ $('#import-config-file').addEventListener('change', async event => {
 let releaseShown = '';
 function renderRelease(value, manual=false) {
  if (!value) return;
+ // 更新重點是更新完成後的結果；與版本通知同時存在時，優先顯示更新重點。
+ if (value.showNotes || value.notesTest) value = {...value, available:false, installAt:0, downloading:false, opening:false, downloadPath:''};
+ $('#check-update').disabled = !!value.notesTest;
  const dialog=$('#release-dialog');
  const pending=value.available && value.version!==value.notifiedVersion && value.version!==releaseShown;
- if ((pending || (manual && value.available)) && !dialog.open && !document.querySelector('dialog[open]')) {
+ if ((pending || value.showNotes || (manual && value.available)) && !dialog.open && !document.querySelector('dialog[open]')) {
   releaseShown=value.version;openDialog('#release-dialog');
   api('updates/ack','POST',{version:value.version}).catch(()=>{releaseShown='';});
  }
  $('#release-version').textContent=value.version || '';
+ const noteLanguage = i18n.preference === 'auto' ? ({'zh-Hant':'zh-Hant',en:'en',ja:'ja',ko:'ko'}[document.documentElement.lang] || 'en') : i18n.preference;
+ const notes = value.showNotes ? (value.notes?.[noteLanguage] || value.notes?.en || value.notes?.['zh-Hant'] || []) : [];
+ const notesElement = $('#release-notes');
+ notesElement.replaceChildren(...notes.slice(0,3).map(note => text('li', note)));
+ notesElement.hidden = notes.length === 0;
  const busy=value.downloading || value.opening;
  const countdown=Number(value.installAt)>0;
  if(countdown && !dialog.open) openDialog('#release-dialog');
@@ -1190,7 +1198,7 @@ function renderRelease(value, manual=false) {
  $('#release-progress').setAttribute('aria-valuetext',progressText);
  const openingLabel='正在準備自動安裝…';
  const label=value.downloading?downloadLabel:value.opening?openingLabel:countdown?'立即更新':value.downloadPath?'開始更新':'下載並自動更新';
- $('#release-title').textContent=i18n.t(value.downloadPath?'下載完成':'發現新版本');
+ $('#release-title').textContent=i18n.t(value.showNotes?'更新重點':value.downloadPath?'下載完成':value.available?'發現新版本':'');
  const message=value.downloading?downloadLabel:value.opening?openingLabel:value.downloadError || value.openError || (value.available && value.asset?.browser_download_url?'下載完成後將自動關閉程式、安裝新版並重新啟動。遠端連線會中斷。':value.message);
  $('#release-status').classList.toggle('update-countdown',countdown);
  $('#release-status').textContent=countdown?i18n.t('即將自動更新，可按取消。')+' '+Math.max(0,Math.ceil((Number(value.installAt)-Date.now())/1000))+' s':i18n.t(message || '');
@@ -1212,6 +1220,7 @@ $('#release-download').addEventListener('click',()=>action(async()=>{
  await downloadUpdate();
 }));
 async function cancelUpdateCountdown(){
+ if(state?.updates?.showNotes) await api('updates/notes/ack','POST').catch(()=>{});
  await api('updates/cancel','POST');
  if(state?.updates)state.updates.installAt=0;
  $('#release-dialog').close();
