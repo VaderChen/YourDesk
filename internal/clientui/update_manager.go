@@ -585,6 +585,7 @@ func (s *server) handleUpdates(w http.ResponseWriter, r *http.Request) bool {
 		s.updater.state.Notes = nil
 		s.updater.state.NotesVersion = ""
 		s.updater.state.ShowNotes = false
+		s.updater.state.NotesTest = false
 		s.updater.saveLocked()
 		s.updater.mu.Unlock()
 		respond(w, 200, map[string]bool{"ok": true})

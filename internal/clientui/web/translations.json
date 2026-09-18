@@ -1,4 +1,5 @@
 {
+ "確定": ["OK", "OK", "확인"],
  "遠端桌面已連線": ["Remote desktop connected", "リモートデスクトップ接続済み", "원격 데스크톱 연결됨"],
  "遠端桌面連線中": ["Connecting to remote desktop", "リモートデスクトップに接続中", "원격 데스크톱 연결 중"],
  "顯示站台 QR Code": ["Show site QR code", "サイトの QR コードを表示", "사이트 QR 코드 표시"],
