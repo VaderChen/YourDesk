@@ -41,4 +41,6 @@ func nativeSetEnhancementStatus(enhancementDisplayStatus) {}
 
 func nativeSetCrop(int, string) {}
 
-func nativeConfirmCrop() {}
+func nativeConfirmCrop()                               {}
+func nativeShowSystemShortcut(string, bool, bool) bool { return false }
+func nativeCancelSystemShortcut()                      {}

@@ -58,9 +58,29 @@ YOURDESK_VERSION='1.26.0908 build 1800' ./pack.command --no-build
 
 未指定簽章身分時優先選擇 Keychain 的 Developer ID Application；找不到時停止建置，不退回 ad-hoc。固定 Developer ID 可讓 macOS 依簽章身分辨識更新版本；buildMac.command 的 App 與 pack.command 的 DMG 均必須完成 Apple 公證、附加並驗證票根與 Gatekeeper 評估；任一步驟失敗即停止。Windows 安裝程式及執行檔目前未做 Authenticode 簽章。
 
+## macOS 公證憑證設定
+
+若出現 `No Keychain password item found for profile`，表示目前使用者的 Keychain 找不到指定名稱的公證設定；Developer ID 簽章憑證與公證登入設定是兩件事。建置會在編譯及清理 `dist` 前停止。
+
+在本機終端機建立設定（將 `PROFILE_NAME` 換成錯誤訊息中的名稱）：
+
+```sh
+xcrun notarytool store-credentials 'PROFILE_NAME'
+```
+
+依互動提示輸入 Apple ID、Team ID 與 app 專用密碼；app 專用密碼可在 [Apple 帳號管理](https://account.apple.com/) 建立。認證資料只存入本機 Keychain，不要寫入專案或聊天內容。若已有其他名稱的設定，可直接使用該名稱：
+
+```sh
+YOURDESK_NOTARY_PROFILE='PROFILE_NAME' ./buildMac.command
+```
+
+公證憑證不存在、Apple 驗證失敗或網路異常時，均維持停止建置，不跳過公證。
+
 ## 輸出與啟動
 
 `dist/` 直接保存 `macos-arm64/`、`windows-x64/`、`windows-arm64/`、`winpe-x64/` 平台目錄，以及 release.json 與 SHA256SUMS，不再建立版本號子目錄。版本仍記錄於 release.json、應用程式及安裝包檔名。buildMac.command／buildWin.command／buildLinux.command 與預設 pack.command 會先清空專案的 dist，再於暫存目錄建置，成功後才發布產物。pack.command --no-build 依 dist/release.json 封裝現有產物，不清空 dist；若另指定 YOURDESK_VERSION，必須與現有版本一致。舊版版本子目錄需重新建置一次。清理會拒絕符號連結或非預期的 dist 路徑。對應本機平台的執行檔同步放入 bin。
+
+每次 Release 前須更新專案根目錄的 `release_zh-Hant.note`、`release_en.note`、`release_ja.note`、`release_ko.note`。每個檔案只放 1 至 3 行面向使用者的簡短更新重點；`pack` 會驗證並將它們放入 Release 資產。新版首次啟動時顯示對應語言的重點，確認後會清除本機暫存內容。
 
 macOS 開啟 YourDesk.app；Windows 開啟 YourDesk.exe（需 WebView2 Runtime）。入口會啟動同目錄的 yourdesk-client，Client 再管理 遠端顯示；關閉視窗仍常駐 Tray，從 Tray 選單結束程式。
 

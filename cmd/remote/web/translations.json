@@ -675,5 +675,31 @@
     "No new region frame yet; use Restore to retry",
     "新しい領域のフレームが届きません。復元で再試行できます",
     "새 영역 프레임이 아직 없습니다. 복원으로 다시 시도하세요"
+  ],
+  "遠端目前無法接受輸入。": ["The remote computer cannot accept input right now.", "リモートは現在入力を受け付けられません。", "현재 원격 컴퓨터가 입력을 받을 수 없습니다."],
+  "系統快捷鍵": [
+    "System shortcuts",
+    "システムショートカット",
+    "시스템 단축키"
+  ],
+  "快捷鍵要作用在哪裡？": [
+    "Where should this shortcut run?",
+    "ショートカットをどこで実行しますか？",
+    "단축키를 어디에서 실행할까요?"
+  ],
+  "本機": [
+    "Local",
+    "このコンピュータ",
+    "로컬"
+  ],
+  "遠端": [
+    "Remote",
+    "リモート",
+    "원격"
+  ],
+  "Windows 會直接處理實體 Ctrl+Alt+Del，APP 無法先攔截；目前也不支援遠端傳送這組安全快捷鍵。": [
+    "Windows handles physical Ctrl+Alt+Del directly, before this app can intercept it. Sending this secure shortcut remotely is not currently supported.",
+    "物理キーの Ctrl+Alt+Del は Windows が直接処理するため、このアプリで事前に捕捉できません。このセキュリティ用ショートカットのリモート送信にも現在対応していません。",
+    "실제 Ctrl+Alt+Del은 앱이 가로채기 전에 Windows가 직접 처리합니다. 이 보안 단축키의 원격 전송도 현재 지원하지 않습니다."
   ]
 }

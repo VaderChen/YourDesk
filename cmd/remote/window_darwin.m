@@ -113,6 +113,10 @@ static void ydUpdateTitlebar(void) {
         [menu addItem:[NSMenuItem separatorItem]];
         BOOL fullscreen = atomic_load(&fullscreenActive);
         addItem(fullscreen ? @"離開全螢幕" : @"進入全螢幕", 4, fullscreen, YES);
+    } else if ([body[@"menu"] isEqual:@"shortcuts"]) {
+        addItem(@"Cmd+Q",51,NO,YES);
+        addItem(@"Cmd+W",50,NO,YES);
+        addItem(@"Ctrl+Alt+Del",55,NO,YES);
     } else if ([body[@"menu"] isEqual:@"display"]) {
         int count = atomic_load(&displayCount), selected = atomic_load(&displayIndex);
         for (int i = 0; i < count; i++) {
@@ -242,7 +246,7 @@ static void ydUpdateTitlebar(void) {
     }
     if (action == 7) [titlebarWeb.window miniaturize:nil];
     else if (action >= 100 && action < 104 && action-100 < atomic_load(&displayCount) && !atomic_load(&displayPending)) atomic_store(&titlebarAction, action);
-    else if ((action >= 1 && action <= 6) || action==13 || action==14 ) atomic_store(&titlebarAction, action);
+    else if ((action >= 1 && action <= 6) || action==13 || action==14 || action==50 || action==51 || action==52 || action==53 || action==55) atomic_store(&titlebarAction, action);
     // 按下 HTML 按鈕後，鍵盤焦點交還遠端畫布。
     [titlebarWeb.window makeFirstResponder:titlebarWeb.window.contentView];
 }
@@ -509,6 +513,59 @@ void yd_show_close_confirmation(void) {
  dispatch_async(dispatch_get_main_queue(), ^{
   if (titlebarLoaded && titlebarWeb.window.visible)
    [titlebarWeb evaluateJavaScript:@"window.showCloseConfirmation()" completionHandler:nil];
+ });
+}
+
+static NSAlert *systemShortcutAlert;
+void yd_system_shortcut(const char *label, int secure, int remote) {
+ NSString *key=[[NSString alloc] initWithUTF8String:label];
+ dispatch_async(dispatch_get_main_queue(), ^{
+  NSWindow *parent=titlebarWeb.window ?: NSApp.keyWindow;
+  if(!parent || systemShortcutAlert){atomic_store(&titlebarAction,42);return;}
+  NSAlert *alert=[[NSAlert alloc] init];systemShortcutAlert=alert;
+  alert.messageText=ydText(@"快捷鍵要作用在哪裡？");
+  NSString *message=secure ? ydText(@"Windows 會直接處理實體 Ctrl+Alt+Del，APP 無法先攔截；目前也不支援遠端傳送這組安全快捷鍵。") : @"";
+  if(!secure && !remote)message=ydText(@"遠端目前無法接受輸入。");
+  alert.informativeText=message.length ? [NSString stringWithFormat:@"%@\n\n%@",key,message] : key;
+  [alert addButtonWithTitle:ydText(@"取消")];
+  [alert addButtonWithTitle:ydText(@"本機")];
+  [alert addButtonWithTitle:ydText(@"遠端")];
+  alert.buttons[1].enabled=!secure;alert.buttons[2].enabled=!secure && remote;
+  NSButton *defaultButton=alert.buttons[2].enabled ? alert.buttons[2] : alert.buttons[0];
+  for(NSButton *button in alert.buttons)button.keyEquivalent=button==defaultButton ? @"\r" : @"";
+  alert.window.defaultButtonCell=defaultButton.cell;
+  alert.window.initialFirstResponder=defaultButton;
+  // 保留原生提示文字排版，僅將開頭的快捷鍵標示為紅色。
+  [alert layout];
+  NSMutableArray<NSView *> *views=[NSMutableArray arrayWithObject:alert.window.contentView];
+  while(views.count){
+   NSView *view=views.lastObject;[views removeLastObject];
+   if([view isKindOfClass:[NSTextField class]] && [((NSTextField *)view).stringValue isEqualToString:alert.informativeText]){
+    NSTextField *field=(NSTextField *)view;
+    NSMutableAttributedString *text=[field.attributedStringValue mutableCopy];
+    [text addAttribute:NSForegroundColorAttributeName value:NSColor.systemRedColor range:NSMakeRange(0,key.length)];
+    field.attributedStringValue=text;[text release];break;
+   }
+   [views addObjectsFromArray:view.subviews];
+  }
+  // 對話框開啟時，第二次 Cmd+Q/W 也不能繞過選擇直接關閉 APP。
+  id monitor=[NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown handler:^NSEvent *(NSEvent *event){
+   if(event.keyCode==53){[parent endSheet:alert.window returnCode:NSAlertFirstButtonReturn];return nil;}
+   if((event.modifierFlags & NSEventModifierFlagCommand) && (event.keyCode==12 || event.keyCode==13))return nil;
+   return event;
+  }];
+  yd_keyboard_suspend(1);
+  [alert beginSheetModalForWindow:parent completionHandler:^(NSModalResponse response){
+   [NSEvent removeMonitor:monitor];yd_keyboard_suspend(0);
+   if(systemShortcutAlert==alert){systemShortcutAlert=nil;atomic_store(&titlebarAction,response==NSAlertSecondButtonReturn?40:response==NSAlertThirdButtonReturn?41:42);}
+   [parent makeFirstResponder:parent.contentView];[alert release];
+  }];
+ });
+ [key release];
+}
+void yd_cancel_system_shortcut(void) {
+ dispatch_async(dispatch_get_main_queue(), ^{
+  if(systemShortcutAlert){NSAlert *alert=systemShortcutAlert;systemShortcutAlert=nil;[alert.window.sheetParent endSheet:alert.window returnCode:NSAlertFirstButtonReturn];}
  });
 }
 

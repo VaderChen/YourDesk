@@ -328,6 +328,8 @@ dialog .remember-row input { display: inline-block; width: 16px; height: 16px; m
 @media(prefers-reduced-motion:reduce){.connection-spinner{animation:none;border-top-width:6px}}
 
 #release-path { overflow-wrap: anywhere; user-select: text; -webkit-user-select: text; }
+#release-notes { margin: 12px 0; padding-left: 22px; text-align: left; line-height: 1.55; }
+#release-notes[hidden] { display: none; }
 
 #release-progress-area { margin: 14px 0; }
 #release-progress { display: block; width: 100%; height: 8px; border: 0; border-radius: 999px; overflow: hidden; background: var(--pale); accent-color: var(--green); }

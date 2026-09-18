@@ -1060,6 +1060,7 @@
     "リモート接続が終了しました。ネットワークとリモート端末を確認して再試行してください。",
     "원격 연결이 종료되었습니다. 네트워크와 원격 장치를 확인한 후 다시 시도하세요."
   ],
+  "更新重點": ["更新重點", "Update highlights", "更新内容", "업데이트 주요 내용"],
   "發現新版本": [
     "New version available",
     "新しいバージョンがあります",
@@ -2665,14 +2666,14 @@
     "マウスやキーボード操作が15分間ない場合、リモートデスクトップ接続とウィンドウを閉じます。ハートビートや画面更新は操作に含みません。",
     "마우스나 키보드 조작 없이 15분이 지나면 원격 데스크톱 연결과 창을 닫습니다. 하트비트와 화면 갱신은 조작으로 간주하지 않습니다."
   ],
-  "斷線後自動重連（實驗功能）": [
-    "Reconnect automatically (experimental)",
-    "切断後に自動再接続（実験的機能）",
-    "연결 종료 후 자동 재연결 (실험 기능)"
+  "斷線後自動重連": [
+    "Reconnect automatically",
+    "切断後に自動再接続",
+    "연결 종료 후 자동 재연결"
   ],
-  "實驗功能：斷線後保留視窗並在背景重連，連續失敗三次才關閉。與斷線後自動關閉視窗互斥。": [
-    "Experimental: Keep the window open and reconnect in the background. Close after three failed attempts. Cannot be enabled together with closing windows on disconnect.",
-    "実験的機能：切断後もウィンドウを保持してバックグラウンドで再接続します。3回失敗すると閉じます。切断時の自動終了とは同時に有効にできません。",
-    "실험 기능: 연결 종료 후 창을 유지하고 백그라운드에서 재연결합니다. 세 번 실패하면 창을 닫습니다. 연결 종료 시 자동 닫기와 동시에 켤 수 없습니다."
+  "斷線後保留視窗並在背景重連，連續失敗三次才關閉。與斷線後自動關閉視窗互斥。": [
+    "Keep the window open and reconnect in the background. Close after three failed attempts. Cannot be enabled together with closing windows on disconnect.",
+    "切断後もウィンドウを保持してバックグラウンドで再接続します。3回失敗すると閉じます。切断時の自動終了とは同時に有効にできません。",
+    "연결 종료 후 창을 유지하고 백그라운드에서 재연결합니다. 세 번 실패하면 창을 닫습니다. 연결 종료 시 자동 닫기와 동시에 켤 수 없습니다."
   ]
 }

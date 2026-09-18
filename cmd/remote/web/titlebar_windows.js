@@ -14,6 +14,8 @@
  .windows .actions{width:auto;padding-right:10px}
  .win-popup{position:fixed;z-index:10;min-width:190px;max-width:calc(100vw - 20px);padding:6px;background:var(--bg);border:1px solid var(--edge);border-radius:12px;box-shadow:0 4px 10px #0003;overflow:auto;max-height:calc(100vh - 72px)}
  .win-popup.crop-confirm{width:420px;padding:22px;max-height:calc(100vh - 72px)}
+ .crop-confirm .system-shortcut-key{color:#c42b1c}
+ @media(prefers-color-scheme:dark){.crop-confirm .system-shortcut-key{color:#ff6961}}
  .crop-confirm h2{font-size:17px;margin:0 0 14px}.crop-confirm p{line-height:1.6;white-space:normal;margin:0}.crop-confirm .buttons{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}.crop-confirm .buttons button{width:auto;border:1px solid var(--edge)}.crop-confirm [data-confirm="16"]{background:#216b50;color:white}
  .win-popup[hidden]{display:none}
  .win-popup.tip{padding:12px 16px;min-width:0;white-space:pre-line;font-size:12px;line-height:1.6;pointer-events:none}
@@ -39,9 +41,9 @@
  const publishRegion=()=>{
   if(popup.hidden){send({popup:true,menu:false,width:0,height:0});return}
   const r=popup.getBoundingClientRect();
-  send({popup:true,menu:kind==='menu'||kind==='confirm',x:r.x,y:r.y,width:r.width,height:r.height});
+  send({popup:true,menu:kind==='menu'||kind==='confirm'||kind==='shortcut',x:r.x,y:r.y,width:r.width,height:r.height});
  };
- window.closeWindowsPopup=()=>{const cancel=kind==='confirm';popup.hidden=true;kind='';publishRegion();if(cancel)send({action:17})};
+ window.closeWindowsPopup=()=>{const cancel=kind==='confirm'?17:kind==='shortcut'?42:0;popup.hidden=true;kind='';window.systemShortcutOpen=false;publishRegion();if(cancel)send({action:cancel})};
  const position=rect=>{
   popup.hidden=false;popup.style.left='10px';popup.style.top='62px';
   popup.style.left=Math.max(10,Math.min(rect.right-popup.offsetWidth,innerWidth-popup.offsetWidth-10))+'px';
@@ -56,8 +58,24 @@
   position({right:innerWidth/2+210});popup.style.top=Math.max(62,(innerHeight-popup.offsetHeight)/2)+'px';publishRegion();
   popup.querySelector('[data-confirm="17"]').focus();
  };
+ window.showSystemShortcut=request=>{
+  window.closeWindowsPopup();kind='shortcut';window.systemShortcutOpen=true;
+  popup.className='win-popup crop-confirm';popup.setAttribute('role','dialog');popup.setAttribute('aria-modal','true');popup.setAttribute('aria-labelledby','system-shortcut-title');
+  const title=document.createElement('h2');title.id='system-shortcut-title';title.textContent=tr('快捷鍵要作用在哪裡？');
+  const key=document.createElement('p');key.className='system-shortcut-key';key.textContent=request.label;
+  const message=document.createElement('p');
+  if(request.secure)message.textContent=tr('Windows 會直接處理實體 Ctrl+Alt+Del，APP 無法先攔截；目前也不支援遠端傳送這組安全快捷鍵。');
+  else if(request.remoteAvailable===false)message.textContent=tr('遠端目前無法接受輸入。');
+  const buttons=document.createElement('div');buttons.className='buttons';
+  for(const [label,action] of [['取消',42],['本機',40],['遠端',41]]){
+   const button=document.createElement('button');button.textContent=tr(label);button.disabled=(!!request.secure&&action!==42)||(action===41&&request.remoteAvailable===false);
+   button.onclick=()=>{kind='';window.closeWindowsPopup();send({action})};buttons.append(button);
+  }
+  popup.replaceChildren(title,key,...(message.textContent?[message]:[]),buttons);position({right:innerWidth/2+210});popup.style.top=Math.max(62,(innerHeight-popup.offsetHeight)/2)+'px';publishRegion();
+  (buttons.lastElementChild.disabled?buttons.firstElementChild:buttons.lastElementChild).focus();
+ };
  window.windowsTitlebarBridge=message=>{
-  if(kind==='confirm' && typeof message!=='number')return;
+  if((kind==='confirm'||kind==='shortcut') && typeof message!=='number')return;
   if(typeof message==='number'){send({action:message});return}
   if(message.menu){
    window.closeWindowsPopup();
@@ -83,6 +101,12 @@
  });
  document.querySelector('.title').addEventListener('dblclick',()=>send({action:8}));
  document.addEventListener('keydown',event=>{if(event.key==='Escape')window.closeWindowsPopup()});
+ document.addEventListener('keydown',event=>{
+  if(kind!=='shortcut'||event.key!=='Tab')return;
+  const buttons=[...popup.querySelectorAll('button:not(:disabled)')];
+  const index=buttons.indexOf(document.activeElement),next=(index+(event.shiftKey?-1:1)+buttons.length)%buttons.length;
+  event.preventDefault();buttons[next].focus();
+ });
  window.addEventListener('blur',window.closeWindowsPopup);
  window.addEventListener('resize',window.closeWindowsPopup);
  document.addEventListener('contextmenu',event=>event.preventDefault());

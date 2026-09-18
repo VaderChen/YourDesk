@@ -10,9 +10,15 @@ static YDKey events[1024];
 static int count=0;
 static pthread_mutex_t keyMutex=PTHREAD_MUTEX_INITIALIZER;
 static atomic_bool enabled=false,suspended=false;
+static atomic_bool shortcutGuard=false;
+void yd_keyboard_shortcut_guard(int value){atomic_store(&shortcutGuard,value!=0);}
 static BOOL capsPhysicalDown=NO;
 static uint64_t modifiers(NSEventModifierFlags f) {
  return ((f&NSEventModifierFlagShift)?1:0)|((f&NSEventModifierFlagControl)?2:0)|((f&NSEventModifierFlagOption)?4:0)|((f&NSEventModifierFlagCommand)?8:0)|((f&NSEventModifierFlagCapsLock)?16:0)|((f&NSEventModifierFlagFunction)?32:0);
+}
+int yd_shortcut_released(int code,uint64_t mods){
+ return !CGEventSourceKeyState(kCGEventSourceStateHIDSystemState,(CGKeyCode)code) &&
+  (modifiers((NSEventModifierFlags)CGEventSourceFlagsState(kCGEventSourceStateHIDSystemState)) & mods & 15)==0;
 }
 void yd_keyboard_suspend(int value){
  atomic_store(&suspended,value!=0);
@@ -24,6 +30,7 @@ void yd_keyboard_enabled(int value) {
  dispatch_once(&once,^{ dispatch_async(dispatch_get_main_queue(),^{
   [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown|NSEventMaskKeyUp|NSEventMaskFlagsChanged handler:^NSEvent *(NSEvent *event){
    if(event.CGEvent && CGEventGetIntegerValueField(event.CGEvent,kCGEventSourceUserData)==0x5944524b)return event;
+   if(atomic_load(&shortcutGuard) && (event.modifierFlags&NSEventModifierFlagCommand) && (event.keyCode==12||event.keyCode==13))return nil;
    Class viewer=NSClassFromString(@"GLFWWindow");
    if(!atomic_load(&enabled)||atomic_load(&suspended)||!viewer||![event.window isKindOfClass:viewer]||!event.window.keyWindow||event.window.firstResponder!=event.window.contentView)return event;
    BOOL down=event.type==NSEventTypeKeyDown;

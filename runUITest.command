@@ -5,6 +5,11 @@ set -Eeuo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 BUILD_ONLY=0
 if [[ "${1:-}" == --build-only ]]; then BUILD_ONLY=1; shift; fi
+if [[ "${1:-}" == --update-notes ]]; then
+  export YOURDESK_TEST_UPDATE_NOTES=1
+  shift
+  echo "啟用更新完成後的多語言更新重點測試。"
+fi
 BUILD_STAGE=""
 export PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"
 finish() {

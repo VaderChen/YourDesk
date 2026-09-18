@@ -3,9 +3,10 @@ package main
 import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"runtime"
+	"yourdesk/internal/shortcut"
 )
 
-// 僅視窗生命週期由本機接管；C/V 留給既有剪貼簿與遠端轉送。
+// 未連線或未啟用遠端控制時的本機視窗操作；C/V 留給既有剪貼簿流程。
 func localWindowShortcut(platform, key string, mods uint64) int {
 	if mods&1 != 0 {
 		return 0
@@ -47,8 +48,14 @@ func (g *game) windowShortcut(raw bool) int {
 	if ebiten.IsKeyPressed(ebiten.KeyMeta) {
 		mods |= 8
 	}
-	for _, key := range []ebiten.Key{ebiten.KeyW, ebiten.KeyQ, ebiten.KeyF4} {
+	for _, key := range []ebiten.Key{ebiten.KeyW, ebiten.KeyQ, ebiten.KeyF4, ebiten.KeyDelete, ebiten.KeyEscape} {
 		if ebiten.IsKeyPressed(key) {
+			if g.peer != nil && g.peer.Connected() && g.controlEnabled && g.displayInputReady() {
+				if request, ok := shortcut.Match(runtime.GOOS, commonKeys[key], mods); ok {
+					g.beginSystemShortcut(request)
+					return 0
+				}
+			}
 			if action := localWindowShortcut(runtime.GOOS, commonKeys[key], mods); action != 0 {
 				return action
 			}
