@@ -1172,9 +1172,9 @@ function renderRelease(value, manual=false) {
  const pending=value.available && value.version!==value.notifiedVersion && value.version!==releaseShown;
  if ((pending || value.showNotes || (manual && value.available)) && !dialog.open && !document.querySelector('dialog[open]')) {
   releaseShown=value.version;openDialog('#release-dialog');
-  api('updates/ack','POST',{version:value.version}).catch(()=>{releaseShown='';});
+  if (!value.showNotes) api('updates/ack','POST',{version:value.version}).catch(()=>{releaseShown='';});
  }
- $('#release-version').textContent=value.version || '';
+ $('#release-version').textContent=(value.showNotes ? value.notesVersion || value.version : value.version) || '';
  const noteLanguage = i18n.preference === 'auto' ? ({'zh-Hant':'zh-Hant',en:'en',ja:'ja',ko:'ko'}[document.documentElement.lang] || 'en') : i18n.preference;
  const notes = value.showNotes ? (value.notes?.[noteLanguage] || value.notes?.en || value.notes?.['zh-Hant'] || []) : [];
  const notesElement = $('#release-notes');

@@ -22,6 +22,15 @@ static atomic_bool titlebarConfigured = false;
 static atomic_bool titlebarConfigurePending = false;
 static WKWebView *titlebarWeb;
 static NSPanel *cropPanel;
+static NSPanel *systemShortcutPanel;
+static NSUInteger systemShortcutGeneration;
+static void ydCloseShortcutPanel(void) {
+ if (!systemShortcutPanel) return;
+ NSPanel *panel=systemShortcutPanel;systemShortcutPanel=nil;
+ NSWindow *parent=panel.sheetParent;
+ [parent endSheet:panel];[panel orderOut:nil];[panel release];
+ yd_keyboard_suspend(0);[parent makeFirstResponder:parent.contentView];
+}
 static NSView *titlebarControls;
 static NSArray<NSValue *> *titlebarInteractiveRects;
 static atomic_bool fullscreenActive = false;
@@ -240,6 +249,9 @@ static void ydUpdateTitlebar(void) {
     if (![message.body isKindOfClass:[NSNumber class]]) return;
     [titlebarTooltip close];
     int action = [message.body intValue];
+    if ((action==40 || action==41 || action==42) && systemShortcutPanel && message.webView==systemShortcutPanel.contentView) {
+      ydCloseShortcutPanel();atomic_store(&titlebarAction,action);return;
+    }
     if ((action==16 || action==17) && cropPanel) {
       [cropPanel.sheetParent endSheet:cropPanel]; [cropPanel orderOut:nil];
       [cropPanel release];cropPanel=nil;atomic_store(&titlebarAction,action);return;
@@ -522,6 +534,20 @@ void yd_system_shortcut(const char *label, int secure, int remote) {
  dispatch_async(dispatch_get_main_queue(), ^{
   NSWindow *parent=titlebarWeb.window ?: NSApp.keyWindow;
   if(!parent || systemShortcutAlert){atomic_store(&titlebarAction,42);return;}
+  if(titlebarWeb.window && titlebarLoaded) {
+   NSUInteger generation=++systemShortcutGeneration;
+   NSData *data=[NSJSONSerialization dataWithJSONObject:@{@"label":key,@"secure":@(secure!=0),@"remoteAvailable":@(remote!=0)} options:0 error:nil];
+   NSString *json=[[[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] autorelease];
+   [titlebarWeb evaluateJavaScript:[NSString stringWithFormat:@"window.systemShortcutDocument(%@)",json] completionHandler:^(id html,NSError *error){
+    if(generation!=systemShortcutGeneration)return;
+    if(error || ![html isKindOfClass:NSString.class] || !parent){atomic_store(&titlebarAction,42);return;}
+    systemShortcutPanel=[[NSPanel alloc] initWithContentRect:NSMakeRect(0,0,480,300) styleMask:NSWindowStyleMaskTitled backing:NSBackingStoreBuffered defer:NO];
+    systemShortcutPanel.title=ydText(@"快捷鍵要作用在哪裡？");
+    WKWebView *web=[[WKWebView alloc] initWithFrame:NSMakeRect(0,0,480,300) configuration:titlebarWeb.configuration];
+    systemShortcutPanel.contentView=web;[web loadHTMLString:html baseURL:nil];[web release];
+    yd_keyboard_suspend(1);[parent beginSheet:systemShortcutPanel completionHandler:nil];
+   }];return;
+  }
   NSAlert *alert=[[NSAlert alloc] init];systemShortcutAlert=alert;
   alert.messageText=ydText(@"快捷鍵要作用在哪裡？");
   NSString *message=secure ? ydText(@"Windows 會直接處理實體 Ctrl+Alt+Del，APP 無法先攔截；目前也不支援遠端傳送這組安全快捷鍵。") : @"";
@@ -565,6 +591,7 @@ void yd_system_shortcut(const char *label, int secure, int remote) {
 }
 void yd_cancel_system_shortcut(void) {
  dispatch_async(dispatch_get_main_queue(), ^{
+  ++systemShortcutGeneration;ydCloseShortcutPanel();
   if(systemShortcutAlert){NSAlert *alert=systemShortcutAlert;systemShortcutAlert=nil;[alert.window.sheetParent endSheet:alert.window returnCode:NSAlertFirstButtonReturn];}
  });
 }

@@ -9,6 +9,7 @@ const root=path.resolve(__dirname,'../cmd/remote/web');
   page.on('pageerror',e=>errors.push(e.message));
   await page.setContent('<script>window.messages=[];window.webkit={messageHandlers:{titlebar:{postMessage:m=>messages.push(m)}}};window.ydTitlebar=async m=>messages.push(m);<\/script>'+fs.readFileSync(path.join(root,'titlebar.html'),'utf8'));
   await page.addScriptTag({path:path.join(root,'titlebar_windows.js')});
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   const actions=()=>page.evaluate(()=>messages.filter(m=>m&&m.action).map(m=>m.action));
   const open=async(secure=false)=>page.evaluate(secure=>{messages=[];window.showSystemShortcut({label:secure?'Ctrl+Alt+Del':'Alt+F4',secure})},secure);
   for(const [button,action] of [['本機',40],['遠端',41],['取消',42]]){
@@ -61,6 +62,24 @@ const root=path.resolve(__dirname,'../cmd/remote/web');
   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   await page.evaluate(()=>window.updateWindowsTitlebar({strings:{},language:'zh-Hant'}));await open();
   if(process.env.YOURDESK_SHORTCUT_SCREENSHOT)await page.screenshot({path:process.env.YOURDESK_SHORTCUT_SCREENSHOT});
+
+  // macOS 使用獨立 WebView sheet；驗證實際產生的 HTML 與一次性橋接。
+  const sheet=await browser.newPage({viewport:{width:480,height:300}});
+  sheet.on('pageerror',e=>errors.push(e.message));
+  for(const [button,action] of [['本機',40],['遠端',41],['取消',42]]){
+   const html=await page.evaluate(()=>window.systemShortcutDocument({label:'Cmd+W',secure:false,remoteAvailable:true}));
+   await sheet.goto('about:blank');
+   await sheet.setContent('<script>window.actions=[];window.webkit={messageHandlers:{titlebar:{postMessage:a=>actions.push(a)}}};<\/script>'+html);
+   assert.equal(await sheet.locator(':focus').textContent(),'遠端');
+   await sheet.getByRole('button',{name:button,exact:true}).click();
+   assert.deepEqual(await sheet.evaluate(()=>actions),[action]);
+  }
+  const secureHTML=await page.evaluate(()=>window.systemShortcutDocument({label:'Ctrl+Alt+Del',secure:true,remoteAvailable:true}));
+  await sheet.goto('about:blank');
+  await sheet.setContent('<script>window.actions=[];window.webkit={messageHandlers:{titlebar:{postMessage:a=>actions.push(a)}}};<\/script>'+secureHTML);
+  assert(await sheet.getByRole('button',{name:'遠端',exact:true}).isDisabled());
+  await sheet.keyboard.press('Escape');assert.deepEqual(await sheet.evaluate(()=>actions),[42]);
+  await sheet.close();
   assert.deepEqual(errors,[]);
   console.log('PASS: 本機／遠端／取消、預設遠端、不可用時預設取消、Escape、焦點圈選、失焦取消、安全快捷鍵限制、C/V 不攔截與四語系窄視窗');
  } finally { await browser.close() }
