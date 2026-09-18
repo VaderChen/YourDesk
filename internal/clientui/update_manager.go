@@ -37,6 +37,7 @@ type updateStatus struct {
 	NotifiedVersion string              `json:"notifiedVersion"`
 	Asset           releaseAsset        `json:"asset"`
 	Notes           map[string][]string `json:"notes,omitempty"`
+	NotesVersion    string              `json:"notesVersion,omitempty"`
 	ShowNotes       bool                `json:"showNotes,omitempty"`
 	NotesTest       bool                `json:"notesTest,omitempty"`
 	Downloading     bool                `json:"downloading"`
@@ -91,12 +92,15 @@ func newUpdateManager(ctx context.Context, dir string) *updateManager {
 		u.state.DownloadBytes = u.state.Asset.Size
 	}
 	// 安裝新版本後，將上一版下載的更新重點留給新版首次啟動顯示一次。
-	showNotes := u.state.Available && versionKey(u.state.Version) == versionKey(currentVersion()) && (len(localNotes) > 0 || len(u.state.Notes) > 0)
+	showNotes := ((u.state.Available && versionKey(u.state.Version) == versionKey(currentVersion())) || (u.state.ShowNotes && versionKey(u.state.NotesVersion) == versionKey(currentVersion()))) && (len(localNotes) > 0 || len(u.state.Notes) > 0)
 	if showNotes && len(localNotes) > 0 {
 		u.state.Notes = localNotes
 	}
 	u.state.Available = versionKey(u.state.Version) != "" && versionKey(currentVersion()) != "" && versionKey(u.state.Version) > versionKey(currentVersion())
 	u.state.ShowNotes = showNotes
+	if showNotes {
+		u.state.NotesVersion = currentVersion()
+	}
 	return u
 }
 
@@ -191,6 +195,10 @@ func (u *updateManager) check(ctx context.Context, manual bool, force ...bool) u
 		if u.state.Version != result.Version || u.state.Asset != result.Asset {
 			u.state.DownloadPath, u.state.DownloadError, u.state.OpenError = "", "", ""
 			u.state.DownloadBytes = 0
+		}
+		// 尚未確認的已安裝版本重點不能被背景更新檢查覆蓋。
+		if !u.state.ShowNotes {
+			u.state.Notes = result.Notes
 		}
 		u.state.Available, u.state.Version, u.state.Asset, u.state.Message = result.Available, result.Version, result.Asset, result.Message
 	}
@@ -575,10 +583,10 @@ func (s *server) handleUpdates(w http.ResponseWriter, r *http.Request) bool {
 	case r.URL.Path == "/api/updates/notes/ack" && r.Method == "POST":
 		s.updater.mu.Lock()
 		s.updater.state.Notes = nil
+		s.updater.state.NotesVersion = ""
 		s.updater.state.ShowNotes = false
 		s.updater.saveLocked()
 		s.updater.mu.Unlock()
-		removeLocalReleaseNotes()
 		respond(w, 200, map[string]bool{"ok": true})
 	case r.URL.Path == "/api/updates/install-now" && r.Method == "POST":
 		s.updater.mu.Lock()
@@ -623,16 +631,4 @@ func (s *server) handleUpdates(w http.ResponseWriter, r *http.Request) bool {
 		return false
 	}
 	return true
-}
-
-func removeLocalReleaseNotes() {
-	executable, err := os.Executable()
-	if err != nil {
-		return
-	}
-	for _, dir := range []string{filepath.Dir(executable), filepath.Join(filepath.Dir(executable), "..", "Resources")} {
-		for _, language := range []string{"zh-Hant", "en", "ja", "ko"} {
-			_ = os.Remove(filepath.Join(dir, "release_"+language+".note"))
-		}
-	}
 }

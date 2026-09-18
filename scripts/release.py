@@ -223,6 +223,7 @@ def staple(target):
 
 
 def notarize_app(app):
+    run(['codesign', '--verify', '--deep', '--strict', app])
     valid = subprocess.run(['xcrun', 'stapler', 'validate', str(app)], capture_output=True).returncode == 0
     if not valid:
         with tempfile.TemporaryDirectory(prefix='yourdesk-notary-') as temporary:
@@ -564,6 +565,8 @@ def pack(release, targets=None):
                 shutil.copy2(folder / 'README.txt', stage / 'README.txt')
                 copy_project_licenses(stage)
                 identity = signing_identity()
+                # 更新重點屬於受簽章保護的資源；變更後重新簽署外層 App。
+                run(['codesign', '--force', '--timestamp', '--options', 'runtime', '--sign', identity, app])
                 notarize_app(app)
                 (stage / 'Applications').symlink_to('/Applications')
                 output = folder / (stem + '.dmg')

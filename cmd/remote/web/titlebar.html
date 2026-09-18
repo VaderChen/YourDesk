@@ -86,6 +86,27 @@ window.cropConfirmationDocument=()=>{
  const escape=text=>{const node=document.createElement('span');node.textContent=t(text);return node.innerHTML};
  return `<!doctype html><meta charset="utf-8"><style>:root{color-scheme:light dark}body{font:14px -apple-system,Segoe UI,sans-serif;padding:22px;margin:0;background:Canvas;color:CanvasText}h2{font-size:17px;margin:0 0 14px}p{line-height:1.6;margin:0}.buttons{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}button{font:inherit;border:1px solid #8886;border-radius:7px;padding:8px 18px;background:ButtonFace;color:ButtonText}button:focus-visible{outline:2px solid #216b50}[data-confirm="16"]{background:#216b50;color:white}</style><body><h2>${escape('復原全畫面串流？')}</h2><p>${escape('復原後將取消目前的裁切區域，恢復串流整個螢幕。')}</p><div class="buttons"><button data-confirm="17" autofocus>${escape('取消')}</button><button data-confirm="16">${escape('復原')}</button></div><script>new ResizeObserver(()=>window.webkit.messageHandlers.titlebar.postMessage({cropHeight:Math.ceil(document.body.getBoundingClientRect().height)})).observe(document.body);document.querySelectorAll('[data-confirm]').forEach(b=>b.onclick=()=>window.webkit.messageHandlers.titlebar.postMessage(Number(b.dataset.confirm)));document.onkeydown=e=>{if(e.key==='Escape')window.webkit.messageHandlers.titlebar.postMessage(17)};<\/script></body>`;
 };
+window.systemShortcutDocument=request=>{
+ const doc=new DOMParser().parseFromString(window.cropConfirmationDocument(),'text/html');
+ doc.querySelector('h2').textContent=t('快捷鍵要作用在哪裡？');
+ const key=doc.querySelector('p');key.textContent=request.label;key.style.color='#c42b1c';
+ const message=doc.createElement('p');
+ message.textContent=request.secure?t('Windows 會直接處理實體 Ctrl+Alt+Del，APP 無法先攔截；目前也不支援遠端傳送這組安全快捷鍵。'):request.remoteAvailable===false?t('遠端目前無法接受輸入。'):'';
+ key.after(message);const buttons=doc.querySelector('.buttons');buttons.replaceChildren();
+ for(const [label,action] of [['取消',42],['本機',40],['遠端',41]]){
+  const button=doc.createElement('button');button.textContent=t(label);button.dataset.confirm=action;
+  button.disabled=(request.secure&&action!==42)||(action===41&&request.remoteAvailable===false);buttons.append(button);
+ }
+ doc.querySelector('script').remove();const script=doc.createElement('script');
+ script.textContent=`const buttons=[...document.querySelectorAll('button:not(:disabled)')];
+ let sent=false;const send=action=>{if(!sent){sent=true;window.webkit.messageHandlers.titlebar.postMessage(action)}};
+ buttons.forEach(b=>b.onclick=()=>send(Number(b.dataset.confirm)));
+ (buttons.find(b=>b.dataset.confirm==='41')||buttons[0]).focus();
+ document.onkeydown=e=>{if(e.key==='Escape'){e.preventDefault();send(42)}
+ else if(e.metaKey&&(e.key==='q'||e.key==='w'))e.preventDefault();
+ else if(e.key==='Tab'){e.preventDefault();const i=buttons.indexOf(document.activeElement);buttons[(i+(e.shiftKey?-1:1)+buttons.length)%buttons.length].focus()}};`;
+ doc.body.append(script);return '<!doctype html>'+doc.documentElement.outerHTML;
+};
 window.setTitlebarState=state=>{
  const crop=document.getElementById("crop");
  crop.classList.toggle("active",state.crop>0);crop.disabled=state.crop===2;crop.setAttribute("aria-pressed",String(state.crop>0));

@@ -26,3 +26,5 @@ Windows 實體 Ctrl+Alt+Del 由作業系統優先處理，一般程式無法保�
 - `go test ./internal/shortcut ./cmd/remote`：快捷鍵分類、一般 C/V 不攔截、修飾鍵順序與成對放開、拒絕合成安全注意序列。
 - `scripts/smoke-system-shortcuts.cjs`：使用瀏覽器與模擬原生橋接檢查三種選擇、預設遠端、不可用時預設取消、Escape、焦點圈選、失焦取消、安全序列限制及四語系窄視窗；不會真的結束 APP、開啟工作管理員或操作遠端。
 - macOS 原生介面及 Windows x64／ARM64 編譯檢查不取代跨電腦實際按鍵與系統行為驗證。
+
+macOS 與 Windows 有 WebView 時以 WebView 顯示快捷鍵詢問；macOS 缺少可用 WebView 時才回退原生對話框。候選版已通過 macOS 編譯及 WebView DOM smoke；Windows 真機快捷鍵行為仍需實測。
