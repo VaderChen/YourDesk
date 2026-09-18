@@ -1166,7 +1166,8 @@ let releaseShown = '';
 function renderRelease(value, manual=false) {
  if (!value) return;
  // 更新重點是更新完成後的結果；與版本通知同時存在時，優先顯示更新重點。
- if (value.showNotes || value.notesTest) value = {...value, available:false, installAt:0, downloading:false, opening:false, downloadPath:''};
+ const showingNotes=!!(value.showNotes || value.notesTest);
+ if (showingNotes) value = {...value, showNotes:true, available:false, installAt:0, downloading:false, opening:false, downloadPath:'', message:'', downloadError:'', openError:''};
  $('#check-update').disabled = !!value.notesTest;
  const dialog=$('#release-dialog');
  const pending=value.available && value.version!==value.notifiedVersion && value.version!==releaseShown;
@@ -1184,6 +1185,7 @@ function renderRelease(value, manual=false) {
  const countdown=Number(value.installAt)>0;
  if(countdown && !dialog.open) openDialog('#release-dialog');
  $('#release-later').textContent=i18n.t(countdown?'取消':'稍後');
+ $('#release-later').hidden=showingNotes;
  $('#release-later').disabled=!!value.opening;
  $('#release-close').disabled=!!value.opening;
  const total=Math.max(0,Number(value.asset?.size)||0);
@@ -1201,10 +1203,11 @@ function renderRelease(value, manual=false) {
  $('#release-title').textContent=i18n.t(value.showNotes?'更新重點':value.downloadPath?'下載完成':value.available?'發現新版本':'');
  const message=value.downloading?downloadLabel:value.opening?openingLabel:value.downloadError || value.openError || (value.available && value.asset?.browser_download_url?'下載完成後將自動關閉程式、安裝新版並重新啟動。遠端連線會中斷。':value.message);
  $('#release-status').classList.toggle('update-countdown',countdown);
+ $('#release-status').hidden=showingNotes;
  $('#release-status').textContent=countdown?i18n.t('即將自動更新，可按取消。')+' '+Math.max(0,Math.ceil((Number(value.installAt)-Date.now())/1000))+' s':i18n.t(message || '');
  $('#release-path').textContent=value.downloadPath ? i18n.t('下載目錄：')+'\n'+value.downloadPath : '';
- $('#release-download').disabled=busy || !value.available || !value.asset?.browser_download_url;
- $('#release-download').textContent=i18n.t(label);
+ $('#release-download').disabled=!showingNotes && (busy || !value.available || !value.asset?.browser_download_url);
+ $('#release-download').textContent=i18n.t(showingNotes?'確定':label);
  $('#release-download').classList.toggle('danger',!!value.downloadPath);
  $('#release-download').classList.toggle('primary',!value.downloadPath);
  $('#download-update').disabled=busy;
@@ -1217,11 +1220,21 @@ async function downloadUpdate() {
  renderRelease(result);
 }
 $('#release-download').addEventListener('click',()=>action(async()=>{
+ if(state?.updates?.showNotes || state?.updates?.notesTest){
+  await cancelUpdateCountdown();
+  return;
+ }
  await downloadUpdate();
 }));
 async function cancelUpdateCountdown(){
- if(state?.updates?.showNotes) await api('updates/notes/ack','POST').catch(()=>{});
- await api('updates/cancel','POST');
+ if(state?.updates?.showNotes || state?.updates?.notesTest){
+  await api('updates/notes/ack','POST');
+  state.updates.showNotes=false;
+  state.updates.notesTest=false;
+  state.updates.notes=null;
+ }else{
+  await api('updates/cancel','POST');
+ }
  if(state?.updates)state.updates.installAt=0;
  $('#release-dialog').close();
 }
