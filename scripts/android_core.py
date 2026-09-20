@@ -34,9 +34,9 @@ def private_build_environment(environment, root=ROOT, home=None, temporary=None)
     env = environment.copy()
     env["GOWORK"] = "off"
     env["GOFLAGS"] = "-mod=readonly -trimpath"
-    roots = [(home or Path.home(), "/_/home"),
-             (temporary or tempfile.gettempdir(), "/_/tmp"), (root, "/_/yourdesk")]
-    roots.extend((env[key], "/_/" + name) for key, name in (
+    roots = [(home or Path.home(), "toolchain/home"),
+             (temporary or tempfile.gettempdir(), "build/tmp"), (root, ".")]
+    roots.extend((env[key], "toolchain/" + name) for key, name in (
         ("ANDROID_HOME", "android-sdk"), ("ANDROID_NDK_HOME", "android-ndk"),
         ("GOTMPDIR", "go-tmp")) if env.get(key))
     mappings = {}
@@ -62,7 +62,7 @@ def private_build_environment(environment, root=ROOT, home=None, temporary=None)
 def verify_private_paths(archive):
     """Reject personal build roots in native code, metadata and Java archives.
 
-    Paths such as /proc, /system and neutral /_/ build mappings are legitimate
+    Paths such as /proc and /system are legitimate
     runtime/toolchain paths; this is not a blanket ban on absolute paths.
     Report only the member name, never the private path found inside it.
     """

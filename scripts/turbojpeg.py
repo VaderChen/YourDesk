@@ -9,6 +9,7 @@ import sys
 import tarfile
 import urllib.request
 import macos_build
+import ffmpeg
 
 VERSION = '3.2.0'
 SHA256 = '6f30092cef9fb839779646608f4ee14ae3cbac989c47fa05e841b0841f09878e'
@@ -45,11 +46,18 @@ def prepare(target, env):
     compiler = env.get('CC', 'cc')
     if len(shlex.split(compiler)) != 1:
         raise RuntimeError('TurboJPEG CC 必須是單一編譯器路徑')
-    signature = hashlib.sha256((VERSION + target + compiler + env.get('CGO_CFLAGS', '')).encode()).hexdigest()[:12]
+    flag_names = ('CFLAGS', 'CXXFLAGS', 'CPPFLAGS', 'LDFLAGS', 'SDKROOT', 'MACOSX_DEPLOYMENT_TARGET')
+    recipe = (VERSION, SHA256, target, compiler, ffmpeg.NATIVE_PATH_RECIPE,
+              tuple((name, env.get(name, '')) for name in flag_names))
+    signature = hashlib.sha256(repr(recipe).encode()).hexdigest()[:12]
     build = CACHE / f'{system}-{arch}-{signature}'
     library = build / 'libturbojpeg.a'
+    path_flags = ffmpeg.go_join(ffmpeg.native_path_flags(((ROOT, '.'), (source, 'libjpeg-turbo'), (build, 'build'))))
+    include_flag = ffmpeg.go_quote('-I' + str(source / 'src'))
+    library_flag = ffmpeg.go_quote('-L' + str(build))
     if not library.exists():
         build.mkdir(parents=True, exist_ok=True)
+        native_env = ffmpeg.native_environment(env, ((ROOT, '.'), (source, 'libjpeg-turbo'), (build, 'build')))
         args = ['cmake', '-S', os.path.relpath(source, build), '-B', '.', '-DCMAKE_BUILD_TYPE=Release',
                 '-DENABLE_SHARED=OFF', '-DENABLE_STATIC=ON', '-DWITH_TURBOJPEG=ON',
                 '-DWITH_SIMD=ON', '-DCMAKE_POSITION_INDEPENDENT_CODE=ON',
@@ -60,14 +68,18 @@ def prepare(target, env):
         elif system == 'darwin':
             args += [f'-DCMAKE_OSX_ARCHITECTURES={arch}',
                      f'-DCMAKE_OSX_DEPLOYMENT_TARGET={macos_build.MINIMUM_VERSION}']
-        subprocess.run(args, cwd=build, check=True, env=env)
-        subprocess.run(['cmake', '--build', '.', '--target', 'turbojpeg-static', '--parallel', '4'], cwd=build, check=True, env=env)
+        subprocess.run(args, cwd=build, check=True, env=native_env)
+        subprocess.run(['cmake', '--build', '.', '--target', 'turbojpeg-static', '--parallel', '4'], cwd=build, check=True, env=native_env)
         if not library.exists():
             raise RuntimeError(f'TurboJPEG 靜態函式庫不存在：{library}')
+    ffmpeg.validate_native_paths([library])
     result = dict(env)
+    if '-trimpath' not in shlex.split(result.get('GOFLAGS', '')):
+        result['GOFLAGS'] = (result.get('GOFLAGS', '') + ' -trimpath').strip()
+    result['CGO_CPPFLAGS'] = (result.get('CGO_CPPFLAGS', '') + ' ' + path_flags).strip()
     # CGo 在不同套件目錄執行；完整路徑由專案位置推導，整個 -I/-L 參數一起加引號。
-    result['CGO_CFLAGS'] = (result.get('CGO_CFLAGS', '') + ' ' + shlex.quote('-I' + str(source / 'src'))).strip()
-    result['CGO_LDFLAGS'] = (result.get('CGO_LDFLAGS', '') + ' ' + shlex.quote('-L' + str(build))).strip()
+    result['CGO_CFLAGS'] = (result.get('CGO_CFLAGS', '') + ' ' + include_flag).strip()
+    result['CGO_LDFLAGS'] = (result.get('CGO_LDFLAGS', '') + ' ' + library_flag).strip()
     return result, source
 
 

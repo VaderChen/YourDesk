@@ -2,11 +2,13 @@
 import hashlib
 import os
 from pathlib import Path
+import re
 import shlex
 import shutil
 import subprocess
 import sys
 import tarfile
+import tempfile
 import urllib.request
 import windows_runtime
 import ffmpeg_artifacts as artifacts
@@ -18,6 +20,80 @@ SOURCES = (
     ('ffmpeg-8.1.1', 'tar.xz', 'https://ffmpeg.org/releases/', 'b6863adde98898f42602017462871b5f6333e65aec803fdd7a6308639c52edf3'),
     ('libaom-3.13.1', 'tar.gz', 'https://storage.googleapis.com/aom-releases/', '19e45a5a7192d690565229983dad900e76b513a02306c12053fb9a262cbeca7d'),
 )
+NATIVE_PATH_RECIPE = 'relative-native-paths-v1'
+
+
+def native_path_flags(roots):
+    """Map compiler source/debug paths to stable, relative build names."""
+    mappings = {}
+    for source, replacement in ((Path.home(), 'home'), (Path(tempfile.gettempdir()), 'tmp'), *roots):
+        for path in (Path(source).absolute(), Path(source).resolve()):
+            if path != Path(path.anchor):
+                mappings[str(path)] = replacement
+    flags = ['-gno-record-gcc-switches']
+    for source, replacement in sorted(mappings.items(), key=lambda item: len(item[0])):
+        flags.extend('-f' + kind + '-prefix-map=' + source + '=' + replacement for kind in ('file', 'debug'))
+    return flags
+
+
+def native_environment(env, roots, for_configure=False):
+    result = dict(env)
+    arguments = native_path_flags(roots)
+    if for_configure:
+        # FFmpeg configure expands CFLAGS without shell re-parsing. Quotes are
+        # literal there; its out-of-tree source paths cannot contain whitespace.
+        if any(re.search(r'''[\s'"`$\\]''', argument) for argument in arguments):
+            raise RuntimeError('FFmpeg 來源／建置目錄不支援空白或 shell 特殊字元；請使用一般相對專案路徑')
+        flags = ' '.join(arguments)
+    else:
+        flags = shlex.join(arguments)
+    for name in ('CFLAGS', 'CXXFLAGS'):
+        result[name] = (result.get(name, '') + ' ' + flags).strip()
+    return result
+
+
+def configure_tool(command, env):
+    """Keep tool locations in PATH, not FFmpeg's embedded configuration."""
+    path = Path(command)
+    if path.parent != Path('.'):
+        env['PATH'] = str(path.absolute().parent) + os.pathsep + env.get('PATH', os.defpath)
+        return path.name
+    return command
+
+
+def configure_tools(commands, env):
+    original_path = env.get('PATH', os.defpath)
+    expected = {}
+    for name, command in commands.items():
+        resolved = shutil.which(command, path=original_path)
+        if not resolved:
+            raise RuntimeError('FFmpeg 找不到指定工具：' + name)
+        expected[name] = Path(resolved).resolve()
+    selected = {name: configure_tool(command, env) for name, command in commands.items()}
+    for name, command in selected.items():
+        resolved = shutil.which(command, path=env.get('PATH', os.defpath))
+        if not resolved or Path(resolved).resolve() != expected[name]:
+            raise RuntimeError('FFmpeg PATH 工具名稱衝突：' + name + '；請使用一致的工具鏈目錄')
+    return selected
+
+
+def go_quote(argument):
+    # cmd/go quoted.Split does not concatenate shell-escaped quote fragments.
+    quote = "'" if "'" not in argument else '"'
+    if quote in argument:
+        raise RuntimeError('CGo 參數同時含單引號與雙引號，無法安全編碼建置路徑')
+    return quote + argument + quote
+
+
+def go_join(arguments):
+    return ' '.join(go_quote(argument) for argument in arguments)
+
+
+def validate_native_paths(paths):
+    personal = re.compile(rb'(?:/(?:Users|home|Volumes)/|[A-Za-z]:[\\/](?:Users|Documents and Settings)[\\/])[^\x00-\x20/\\]+', re.I)
+    for path in paths:
+        if personal.search(path.read_bytes()):
+            raise RuntimeError('原生影音產物的建置路徑驗證失敗：' + path.name)
 
 
 def sources():
@@ -85,8 +161,9 @@ def prepare(target, env):
     cc, cxx = env.get('CC', 'cc'), env.get('CXX', 'c++')
     if len(shlex.split(cc)) != 1 or len(shlex.split(cxx)) != 1:
         raise RuntimeError('CC／CXX 必須是單一編譯器路徑')
-    flag_names = ('CFLAGS', 'CXXFLAGS', 'LDFLAGS') + (('MACOSX_DEPLOYMENT_TARGET',) if system == 'darwin' else ())
-    build_key = repr((SOURCES, target, cc, cxx, ('shared-v5-av1-videotoolbox' if system=='darwin' else 'shared-v4-av1-encoder'), tuple((k, env.get(k, '')) for k in flag_names)))
+    cc, cxx = shlex.split(cc)[0], shlex.split(cxx)[0]
+    flag_names = ('CFLAGS', 'CXXFLAGS', 'CPPFLAGS', 'LDFLAGS', 'SDKROOT') + (('MACOSX_DEPLOYMENT_TARGET',) if system == 'darwin' else ())
+    build_key = repr((SOURCES, target, cc, cxx, NATIVE_PATH_RECIPE, ('shared-v5-av1-videotoolbox' if system=='darwin' else 'shared-v4-av1-encoder'), tuple((k, env.get(k, '')) for k in flag_names)))
     signature = hashlib.sha256(build_key.encode()).hexdigest()[:12]
     build = CACHE / f'{system}-{arch}-{signature}'
     with artifacts.locked(CACHE, build):
@@ -117,6 +194,14 @@ def prepare_locked(target, env, cc, cxx, build):
         return build_environment(env, prefix, system), prefix
     tools = required_build_tools(arch, env)
     ffmpeg, aom = sources()
+    native_env = native_environment(env, ((ROOT, '.'), (ffmpeg, 'ffmpeg'), (aom, 'libaom'), (build, 'build')))
+    buildenv = native_environment(env, ((ROOT, '.'), (ffmpeg, 'ffmpeg'), (aom, 'libaom'), (build, 'build')), for_configure=True)
+    buildenv.update(PKG_CONFIG_LIBDIR='../install/lib/pkgconfig', PKG_CONFIG_PATH='')
+    configure_commands = {'cc': cc, 'cxx': cxx, 'pkg-config': tools['pkg-config']}
+    if system == 'windows':
+        toolprefix = 'aarch64-w64-mingw32-' if arch == 'arm64' else 'x86_64-w64-mingw32-'
+        configure_commands.update((name, str(Path(cc).parent / (toolprefix + name))) for name in ('ar', 'ranlib', 'nm', 'windres'))
+    selected_tools = configure_tools(configure_commands, buildenv)
     # NASM 3 分開一般與格式說明；另外取得最佳化選項，保留原有能力檢查。
     nasm_check = aom / 'build/cmake/aom_optimization.cmake'
     original = nasm_check.read_text().replace('${CMAKE_ASM_NASM_COMPILER} -h\n', '${CMAKE_ASM_NASM_COMPILER} -hf\n')
@@ -144,29 +229,27 @@ def prepare_locked(target, env, cc, cxx, build):
         else:
             args += [f'-DCMAKE_OSX_ARCHITECTURES={"arm64" if arch == "arm64" else "x86_64"}',
                      f'-DCMAKE_OSX_DEPLOYMENT_TARGET={macos_build.MINIMUM_VERSION}']
-        subprocess.run(args, cwd=build, env=env, check=True)
-        subprocess.run([tools['cmake'], '--build', 'aom', '--target', 'aom', 'aom_pc', '--parallel', '6'], cwd=build, env=env, check=True)
-        subprocess.run([tools['cmake'], '--install', 'aom', '--prefix', 'install'], cwd=build, env=env, check=True)
+        subprocess.run(args, cwd=build, env=native_env, check=True)
+        subprocess.run([tools['cmake'], '--build', 'aom', '--target', 'aom', 'aom_pc', '--parallel', '6'], cwd=build, env=native_env, check=True)
+        subprocess.run([tools['cmake'], '--install', 'aom', '--prefix', 'install'], cwd=build, env=native_env, check=True)
         relocatable_pkg_config(prefix / 'lib/pkgconfig/aom.pc')
         work = build / 'ffmpeg'
         work.mkdir(exist_ok=True)
-        buildenv = dict(env, PKG_CONFIG_LIBDIR='../install/lib/pkgconfig', PKG_CONFIG_PATH='')
-        args = [os.path.relpath(ffmpeg / 'configure', work), '--prefix=../install', f'--cc={cc}', f'--cxx={cxx}',
+        args = [os.path.relpath(ffmpeg / 'configure', work), '--prefix=../install', f'--cc={selected_tools["cc"]}', f'--cxx={selected_tools["cxx"]}',
                 '--disable-everything', '--disable-autodetect', '--disable-programs', '--disable-doc',
                 '--disable-avdevice', '--disable-avformat', '--disable-avfilter', '--disable-swresample',
                 '--enable-avcodec', '--enable-avutil', '--enable-swscale', '--enable-shared', '--disable-static',
                 '--enable-libaom', '--enable-decoder=h264,hevc,libaom_av1', '--enable-encoder=libaom_av1',
                 '--enable-parser=h264,hevc,av1', '--enable-pic', '--disable-debug',
-                '--pkg-config-flags=--static', f'--pkg-config={tools["pkg-config"]}']
+                '--pkg-config-flags=--static', f'--pkg-config={selected_tools["pkg-config"]}']
         if system == 'darwin':
             minimum = f'-mmacosx-version-min={macos_build.MINIMUM_VERSION}'
             args += ['--enable-videotoolbox', '--enable-hwaccel=av1_videotoolbox', '--install-name-dir=@rpath',
                      f'--extra-cflags={minimum}', f'--extra-ldflags={minimum}']
         if system == 'windows':
-            toolprefix = str(Path(cc).parent / ('aarch64-w64-mingw32-' if arch == 'arm64' else 'x86_64-w64-mingw32-'))
             args += ['--enable-cross-compile', '--target-os=mingw32', '--disable-pthreads', '--enable-w32threads', f'--arch={"aarch64" if arch == "arm64" else "x86_64"}',
-                     f'--cross-prefix={toolprefix}', f'--ar={toolprefix}ar', f'--ranlib={toolprefix}ranlib', f'--nm={toolprefix}nm',
-                     f'--windres={toolprefix}windres', '--extra-ldflags=-static-libgcc']
+                     f'--cross-prefix={toolprefix}', *(f'--{name}={selected_tools[name]}' for name in ('ar', 'ranlib', 'nm', 'windres')),
+                     '--extra-ldflags=-static-libgcc']
         try:
             subprocess.run(args, cwd=work, env=buildenv, check=True)
         except subprocess.CalledProcessError as error:
@@ -197,6 +280,9 @@ def prepare_locked(target, env, cc, cxx, build):
 def validate_build(system, prefix, configuration_folder):
     configuration = (configuration_folder / 'config.h').read_text()
     components = (configuration_folder / 'config_components.h').read_text()
+    configured = re.search(r'^#define FFMPEG_CONFIGURATION "(.*)"$', configuration, re.M)
+    if configured is None or re.search(r'--[a-z-]+=(?:[\\\'"])*(?:/|[A-Za-z]:[\\/])', configured[1]):
+        raise RuntimeError('FFmpeg 組態必須使用相對路徑及 PATH 工具名稱')
     if '#define CONFIG_LIBAOM_AV1_ENCODER 1' not in components:
         raise RuntimeError('FFmpeg 快取未包含 AV1 軟體編碼器')
     if system == 'darwin' and '#define CONFIG_AV1_VIDEOTOOLBOX_HWACCEL 1' not in components:
@@ -220,6 +306,8 @@ def validate_build(system, prefix, configuration_folder):
     if system == 'darwin':
         for name in macos_build.RUNTIME_LIBRARIES:
             macos_build.verify_binary(prefix / 'lib' / name)
+    libraries = list((prefix / 'bin').glob('*.dll')) if system == 'windows' else [prefix / 'lib' / name for name in macos_build.RUNTIME_LIBRARIES]
+    validate_native_paths(libraries)
 
 
 def retain_metadata(build, ffmpeg, aom):
@@ -236,10 +324,13 @@ def retain_metadata(build, ffmpeg, aom):
 
 def build_environment(env, prefix, system):
     result = dict(env)
+    result['GOFLAGS'] = (result.get('GOFLAGS', '') + ' -trimpath').strip()
+    path_flags = native_path_flags(((ROOT, '.'), (prefix, 'native')))
+    result['CGO_CPPFLAGS'] = (result.get('CGO_CPPFLAGS', '') + ' ' + go_join(path_flags)).strip()
     # Go 的 quoted.Split 只接受整個參數加引號，不接受 -I'含空白路徑'。
     # CGo 會切換到各套件工作目錄，因此此處才從專案位置推導完整搜尋路徑。
-    result['CGO_CFLAGS'] = (result.get('CGO_CFLAGS', '') + ' ' + shlex.quote('-I' + str(prefix / 'include'))).strip()
-    result['CGO_LDFLAGS'] = (result.get('CGO_LDFLAGS', '') + ' ' + shlex.quote('-L' + str(prefix / 'lib'))).strip()
+    result['CGO_CFLAGS'] = (result.get('CGO_CFLAGS', '') + ' ' + go_quote('-I' + str(prefix / 'include'))).strip()
+    result['CGO_LDFLAGS'] = (result.get('CGO_LDFLAGS', '') + ' ' + go_quote('-L' + str(prefix / 'lib'))).strip()
     if system == 'darwin':
         # CGo 預設拒絕以 @ 開頭的連結器參數；只允許套件內這兩個 macOS 路徑。
         allowed = r'-Wl,-rpath,@loader_path(?:/\.\./Frameworks)?'
@@ -259,6 +350,7 @@ def copy_runtime(prefix, folder):
             raise RuntimeError('缺少 macOS FFmpeg 動態庫')
     if len(dlls) != 3:
         raise RuntimeError(f'FFmpeg 動態庫數量不符：{dlls}')
+    validate_native_paths(dlls)
     for dll in dlls:
         shutil.copy2(dll, folder / dll.name)
     dest = folder / 'ThirdPartyLicenses' / 'FFmpeg'

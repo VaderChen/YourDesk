@@ -49,10 +49,19 @@ def capture(args, env=None):
     return subprocess.check_output(args, cwd=ROOT, env=env, text=True).strip()
 
 
+def is_filesystem_metadata(path):
+    return any(part.startswith('._') or part == '.DS_Store' for part in Path(path).parts)
+
+
+def ignore_filesystem_metadata(_directory, names):
+    return [name for name in names if is_filesystem_metadata(name)]
+
+
 def manifest(folder):
     lines = []
     for item in sorted(folder.rglob('*')):
-        if item.is_file() and not item.is_symlink() and item.name != 'SHA256SUMS':
+        if (item.is_file() and not item.is_symlink() and item.name != 'SHA256SUMS'
+                and not is_filesystem_metadata(item.relative_to(folder))):
             lines.append(f'{hashlib.sha256(item.read_bytes()).hexdigest()}  {item.relative_to(folder)}\n')
     (folder / 'SHA256SUMS').write_text(''.join(lines))
 
@@ -274,9 +283,9 @@ def mac_bundle(folder, version):
         info['CFBundleIconFile'] = 'AppIcon.icns'
     copy_project_licenses(resources)
     if (folder / 'ThirdPartyLicenses' / 'libjpeg-turbo').is_dir():
-        shutil.copytree(folder / 'ThirdPartyLicenses' / 'libjpeg-turbo', resources / 'ThirdPartyLicenses' / 'libjpeg-turbo', dirs_exist_ok=True)
+        shutil.copytree(folder / 'ThirdPartyLicenses' / 'libjpeg-turbo', resources / 'ThirdPartyLicenses' / 'libjpeg-turbo', dirs_exist_ok=True, ignore=ignore_filesystem_metadata)
     if (folder / 'ThirdPartyLicenses/FFmpeg').is_dir():
-        shutil.copytree(folder / 'ThirdPartyLicenses/FFmpeg', resources / 'ThirdPartyLicenses/FFmpeg', dirs_exist_ok=True)
+        shutil.copytree(folder / 'ThirdPartyLicenses/FFmpeg', resources / 'ThirdPartyLicenses/FFmpeg', dirs_exist_ok=True, ignore=ignore_filesystem_metadata)
     copy_model_licenses(resources)
     (app / 'Contents/Info.plist').write_bytes(plistlib.dumps(info))
     identity = signing_identity()
@@ -302,6 +311,8 @@ def copy_project_licenses(folder):
     licenses = folder / "ThirdPartyLicenses"
     licenses.mkdir(exist_ok=True)
     for source in (ROOT / "docs/third-party").glob("*-LICENSE.txt"):
+        if is_filesystem_metadata(source.name):
+            continue
         destination = licenses / source.name
         # 模組快取的授權檔可能唯讀；重複封裝仍須能更新副本。
         if destination.exists():
@@ -359,14 +370,14 @@ def winpe_zip(folder, stem):
         package.mkdir()
         for source in payload:
             if source.is_dir():
-                shutil.copytree(source, package / source.name)
+                shutil.copytree(source, package / source.name, ignore=ignore_filesystem_metadata)
             else:
                 shutil.copy2(source, package / source.name)
         manifest(package)
         archive = stage / (stem + '.zip')
         with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as output:
             for item in sorted(package.rglob('*')):
-                if item.is_file():
+                if item.is_file() and not is_filesystem_metadata(item.relative_to(package)):
                     output.write(item, item.relative_to(stage))
         os.replace(archive, folder / archive.name)
     return folder / (stem + '.zip')
@@ -529,7 +540,7 @@ def windows_portable_zip(folder, stem, version):
         for name in payload:
             source = folder / name
             if source.is_dir():
-                shutil.copytree(source, package / name)
+                shutil.copytree(source, package / name, ignore=ignore_filesystem_metadata)
             else:
                 shutil.copy2(source, package / name)
         write_instructions(package, 'windows', version)
@@ -537,7 +548,7 @@ def windows_portable_zip(folder, stem, version):
         archive = stage / (stem + '-portable.zip')
         with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as output:
             for item in sorted(package.rglob('*')):
-                if item.is_file():
+                if item.is_file() and not is_filesystem_metadata(item.relative_to(package)):
                     output.write(item, item.relative_to(stage))
         shutil.copy2(archive, folder / archive.name)
     return folder / archive.name
@@ -564,7 +575,7 @@ def pack(release, targets=None):
             with tempfile.TemporaryDirectory(prefix='yourdesk-dmg-') as temporary:
                 stage = Path(temporary)
                 app = stage / 'YourDesk.app'
-                shutil.copytree(folder / 'YourDesk.app', app)
+                shutil.copytree(folder / 'YourDesk.app', app, ignore=ignore_filesystem_metadata)
                 for language in RELEASE_NOTE_LANGUAGES:
                     shutil.copy2(folder / f'release_{language}.note', app / 'Contents' / 'Resources' / f'release_{language}.note')
                 shutil.copy2(folder / 'README.txt', stage / 'README.txt')
@@ -595,7 +606,7 @@ def pack(release, targets=None):
                 archive = Path(temporary) / (stem + '-cli.zip')
                 with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as output:
                     for item in sorted(folder.rglob('*')):
-                        if item.is_file():
+                        if item.is_file() and not is_filesystem_metadata(item.relative_to(folder)):
                             output.write(item, item.relative_to(folder.parent))
                 shutil.move(archive, folder / archive.name)
         elif system == 'winpe':

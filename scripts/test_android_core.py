@@ -42,10 +42,10 @@ class AndroidArtifactTests(unittest.TestCase):
             flags = shlex.split(result["CGO_CPPFLAGS"])
             self.assertEqual(flags[0], "-DKEEP_EXISTING=1")
             for kind in ("file", "debug"):
-                self.assertIn("-f" + kind + "-prefix-map=" + str(root / "source's tree") + "=/_/yourdesk", flags)
-                self.assertIn("-f" + kind + "-prefix-map=" + str(root / "sdk/ndk") + "=/_/android-ndk", flags)
-            self.assertLess(flags.index("-ffile-prefix-map=" + str(root) + "=/_/home"),
-                            flags.index("-ffile-prefix-map=" + str(root / "sdk/ndk") + "=/_/android-ndk"))
+                self.assertIn("-f" + kind + "-prefix-map=" + str(root / "source's tree") + "=.", flags)
+                self.assertIn("-f" + kind + "-prefix-map=" + str(root / "sdk/ndk") + "=toolchain/android-ndk", flags)
+            self.assertLess(flags.index("-ffile-prefix-map=" + str(root) + "=toolchain/home"),
+                            flags.index("-ffile-prefix-map=" + str(root / "sdk/ndk") + "=toolchain/android-ndk"))
             self.assertEqual(environment["GOFLAGS"], "-mod=mod")
             self.assertEqual(environment["CGO_CPPFLAGS"], "-DKEEP_EXISTING=1")
 
@@ -67,7 +67,7 @@ class AndroidArtifactTests(unittest.TestCase):
                         core.verify_private_paths(aar)
                     self.assertNotIn("example-builder", str(raised.exception))
             with zipfile.ZipFile(aar, "w") as archive:
-                archive.writestr("jni/arm64-v8a/libgojni.so", elf() + b"\x00/proc/self/maps\x00/_/yourdesk/core.go")
+                archive.writestr("jni/arm64-v8a/libgojni.so", elf() + b"\x00/proc/self/maps\x00./core.go")
             core.verify_private_paths(aar)
 
     def test_nested_compressed_java_classes_and_member_names_are_checked(self):
@@ -90,7 +90,7 @@ class AndroidArtifactTests(unittest.TestCase):
         for private in (False, True):
             with self.subTest(private=private), tempfile.TemporaryDirectory() as folder:
                 apk = Path(folder) / "app.apk"
-                path = b"/Users/example-builder/dependency.c" if private else b"/_/dependency.c"
+                path = b"/Users/example-builder/dependency.c" if private else b"./dependency.c"
                 with zipfile.ZipFile(apk, "w", compression=zipfile.ZIP_DEFLATED) as archive:
                     archive.writestr("lib/arm64-v8a/libdependency.so", elf() + b"\x00" + path)
                 # Both fixtures satisfy the existing ELF/ZIP gate; only the

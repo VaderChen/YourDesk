@@ -2,6 +2,7 @@
 import hashlib
 import os
 from pathlib import Path
+import re
 import shlex
 import shutil
 import subprocess
@@ -13,13 +14,40 @@ import ffmpeg
 import turbojpeg
 
 
+def go_split(value):
+    """Mirror cmd/go quoted.Split: whole-token quotes, no shell concatenation."""
+    result = []
+    while value:
+        value = value.lstrip(' \t\r\n')
+        if not value:
+            break
+        if value[0] in ('\'', '"'):
+            end = value.find(value[0], 1)
+            if end == -1:
+                raise ValueError('unterminated Go quote')
+            result.append(value[1:end])
+            value = value[end + 1:]
+        else:
+            end = re.search(r'[ \t\r\n]', value)
+            size = end.start() if end else len(value)
+            result.append(value[:size])
+            value = value[size:]
+    return result
+
+
 class NativeBuildTests(unittest.TestCase):
-    def prepare_fixture(self, root, configure_error=False):
+    def executable(self, path):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text('#!/bin/sh\nexit 0\n')
+        path.chmod(0o755)
+        return str(path)
+
+    def prepare_fixture(self, root, configure_error=False, target='darwin/arm64', environment=None):
         cache = root / 'cache'
         source, aom = cache / 'ffmpeg-source', cache / 'aom-source'
-        source.mkdir(parents=True)
+        source.mkdir(parents=True, exist_ok=True)
         cmake = aom / 'build/cmake'
-        cmake.mkdir(parents=True)
+        cmake.mkdir(parents=True, exist_ok=True)
         (cmake / 'aom_optimization.cmake').write_text('')
         (cmake / 'aom_configure.cmake').write_text('')
         for name in ('COPYING.LGPLv2.1', 'LICENSE.md'):
@@ -36,7 +64,9 @@ class NativeBuildTests(unittest.TestCase):
                 if configure_error:
                     raise subprocess.CalledProcessError(1, args)
                 work = kwargs['cwd']
-                (work / 'config.h').write_text('#define CONFIG_GPL 0\n#define CONFIG_NONFREE 0\n')
+                (work / 'config.h').write_text('#define CONFIG_GPL 0\n#define CONFIG_NONFREE 0\n'
+                                              '#define HAVE_PTHREADS 0\n#define HAVE_W32THREADS 1\n'
+                                              '#define FFMPEG_CONFIGURATION "' + ' '.join(args[1:]) + '"\n')
                 (work / 'config_components.h').write_text(
                     '#define CONFIG_LIBAOM_AV1_ENCODER 1\n#define CONFIG_AV1_VIDEOTOOLBOX_HWACCEL 1\n')
                 prefix = work.parent / 'install'
@@ -47,15 +77,26 @@ class NativeBuildTests(unittest.TestCase):
                 (prefix / 'lib').mkdir(exist_ok=True)
                 for name in ('libavcodec.62', 'libavutil.60', 'libswscale.9', 'libavcodec', 'libavutil', 'libswscale'):
                     (prefix / 'lib' / (name + '.dylib')).write_bytes(b'library fixture')
+                if target.startswith('windows/'):
+                    (prefix / 'bin').mkdir(exist_ok=True)
+                    for name in ('avcodec', 'avutil', 'swscale'):
+                        (prefix / 'lib' / ('lib' + name + '.dll.a')).write_bytes(b'import library fixture')
+                        (prefix / 'bin' / (name + '.dll')).write_bytes(b'library fixture')
             return subprocess.CompletedProcess(args, 0)
 
-        tools = {name: '/tools/' + name for name in ('cmake', 'make', 'pkg-config')}
+        tools = {name: self.executable(root / 'tools' / name) for name in ('cmake', 'make', 'pkg-config')}
+        if target.startswith('windows/'):
+            for key in ('CC', 'CXX'):
+                self.executable(Path(environment[key]))
+            for name in ('ar', 'ranlib', 'nm', 'windres'):
+                self.executable(Path(environment['CC']).parent / ('aarch64-w64-mingw32-' + name))
         with mock.patch.object(ffmpeg, 'CACHE', cache), \
                 mock.patch.object(ffmpeg, 'sources', return_value=(source, aom)), \
                 mock.patch.object(ffmpeg, 'required_build_tools', return_value=tools), \
                 mock.patch.object(ffmpeg.macos_build, 'verify_binary'), \
+                mock.patch.object(ffmpeg.windows_runtime, 'validate'), \
                 mock.patch.object(ffmpeg.subprocess, 'run', side_effect=run) as commands:
-            result = ffmpeg.prepare('darwin/arm64', {})
+            result = ffmpeg.prepare(target, environment or {})
         return commands.call_args_list, result
 
     def test_standard_configure_uses_relative_directories_without_overrides(self):
@@ -72,6 +113,7 @@ class NativeBuildTests(unittest.TestCase):
             self.assertEqual(configure.args[0][0], '../../ffmpeg-source/configure')
             self.assertIn('--prefix=../install', configure.args[0])
             self.assertIn('--pkg-config-flags=--static', configure.args[0])
+            self.assertIn('--pkg-config=pkg-config', configure.args[0])
             self.assertIn('--extra-cflags=-mmacosx-version-min=13.0', configure.args[0])
             self.assertIn('--extra-ldflags=-mmacosx-version-min=13.0', configure.args[0])
             self.assertFalse(any('--define-variable' in arg for arg in configure.args[0]))
@@ -86,13 +128,162 @@ class NativeBuildTests(unittest.TestCase):
             for command in commands[3:]:
                 self.assertEqual(command.kwargs['cwd'], prefix.parent / 'ffmpeg')
 
+    def test_windows_configuration_uses_tool_names_and_relative_install(self):
+        with tempfile.TemporaryDirectory() as temp:
+            toolchain = Path(temp) / 'compiler/bin'
+            environment = {'CC': str(toolchain / 'aarch64-w64-mingw32-clang'),
+                           'CXX': str(toolchain / 'aarch64-w64-mingw32-clang++')}
+            commands, (_, prefix) = self.prepare_fixture(Path(temp), target='windows/arm64', environment=environment)
+            configure = commands[3]
+            args = configure.args[0]
+            self.assertIn('--cc=aarch64-w64-mingw32-clang', args)
+            self.assertIn('--cxx=aarch64-w64-mingw32-clang++', args)
+            self.assertIn('--cross-prefix=aarch64-w64-mingw32-', args)
+            self.assertIn('--ar=aarch64-w64-mingw32-ar', args)
+            self.assertIn('--prefix=../install', args)
+            self.assertFalse(any(temp in argument or argument.startswith('--pkg-config=/') for argument in args))
+            self.assertIn(str(toolchain), configure.kwargs['env']['PATH'].split(os.pathsep))
+            self.assertIn('-ffile-prefix-map=', configure.kwargs['env']['CFLAGS'])
+            configuration = (prefix.parent / 'metadata/config.h').read_text()
+            self.assertNotIn(temp, configuration)
+
+    def test_native_recipe_and_flag_changes_preserve_previous_cache(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            with mock.patch.object(ffmpeg, 'NATIVE_PATH_RECIPE', 'previous-build-recipe'):
+                _, (_, previous) = self.prepare_fixture(root)
+            binary = previous / 'lib/libavcodec.62.dylib'
+            before = (binary.read_bytes(), binary.stat().st_mtime_ns)
+            _, (_, current) = self.prepare_fixture(root)
+            self.assertNotEqual(previous, current)
+            self.assertEqual((binary.read_bytes(), binary.stat().st_mtime_ns), before)
+            _, (_, changed) = self.prepare_fixture(root, environment={'CPPFLAGS': '-DEXAMPLE=1'})
+            self.assertNotEqual(current, changed)
+            self.assertEqual((binary.read_bytes(), binary.stat().st_mtime_ns), before)
+
+    def test_absolute_configuration_and_personal_binary_paths_are_rejected(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = root / 'config.h'
+            (root / 'config_components.h').write_text('')
+            for option in ('--prefix=/opt/build/install', '--cc=/opt/build/cc',
+                           "--pkg-config='/opt/build/pkg-config'", '--cc=C:/build/cc'):
+                config.write_text('#define FFMPEG_CONFIGURATION "' + option + '"\n')
+                with self.assertRaisesRegex(RuntimeError, '相對路徑'):
+                    ffmpeg.validate_build('darwin', root / 'install', root)
+            binary = root / 'library.dylib'
+            binary.write_bytes(b'object\0/Users/example-builder/source.c')
+            with self.assertRaisesRegex(RuntimeError, '建置路徑驗證失敗'):
+                ffmpeg.validate_native_paths([binary])
+            binary.write_bytes(b'object\0ffmpeg/source.c\0/system/lib')
+            ffmpeg.validate_native_paths([binary])
+
+    def test_copy_runtime_checks_every_library_before_copying(self):
+        for system, private in (('darwin', b'/Volumes/example-disk/build/codec.c'),
+                                ('windows', b'C:\\Users\\example-builder\\build\\codec.c')):
+            with self.subTest(system=system), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                prefix, output = root / 'install', root / 'output'
+                output.mkdir()
+                names = ('avcodec-62.dll', 'avutil-60.dll', 'swscale-9.dll') if system == 'windows' else ffmpeg.macos_build.RUNTIME_LIBRARIES
+                folder = prefix / ('bin' if system == 'windows' else 'lib')
+                folder.mkdir(parents=True)
+                for index, name in enumerate(names):
+                    (folder / name).write_bytes(b'library\0' + (private if index == 2 else b'relative/source.c'))
+                with mock.patch.object(ffmpeg.windows_runtime, 'validate'):
+                    with self.assertRaisesRegex(RuntimeError, '建置路徑驗證失敗'):
+                        ffmpeg.copy_runtime(prefix, output)
+                self.assertEqual(list(output.iterdir()), [])
+
+    @unittest.skipUnless(shutil.which('cc') and shutil.which('c++'), 'requires C and C++ compilers')
+    def test_real_c_and_cpp_objects_use_relative_macro_and_debug_paths(self):
+        with tempfile.TemporaryDirectory(prefix='native 路徑-') as temp:
+            root = Path(temp)
+            source = root / 'source'
+            source.mkdir()
+            environment = ffmpeg.native_environment({}, ((root, 'build'), (source, 'source')))
+            for compiler, extension, variable in (('cc', 'c', 'CFLAGS'), ('c++', 'cpp', 'CXXFLAGS')):
+                path = source / ('fixture.' + extension)
+                path.write_text('const char *source_name = __FILE__;\nint fixture(void) { return source_name[0]; }\n')
+                output = root / ('fixture-' + extension + '.o')
+                subprocess.run([shutil.which(compiler), '-g', *shlex.split(environment[variable]),
+                                '-c', str(path), '-o', str(output)], cwd=root,
+                               capture_output=True, check=True)
+                data = output.read_bytes()
+                self.assertNotIn(str(root).encode(), data)
+                self.assertNotIn(str(root.resolve()).encode(), data)
+                self.assertIn(('source/fixture.' + extension).encode(), data)
+
     def test_ffmpeg_cgo_quotes_whole_arguments(self):
         # CGo 參數引用是一般正確性要求，與 FFmpeg 的來源路徑限制分開驗證。
         with tempfile.TemporaryDirectory(prefix='cgo flags-') as temp:
-            _, (env, prefix) = self.prepare_fixture(Path(temp))
+            prefix = Path(temp) / 'install'
+            env = ffmpeg.build_environment(ffmpeg.macos_build.environment('darwin/arm64', {}), prefix, 'darwin')
             self.assertTrue(env['CGO_CFLAGS'].endswith("'-I" + str(prefix / 'include') + "'"))
             self.assertTrue(env['CGO_LDFLAGS'].endswith("'-L" + str(prefix / 'lib') + "'"))
             self.assertIn('-mmacosx-version-min=13.0', shlex.split(env['CGO_CFLAGS']))
+            self.assertIn('-trimpath', shlex.split(env['GOFLAGS']))
+            self.assertIn('-ffile-prefix-map=', env['CGO_CPPFLAGS'])
+
+    def test_cgo_single_and_double_quote_paths_use_go_token_rules(self):
+        for name in ("builder's files", 'builder"s files'):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temp:
+                prefix = Path(temp) / name
+                env = ffmpeg.build_environment({}, prefix, 'darwin')
+                self.assertEqual(go_split(env['CGO_CFLAGS']), ['-I' + str(prefix / 'include')])
+                self.assertEqual(go_split(env['CGO_LDFLAGS']), ['-L' + str(prefix / 'lib')])
+                self.assertEqual(go_split(env['CGO_CPPFLAGS']), ffmpeg.native_path_flags(((ffmpeg.ROOT, '.'), (prefix, 'native'))))
+        with self.assertRaisesRegex(RuntimeError, '單引號與雙引號'):
+            ffmpeg.build_environment({}, Path('both\'and"quotes'), 'darwin')
+
+    def test_configure_tools_rejects_path_shadowing_of_requested_compiler(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            requested = self.executable(root / 'toolchain/clang')
+            other = self.executable(root / 'system/clang')
+            cxx = self.executable(root / 'system/clang++')
+            pkg = self.executable(root / 'system/pkg-config')
+            env = {'PATH': str(root / 'toolchain')}
+            with self.assertRaisesRegex(RuntimeError, 'PATH 工具名稱衝突：cc'):
+                ffmpeg.configure_tools({'cc': requested, 'cxx': cxx, 'pkg-config': pkg}, env)
+            # The safe case still writes only names to configure, while every
+            # name resolves to the exact originally requested executable.
+            env = {'PATH': str(root / 'system')}
+            selected = ffmpeg.configure_tools({'cc': other, 'cxx': cxx, 'pkg-config': pkg}, env)
+            self.assertEqual(selected, {'cc': 'clang', 'cxx': 'clang++', 'pkg-config': 'pkg-config'})
+            self.assertEqual(Path(shutil.which(selected['cc'], path=env['PATH'])).resolve(), Path(other).resolve())
+            with self.assertRaisesRegex(RuntimeError, '找不到指定工具：ar'):
+                ffmpeg.configure_tools({'ar': str(root / 'missing/ar')}, env)
+
+    def test_configure_tools_bare_names_are_pinned_before_path_changes(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.executable(root / 'original/clang')
+            self.executable(root / 'new/clang')
+            pkg = self.executable(root / 'new/pkg-config')
+            with self.assertRaisesRegex(RuntimeError, 'PATH 工具名稱衝突：cc'):
+                ffmpeg.configure_tools({'cc': 'clang', 'pkg-config': pkg}, {'PATH': str(root / 'original')})
+            alias = root / 'alias'
+            alias.symlink_to(root / 'original', target_is_directory=True)
+            pkg = self.executable(root / 'original/pkg-config')
+            selected = ffmpeg.configure_tools({'cc': 'clang', 'pkg-config': pkg}, {'PATH': str(alias)})
+            self.assertEqual(selected['cc'], 'clang')
+
+    @unittest.skipUnless(shutil.which('cc'), 'requires C compiler')
+    def test_ffmpeg_unquoted_flags_support_unicode_under_c_locale(self):
+        with tempfile.TemporaryDirectory(prefix='原生路徑-') as temp:
+            root = Path(temp)
+            source, output = root / 'fixture.c', root / 'fixture.o'
+            source.write_text('const char *source_name = __FILE__;\n')
+            environment = ffmpeg.native_environment(dict(os.environ, LC_ALL='C'), ((root, 'source'),), for_configure=True)
+            self.assertNotIn("'", environment['CFLAGS'])
+            subprocess.run(['/bin/sh', '-c', '"$1" $CFLAGS -g -c "$2" -o "$3"',
+                            'configure-test', shutil.which('cc'), str(source), str(output)],
+                           cwd=root, env=environment, capture_output=True, check=True)
+            data = output.read_bytes()
+            self.assertNotIn(str(root).encode(), data)
+            self.assertNotIn(str(root.resolve()).encode(), data)
+            self.assertIn(b'source/fixture.c', data)
 
     def test_second_build_reuses_binaries_after_intermediates_are_removed(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -180,6 +371,70 @@ class NativeBuildTests(unittest.TestCase):
             self.assertEqual(actual_source, source)
             self.assertEqual(env['CGO_CFLAGS'], "-O2 -mmacosx-version-min=13.0 '-I" + str(source / 'src') + "'")
             self.assertEqual(env['CGO_LDFLAGS'], "-lm -mmacosx-version-min=13.0 '-L" + str(build) + "'")
+            self.assertIn('-ffile-prefix-map=', configure.kwargs['env']['CFLAGS'])
+            self.assertIn('-fdebug-prefix-map=', configure.kwargs['env']['CXXFLAGS'])
+            self.assertIn('-trimpath', shlex.split(env['GOFLAGS']))
+
+    def test_turbojpeg_native_flags_select_new_cache_and_unchanged_build_is_reused(self):
+        with tempfile.TemporaryDirectory() as temp:
+            cache = Path(temp)
+            data = b'cached archive fixture'
+            (cache / f'libjpeg-turbo-{turbojpeg.VERSION}.tar.gz').write_bytes(data)
+            (cache / f'libjpeg-turbo-{turbojpeg.VERSION}').mkdir()
+            builds = []
+            def run(args, **kwargs):
+                if '--build' in args:
+                    build = kwargs['cwd']
+                    builds.append(build)
+                    (build / 'libturbojpeg.a').write_bytes(b'valid relative library fixture')
+                return subprocess.CompletedProcess(args, 0)
+            with mock.patch.object(turbojpeg, 'CACHE', cache), \
+                 mock.patch.object(turbojpeg, 'SHA256', hashlib.sha256(data).hexdigest()), \
+                 mock.patch.object(turbojpeg.shutil, 'which', return_value='/tools/cmake'), \
+                 mock.patch.object(turbojpeg.subprocess, 'run', side_effect=run):
+                turbojpeg.prepare('darwin/arm64', {'CFLAGS': '-O2'})
+                previous = builds[0] / 'libturbojpeg.a'
+                before = (previous.read_bytes(), previous.stat().st_mtime_ns)
+                turbojpeg.prepare('darwin/arm64', {'CFLAGS': '-O2'})
+                self.assertEqual(len(builds), 1)
+                turbojpeg.prepare('darwin/arm64', {'CFLAGS': '-O3'})
+                self.assertEqual(len(builds), 2)
+                self.assertNotEqual(builds[0], builds[1])
+                self.assertEqual((previous.read_bytes(), previous.stat().st_mtime_ns), before)
+                previous.write_bytes(b'library\0/home/example-builder/source.c')
+                with self.assertRaisesRegex(RuntimeError, '建置路徑驗證失敗'):
+                    turbojpeg.prepare('darwin/arm64', {'CFLAGS': '-O2'})
+                self.assertEqual(len(builds), 2)
+
+    def test_turbojpeg_cgo_quoted_paths_and_early_unencodable_path_rejection(self):
+        for name in ("builder's files", 'builder"s files', 'both\'and"quotes'):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temp:
+                cache = Path(temp) / name
+                cache.mkdir()
+                data = b'cached archive fixture'
+                (cache / f'libjpeg-turbo-{turbojpeg.VERSION}.tar.gz').write_bytes(data)
+                source = cache / f'libjpeg-turbo-{turbojpeg.VERSION}'
+                source.mkdir()
+                builds = []
+                def run(args, **kwargs):
+                    if '--build' in args:
+                        builds.append(kwargs['cwd'])
+                        (kwargs['cwd'] / 'libturbojpeg.a').write_bytes(b'library fixture')
+                    return subprocess.CompletedProcess(args, 0)
+                with mock.patch.object(turbojpeg, 'CACHE', cache), \
+                     mock.patch.object(turbojpeg, 'SHA256', hashlib.sha256(data).hexdigest()), \
+                     mock.patch.object(turbojpeg.shutil, 'which', return_value='/tools/cmake'), \
+                     mock.patch.object(turbojpeg.subprocess, 'run', side_effect=run) as commands:
+                    if name.startswith('both'):
+                        with self.assertRaisesRegex(RuntimeError, '單引號與雙引號'):
+                            turbojpeg.prepare('darwin/arm64', {})
+                        commands.assert_not_called()
+                    else:
+                        env, _ = turbojpeg.prepare('darwin/arm64', {})
+                        self.assertIn('-I' + str(source / 'src'), go_split(env['CGO_CFLAGS']))
+                        self.assertIn('-L' + str(builds[0]), go_split(env['CGO_LDFLAGS']))
+                        expected = ffmpeg.native_path_flags(((turbojpeg.ROOT, '.'), (source, 'libjpeg-turbo'), (builds[0], 'build')))
+                        self.assertEqual(go_split(env['CGO_CPPFLAGS']), expected)
 
 
 if __name__ == '__main__':

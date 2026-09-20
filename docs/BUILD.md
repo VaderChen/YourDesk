@@ -35,6 +35,7 @@ brew install cmake pkgconf
 Homebrew 的 `pkgconf` 提供 `pkg-config` 指令。x64 原生影音建置另外需要 `nasm`；`make` 與 C/C++ 編譯器由 Xcode Command Line Tools 提供。缺少工具時會在下載來源前停止並列出原因，不會自動安裝全域套件。
 
 原生影音產物保留在專案內的 `.local-run/software-video` 與 `.local-run/turbojpeg`。建置指令使用相對目錄，依賴 FFmpeg／CMake 的標準流程，不預先建立來源別名或覆寫 pkg-config prefix；專案應置於不含空白的本機路徑。
+FFmpeg 組態以相對來源／安裝目錄及 `PATH` 工具名稱記錄建置參數；C／C++ 來源與除錯資訊透過 prefix-map 映射為相對路徑，Go／CGo 使用 `-trimpath`。原生函式庫在驗證及打包複製前都會檢查路徑；建置旗標改變使用獨立快取，保留先前產物。
 libaom 的 `aom.pc` 使用標準 `${pcfiledir}` 變數定位相鄰安裝目錄，避免記錄搬移前的路徑，也避免 FFmpeg 的 C locale 將中文路徑轉義後找不到標頭。
 FFmpeg 的 `install/`（二進位、連結庫及標頭）與 `metadata/`（組態、授權與內容指紋）會長期保留。來源版本／內容、FFmpeg 編譯腳本、編譯器路徑／檔案、建置旗標改變，或產物遺失／內容損壞時才重建；一般 YourDesk 程式或產物清理邏輯修改不重編 FFmpeg。舊版已完成產物會直接接管，不因新增此機制重編。
 每次 FFmpeg 建置或重用成功後，只清除該平台的 `aom/`、`ffmpeg/` 工作目錄（物件檔、CMake／Make 快取）；失敗時保留診斷資料。固定雜湊的來源封存、已解壓來源與授權資料保留，用於離線重建、偵測來源修改及隨包提供來源，不清理 Go 全域快取或其他專案。不要整個刪除 `.local-run/software-video`；那會連已保存的二進位一起刪除。
