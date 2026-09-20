@@ -2012,6 +2012,26 @@
     "ダウンロードして自動更新",
     "다운로드 및 자동 업데이트"
   ],
+  "下載並開啟": [
+    "Download and open",
+    "ダウンロードして開く",
+    "다운로드 후 열기"
+  ],
+  "開啟下載檔案": [
+    "Open downloaded package",
+    "ダウンロードしたパッケージを開く",
+    "다운로드한 패키지 열기"
+  ],
+  "正在開啟下載檔案…": [
+    "Opening downloaded package…",
+    "ダウンロードしたパッケージを開いています…",
+    "다운로드한 패키지를 여는 중…"
+  ],
+  "下載完成後將開啟解壓縮目錄，請手動更新。程式與遠端連線不會自動關閉。": [
+    "After downloading, the extracted folder will open for a manual update. YourDesk and remote sessions will stay open.",
+    "ダウンロード後、展開したフォルダーが開きます。手動で更新してください。アプリとリモート接続は自動終了しません。",
+    "다운로드 후 압축을 푼 폴더가 열립니다. 직접 업데이트하세요. 앱과 원격 연결은 자동으로 종료되지 않습니다."
+  ],
   "下載完成後將自動關閉程式、安裝新版並重新啟動。遠端連線會中斷。": [
     "After downloading, YourDesk will quit, install the update and restart automatically. Remote sessions will disconnect.",
     "ダウンロード後、YourDesk を終了して新版をインストールし、自動で再起動します。リモート接続は切断されます。",

@@ -331,6 +331,16 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 	}()
 	configPeer.Store(peer)
 	authorized.Store(true)
+	if runtime.GOOS == "darwin" || runtime.GOOS == "windows" {
+		// IME clients use the existing command advertisement to distinguish older
+		// Hosts that only understand physical key events. This command is read-only.
+		_ = peer.RegisterCommand("input.text-capabilities", func(commandCtx context.Context) (any, error) {
+			if err := commandCtx.Err(); err != nil {
+				return nil, err
+			}
+			return map[string]any{"supported": true, "maxBytes": input.MaxTextBytes}, nil
+		})
+	}
 	if !options.DisableRemoteData {
 		remotedata.Register(peer, authorized.Load)
 		terminal.Register(peer, authorized.Load, terminalActive.Store)
@@ -359,8 +369,8 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 		if now-previous < 1000 || !lastKeyframeRequest.CompareAndSwap(previous, now) {
 			return map[string]bool{"accepted": true, "coalesced": true}, nil
 		}
-		fullFrameRequested.Store(true)
 		recovery.Add(1)
+		fullFrameRequested.Store(true)
 		return map[string]bool{"accepted": true}, nil
 	})
 
@@ -446,6 +456,9 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 	var lastStatusCodec video.WireCodec
 	lastStatusMode := ""
 	var enhancementReport p2p.EnhancementReport
+	var jpegRefreshActive atomic.Bool
+	jpegRefreshActive.Store(true)
+	var idleRefresh idleFrameRefresh
 	configuredGOP := func() int {
 		// 只有 遠端顯示 已宣告連續解碼能力時才能使用參考影格。
 		if remoteGOP.Load() != 10 {
@@ -457,6 +470,7 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 		return 10
 	}
 	reportEncoding := func(codec video.WireCodec, hardware bool) {
+		jpegRefreshActive.Store(codec == video.WireJPEG)
 		if activeConfig.Revision > 0 {
 			result := &streamconfig.Result{SessionID: configSession, Revision: activeConfig.Revision, Accepted: true, Effective: streamconfig.Effective{Width: enhancementReport.StreamWidth, Height: enhancementReport.StreamHeight, FPS: streamFPS, Bitrate: enhancementReport.Bitrate, Quality: encodeQuality, KeyframeInterval: configuredGOP()}}
 			if !hardware || codec == video.WireJPEG {
@@ -567,11 +581,9 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 		if view.Mode == "paused" {
 			return capturedFrame{}, streampipeline.Skip
 		}
-		img, err := capturer.Capture(current)
-		if fullFrameRequested.Swap(false) && errors.Is(err, desktop.ErrNoNewFrame) {
-			// 靜止畫面也要嘗試提供完整影格，不能一直等下一次桌面變化。
-			img, err = (desktop.ScreenshotCapturer{}).Capture(current)
-		}
+		img, err := idleRefresh.capture(time.Now(), jpegRefreshActive.Load(), fullFrameRequested.Swap(false),
+			func() (image.Image, error) { return capturer.Capture(current) },
+			func() (image.Image, error) { return (desktop.ScreenshotCapturer{}).Capture(current) })
 		if err != nil {
 			if !errors.Is(err, desktop.ErrNoNewFrame) {
 				slog.Warn("capture failed", "error", err)
@@ -755,6 +767,7 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 			if err := peer.SendFrameLimited(stageCtx, frame, batch.BitrateLimit); err != nil {
 				if errors.Is(err, p2p.ErrFrameDropped) {
 					recovery.Add(1)
+					fullFrameRequested.Store(true)
 					return nil
 				}
 				return err
@@ -778,6 +791,8 @@ func handleControl(c input.Controller, e p2p.Control) {
 		err = c.ButtonAt(e.Button, e.Down, e.X, e.Y)
 	case "key":
 		err = c.Key(e.Key, e.Down)
+	case "text":
+		err = input.SendText(c, e.Text)
 	case "wheel":
 		err = c.Wheel(e.Delta)
 	}

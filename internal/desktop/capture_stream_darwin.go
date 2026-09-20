@@ -6,7 +6,9 @@ package desktop
 #cgo LDFLAGS: -framework Foundation -framework ScreenCaptureKit -framework CoreMedia -framework CoreVideo -framework CoreGraphics
 #include <stdlib.h>
 void *yd_capture_open(int,int,int,char*,int);
-int yd_capture_read(void*,unsigned char*,int,int,char*,int);
+int yd_capture_take(void*,void**,int,int,char*,int);
+int yd_capture_copy(void*,unsigned char*,int,int,char*,int);
+void yd_capture_release(void*);
 void yd_capture_close(void*);
 unsigned int yd_capture_display_id(int);
 */
@@ -60,11 +62,17 @@ func (c *liveCapturer) Capture(display int) (image.Image, error) {
 	if c.stream == nil {
 		return c.ScreenshotCapturer.Capture(display)
 	}
-	out := image.NewRGBA(image.Rect(0, 0, c.w, c.h))
 	var message [512]C.char
-	status := int(C.yd_capture_read(c.stream, (*C.uchar)(unsafe.Pointer(&out.Pix[0])), C.int(c.w), C.int(c.h), &message[0], 512))
+	var pixel unsafe.Pointer
+	status := int(C.yd_capture_take(c.stream, &pixel, C.int(c.w), C.int(c.h), &message[0], 512))
 	if status == 1 {
-		return out, nil
+		// 確認有新影格後才配置；原生 buffer 已 retain，不會被擷取回呼覆寫。
+		defer C.yd_capture_release(pixel)
+		out := image.NewRGBA(image.Rect(0, 0, c.w, c.h))
+		status = int(C.yd_capture_copy(pixel, (*C.uchar)(unsafe.Pointer(&out.Pix[0])), C.int(c.w), C.int(c.h), &message[0], 512))
+		if status == 1 {
+			return out, nil
+		}
 	}
 	if status == 0 {
 		return nil, ErrNoNewFrame

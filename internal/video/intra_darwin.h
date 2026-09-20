@@ -113,7 +113,7 @@ static void yd_intra_decode_callback(void *ref,void *source,OSStatus status,VTDe
 typedef struct { VTDecompressionSessionRef session; CMVideoFormatDescriptionRef format; } yd_decoder;
 typedef struct { int width,height,mode; } yd_decode_policy;
 static void yd_decoder_close(yd_decoder *d) { if(d->session){VTDecompressionSessionInvalidate(d->session);CFRelease(d->session);} if(d->format)CFRelease(d->format); d->session=NULL;d->format=NULL; }
-static OSStatus yd_intra_decode(yd_decoder *decoder,CMVideoCodecType codec,const unsigned char *data,size_t length,const yd_decode_policy *policy,int policyCount,unsigned char **out,int *width,int *height,int *hardware) {
+static OSStatus yd_intra_decode(yd_decoder *decoder,CMVideoCodecType codec,const unsigned char *data,size_t length,const yd_decode_policy *policy,int policyCount,CVPixelBufferRef *out,int *width,int *height,int *hardware) {
  *out=NULL;*width=0;*height=0;*hardware=-1;
  if(length<1||data[0]!=(codec==kCMVideoCodecType_HEVC?3:2))return -1;
  size_t count=data[0],pos=1,sizes[3];const uint8_t *params[3];
@@ -164,20 +164,25 @@ static OSStatus yd_intra_decode(yd_decoder *decoder,CMVideoCodecType codec,const
  if(!s)s=result.status;
  if(!s&&!result.image)s=-1;
  if(!s){
-  s=CVPixelBufferLockBaseAddress(result.image,kCVPixelBufferLock_ReadOnly);
-  if(!s){
-   size_t w=CVPixelBufferGetWidth(result.image),h=CVPixelBufferGetHeight(result.image),row=CVPixelBufferGetBytesPerRow(result.image);
-   const unsigned char *base=CVPixelBufferGetBaseAddress(result.image);
-   if(w!=(size_t)dims.width||h!=(size_t)dims.height||!base)s=-1;
-   unsigned char *pixels=s?NULL:malloc(w*h*4);
-   if(!pixels)s=-1;
-   if(!s){for(size_t y=0;y<h;y++)yd_swap_rb_opaque(pixels+y*w*4,base+y*row,w);
-   *out=pixels;*width=(int)w;*height=(int)h;}
-   CVPixelBufferUnlockBaseAddress(result.image,kCVPixelBufferLock_ReadOnly);
-  }
+  size_t w=CVPixelBufferGetWidth(result.image),h=CVPixelBufferGetHeight(result.image);
+  if(w!=(size_t)dims.width||h!=(size_t)dims.height)s=-1;
+  // 將 retained buffer 移交呼叫端；直接轉換到 Go 影格，省掉中間 malloc/GoBytes。
+  if(!s){*out=result.image;result.image=NULL;*width=(int)w;*height=(int)h;}
  }
  if(result.image)CFRelease(result.image);
  if(sample)CFRelease(sample);if(block)CFRelease(block);
  CFRelease(format);return s;
+}
+static OSStatus yd_decoded_copy(uintptr_t handle,unsigned char *out,size_t length) {
+ if(!handle)return -1;
+ CVPixelBufferRef image=(CVPixelBufferRef)handle;
+ size_t w=CVPixelBufferGetWidth(image),h=CVPixelBufferGetHeight(image);
+ if(!out||!w||!h||w>8192||h>8192||w*h>32*1024*1024||length!=w*h*4)return -1;
+ OSStatus s=CVPixelBufferLockBaseAddress(image,kCVPixelBufferLock_ReadOnly);
+ if(s)return s;
+ const unsigned char *base=CVPixelBufferGetBaseAddress(image);size_t row=CVPixelBufferGetBytesPerRow(image);
+ if(!base||row<w*4)s=-1;
+ if(!s)for(size_t y=0;y<h;y++)yd_swap_rb_opaque(out+y*w*4,base+y*row,w);
+ CVPixelBufferUnlockBaseAddress(image,kCVPixelBufferLock_ReadOnly);return s;
 }
 #endif

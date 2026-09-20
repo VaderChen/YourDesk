@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"sync"
 	"time"
+	"unicode/utf8"
 	"yourdeskandroid/core/internal/p2p"
 	"yourdeskandroid/core/internal/security"
 	"yourdeskandroid/core/internal/signaling"
+	"yourdeskandroid/core/internal/streamconfig"
 )
 
 type FrameInfo struct {
@@ -20,18 +22,29 @@ type FrameInfo struct {
 	Bytes         int
 }
 type Viewer struct {
-	mu      sync.Mutex
-	peer    *p2p.Peer
-	cancel  context.CancelFunc
-	onFrame func(FrameInfo)
-	onState func(string)
-	frameMu sync.Mutex
+	mu         sync.Mutex
+	generation uint64
+	peer       *p2p.Peer
+	cancel     context.CancelFunc
+	onFrame    func(FrameInfo)
+	onState    func(string)
+	frameMu    sync.Mutex
 	// JPEG 模式會把一張桌面拆成多個區塊影格；不能只保留最後一筆，
 	// 否則 Android 尚未讀取前面的區塊時，合成基底就會缺塊。
-	frames []*p2p.Frame
+	frames             []*p2p.Frame
+	frameGeneration    uint64
+	frameBytes         int
+	awaitingKeyframe   bool
+	recoveryPending    bool
+	streamSendMu       sync.Mutex
+	streamCapabilities *streamconfig.Capabilities
+	streamRevision     uint64
+	streamRequest      *streamconfig.Request
+	streamResult       *streamconfig.Result
+	streamError        string
 }
 
-func NewViewer() *Viewer                            { return &Viewer{} }
+func NewViewer() *Viewer                            { return &Viewer{awaitingKeyframe: true} }
 func (v *Viewer) SetFrameHandler(h func(FrameInfo)) { v.mu.Lock(); v.onFrame = h; v.mu.Unlock() }
 func (v *Viewer) SetStateHandler(h func(string))    { v.mu.Lock(); v.onState = h; v.mu.Unlock() }
 func (v *Viewer) state(s string) {
@@ -45,15 +58,17 @@ func (v *Viewer) state(s string) {
 
 // Connect 等待認證、ICE 與命令列能力完成才回傳。
 func (v *Viewer) Connect(url, room, secret string) error {
-	v.Close()
+	// Register the new cancellation before notifying observers or closing the old
+	// peer: Close must also cancel a connection still preparing its first dial.
+	ctx, cancel, generation := v.beginConnect()
 	raw, err := security.DecodeSecret(secret)
 	if err != nil {
+		cancel()
 		return err
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	v.mu.Lock()
-	v.cancel = cancel
-	v.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	timer := time.AfterFunc(90*time.Second, cancel)
 	defer timer.Stop()
 	var sig *signaling.Client
@@ -66,7 +81,7 @@ func (v *Viewer) Connect(url, room, secret string) error {
 		cancel()
 		return err
 	}
-	p, err := p2p.NewViewer(ctx, sig, func(f p2p.Frame) { v.enqueueFrame(f) })
+	p, err := p2p.NewViewer(ctx, sig, func(f p2p.Frame) { v.enqueueSessionFrame(f, generation) }, func(c p2p.Control) { v.receiveStreamControl(c, generation) })
 	if err != nil {
 		sig.Close()
 		cancel()
@@ -90,11 +105,11 @@ func (v *Viewer) Connect(url, room, secret string) error {
 		}
 	}
 	v.mu.Lock()
-	if ctx.Err() != nil {
+	if ctx.Err() != nil || v.generation != generation {
 		v.mu.Unlock()
 		p.Close()
 		sig.Close()
-		return ctx.Err()
+		return context.Canceled
 	}
 	v.peer = p
 	v.mu.Unlock()
@@ -109,11 +124,18 @@ func (v *Viewer) Connect(url, room, secret string) error {
 	}()
 	return nil
 }
-func (v *Viewer) Close() {
+
+func (v *Viewer) beginConnect() (context.Context, context.CancelFunc, uint64) {
+	ctx, cancel := context.WithCancel(context.Background())
 	v.mu.Lock()
 	p, c := v.peer, v.cancel
-	v.peer = nil
-	v.cancel = nil
+	v.generation++
+	generation := v.generation
+	v.peer, v.cancel = nil, cancel
+	v.resetStreamLocked()
+	v.frameMu.Lock()
+	v.resetFramesLocked(generation)
+	v.frameMu.Unlock()
 	v.mu.Unlock()
 	if c != nil {
 		c()
@@ -121,59 +143,103 @@ func (v *Viewer) Close() {
 	if p != nil {
 		_ = p.Close()
 	}
+	v.state("closed")
+	return ctx, cancel, generation
+}
+
+func (v *Viewer) Close() {
+	v.mu.Lock()
+	p, c := v.peer, v.cancel
+	v.generation++
+	v.peer = nil
+	v.cancel = nil
+	v.resetStreamLocked()
 	v.frameMu.Lock()
-	v.frames = nil
+	v.resetFramesLocked(v.generation)
 	v.frameMu.Unlock()
+	v.mu.Unlock()
+	if c != nil {
+		c()
+	}
+	if p != nil {
+		_ = p.Close()
+	}
 	v.state("closed")
 }
 func (v *Viewer) Terminal() *TerminalSession { return &TerminalSession{viewer: v} }
 
-const maxQueuedFrames = 512
+const (
+	maxQueuedFrames     = 512
+	maxQueuedFrameBytes = 32 * 1024 * 1024
+)
+
+func (v *Viewer) resetFramesLocked(generation uint64) {
+	v.frames = nil
+	v.frameBytes = 0
+	v.frameGeneration = generation
+	v.awaitingKeyframe = true
+	v.recoveryPending = false
+}
 
 // enqueueFrame 保留接收順序。JPEG 差分影格的 x/y 是貼回完整畫面的座標，
-// 少掉任何一個區塊都可能留下舊畫面，因此佇列溢位時優先從最近的 keyframe 重建。
+// 少掉任何一個區塊都可能留下舊畫面。溢位時丟棄整條相依鏈，直到完整
+// keyframe 才恢復；張數與位元組都設上限，不在 DataChannel 回呼等待解碼。
 func (v *Viewer) enqueueFrame(f p2p.Frame) {
+	v.enqueueSessionFrame(f, 0)
+}
+
+func (v *Viewer) enqueueSessionFrame(f p2p.Frame, generation uint64) {
 	copyFrame := f
 	v.frameMu.Lock()
-	if len(v.frames) >= maxQueuedFrames {
-		drop := 1
-		for i := len(v.frames) - 1; i >= 0; i-- {
-			if v.frames[i] != nil && v.frames[i].Keyframe {
-				drop = i
-				break
-			}
-		}
-		if drop > 0 {
-			copy(v.frames, v.frames[drop:])
-			for i := len(v.frames) - drop; i < len(v.frames); i++ {
-				v.frames[i] = nil
-			}
-			v.frames = v.frames[:len(v.frames)-drop]
-		}
+	if generation != v.frameGeneration {
+		v.frameMu.Unlock()
+		return
+	}
+	if len(f.JPEG) == 0 || len(f.JPEG) > maxQueuedFrameBytes || len(v.frames) >= maxQueuedFrames || v.frameBytes > maxQueuedFrameBytes-len(f.JPEG) {
+		v.frames = nil
+		v.frameBytes = 0
+		v.awaitingKeyframe = true
+		v.recoveryPending = true
+	}
+	if len(f.JPEG) == 0 || len(f.JPEG) > maxQueuedFrameBytes || (v.awaitingKeyframe && !f.Keyframe) {
+		v.recoveryPending = true
+		v.frameMu.Unlock()
+		return
+	}
+	if f.Keyframe {
+		v.awaitingKeyframe = false
+		v.recoveryPending = false
 	}
 	v.frames = append(v.frames, &copyFrame)
+	v.frameBytes += len(f.JPEG)
 	v.frameMu.Unlock()
 
 	v.mu.Lock()
 	h := v.onFrame
+	current := v.generation == generation
 	v.mu.Unlock()
-	if h != nil {
+	if current && h != nil {
 		h(FrameInfo{Sequence: f.Sequence, Display: f.Display, Width: int(f.Width), Height: int(f.Height), Codec: int(f.Codec), Keyframe: f.Keyframe, Bytes: len(f.JPEG)})
 	}
+}
+
+// ConsumeFrameRecoveryRequest 由 Android frame pump 輪詢，並在自己的
+// command worker 節流要求 video.keyframe；接收回呼只設旗標，不等待網路。
+func (v *Viewer) ConsumeFrameRecoveryRequest() bool {
+	v.frameMu.Lock()
+	defer v.frameMu.Unlock()
+	pending := v.recoveryPending
+	v.recoveryPending = false
+	return pending
 }
 
 // ReadFrameJSON 依接收順序取得一筆影格。JPEG 差分影格必須逐筆合成，
 // 所以不能覆寫成「最近一筆」；尚未有影格時回傳空字串。
 func (v *Viewer) ReadFrameJSON() string {
-	v.frameMu.Lock()
-	defer v.frameMu.Unlock()
-	if len(v.frames) == 0 {
+	f := v.popFrame()
+	if f == nil {
 		return ""
 	}
-	f := v.frames[0]
-	copy(v.frames, v.frames[1:])
-	v.frames[len(v.frames)-1] = nil
-	v.frames = v.frames[:len(v.frames)-1]
 	b, _ := json.Marshal(struct {
 		Sequence uint64 `json:"sequence"`
 		Display  int    `json:"display"`
@@ -186,6 +252,23 @@ func (v *Viewer) ReadFrameJSON() string {
 		Data     []byte `json:"data"`
 	}{f.Sequence, f.Display, f.Width, f.Height, f.X, f.Y, f.Codec, f.Keyframe, f.JPEG})
 	return string(b)
+}
+
+func (v *Viewer) popFrame() *p2p.Frame {
+	v.frameMu.Lock()
+	if len(v.frames) == 0 {
+		v.frameMu.Unlock()
+		return nil
+	}
+	f := v.frames[0]
+	copy(v.frames, v.frames[1:])
+	v.frames[len(v.frames)-1] = nil
+	v.frames = v.frames[:len(v.frames)-1]
+	v.frameBytes -= len(f.JPEG)
+	// JSON/Base64 costs scale with payload size. Never hold the receive lock
+	// while serializing or copying the return string across the JNI boundary.
+	v.frameMu.Unlock()
+	return f
 }
 
 // TrafficJSON 回傳目前 P2P DataChannel 的累計有效資料量。
@@ -320,6 +403,9 @@ func (v *Viewer) SendVideoCapabilities(codecs, hardware []byte) error {
 
 // SendControlJSON 傳送既有 control DataChannel JSON 封包。
 func (v *Viewer) SendControlJSON(payload string) error {
+	if !utf8.ValidString(payload) || len(payload) > 128*1024 {
+		return fmt.Errorf("控制封包不是有效 UTF-8 或超過大小上限")
+	}
 	v.mu.Lock()
 	p := v.peer
 	v.mu.Unlock()
@@ -329,6 +415,9 @@ func (v *Viewer) SendControlJSON(payload string) error {
 	var c p2p.Control
 	if err := json.Unmarshal([]byte(payload), &c); err != nil {
 		return err
+	}
+	if c.Type == "text" && (len(c.Text) == 0 || len(c.Text) > 16*1024 || !utf8.ValidString(c.Text)) {
+		return fmt.Errorf("輸入文字不是有效 UTF-8 或超過 16 KiB")
 	}
 	return p.SendControl(c)
 }

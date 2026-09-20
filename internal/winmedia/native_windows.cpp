@@ -22,6 +22,7 @@
 #include <cstring>
 #include <cstdio>
 #include "readback.h"
+#include "video_color.h"
 using Microsoft::WRL::ComPtr;
 static thread_local char ydFailure[1024]{};
 static HRESULT traceFailure(HRESULT hr,const char *step){
@@ -70,7 +71,7 @@ struct GPU {
   CHECK(texture(ow,oh,fmt,D3D11_BIND_RENDER_TARGET,D3D11_USAGE_DEFAULT,0,&target));
   sw=iw;sh=ih;dw=ow;dh=oh;format=fmt;return S_OK;
  }
- HRESULT convert(ID3D11Texture2D *source,UINT sub,int iw,int ih,int ow,int oh,DXGI_FORMAT fmt){
+ HRESULT convert(ID3D11Texture2D *source,UINT sub,int iw,int ih,int ow,int oh,DXGI_FORMAT fmt,const D3D11_VIDEO_PROCESSOR_COLOR_SPACE *decodedColor=nullptr){
   CHECK(prepare(iw,ih,ow,oh,fmt));
   D3D11_TEXTURE2D_DESC srcDesc{};source->GetDesc(&srcDesc);
   UINT support=0;CHECK(enumerator->CheckVideoProcessorFormat(srcDesc.Format,&support));if(!(support&D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT_INPUT))return E_NOINTERFACE;
@@ -83,8 +84,9 @@ struct GPU {
   videoContext->VideoProcessorSetStreamAutoProcessingMode(processor.Get(),0,FALSE);
   videoContext->VideoProcessorSetStreamSourceRect(processor.Get(),0,TRUE,&sr);videoContext->VideoProcessorSetStreamDestRect(processor.Get(),0,TRUE,&dr);videoContext->VideoProcessorSetOutputTargetRect(processor.Get(),TRUE,&dr);
   D3D11_VIDEO_PROCESSOR_COLOR_SPACE inputColor{},outputColor{};
-  inputColor.YCbCr_Matrix=0;inputColor.Nominal_Range=srcDesc.Format==DXGI_FORMAT_NV12?1:2;
-  outputColor.YCbCr_Matrix=0;outputColor.Nominal_Range=fmt==DXGI_FORMAT_NV12?1:2;
+  inputColor.YCbCr_Matrix=1;inputColor.Nominal_Range=srcDesc.Format==DXGI_FORMAT_NV12?D3D11_VIDEO_PROCESSOR_NOMINAL_RANGE_16_235:D3D11_VIDEO_PROCESSOR_NOMINAL_RANGE_0_255;
+  if(decodedColor)inputColor=*decodedColor;
+  outputColor.YCbCr_Matrix=1;outputColor.Nominal_Range=fmt==DXGI_FORMAT_NV12?D3D11_VIDEO_PROCESSOR_NOMINAL_RANGE_16_235:D3D11_VIDEO_PROCESSOR_NOMINAL_RANGE_0_255;
   videoContext->VideoProcessorSetStreamColorSpace(processor.Get(),0,&inputColor);videoContext->VideoProcessorSetOutputColorSpace(processor.Get(),&outputColor);
   D3D11_VIDEO_PROCESSOR_STREAM stream{};stream.Enable=TRUE;stream.pInputSurface=input.Get();
   CHECK(videoContext->VideoProcessorBlt(processor.Get(),output.Get(),0,1,&stream));return device->GetDeviceRemovedReason();
@@ -250,10 +252,13 @@ struct yd_media {
   HRESULT result=selectTransform(MFT_CATEGORY_VIDEO_ENCODER,MFT_ENUM_FLAG_HARDWARE|MFT_ENUM_FLAG_SORTANDFILTER,in,out,[&](IMFActivate *act)->HRESULT{
     CHECK(transform.attach(act,gpu,false));ComPtr<IMFMediaType> input,output;
     CHECK(mediaType(encodeCodec,width,height,frames,output));// Quality 模式忽略平均碼率；保留正值以滿足媒體型別格式要求。
+    CHECK(output->SetUINT32(MF_MT_YUV_MATRIX,MFVideoTransferMatrix_BT709));CHECK(output->SetUINT32(MF_MT_VIDEO_NOMINAL_RANGE,MFNominalRange_16_235));
     CHECK(output->SetUINT32(MF_MT_AVG_BITRATE,bitrate>0?bitrate:1));if(encodeCodec==MFVideoFormat_H264)output->SetUINT32(MF_MT_MPEG2_PROFILE,eAVEncH264VProfile_Base);
     CHECK(setCodec(transform.mft.Get(),CODECAPI_AVEncCommonRateControlMode,bitrate>0?eAVEncCommonRateControlMode_CBR:eAVEncCommonRateControlMode_Quality));
     if(bitrate<=0)CHECK(setCodec(transform.mft.Get(),CODECAPI_AVEncCommonQuality,q));
-    CHECK(transform.mft->SetOutputType(transform.output,output.Get(),0));CHECK(mediaType(MFVideoFormat_NV12,width,height,frames,input));CHECK(transform.mft->SetInputType(transform.input,input.Get(),0));
+    CHECK(transform.mft->SetOutputType(transform.output,output.Get(),0));CHECK(mediaType(MFVideoFormat_NV12,width,height,frames,input));
+    CHECK(input->SetUINT32(MF_MT_YUV_MATRIX,MFVideoTransferMatrix_BT709));CHECK(input->SetUINT32(MF_MT_VIDEO_NOMINAL_RANGE,MFNominalRange_16_235));
+    CHECK(transform.mft->SetInputType(transform.input,input.Get(),0));
     if(bitrate>0)CHECK(setCodec(transform.mft.Get(),CODECAPI_AVEncCommonMeanBitRate,bitrate));
     // GOP 關閉 B 幀重排，第一張與每個週期要求 IDR。
     HRESULT intervalResult=setCodec(transform.mft.Get(),CODECAPI_AVEncMPVGOPSize,keyInterval);
@@ -368,18 +373,12 @@ static int decodeFrame(yd_media *m,const unsigned char *data,size_t size,int wid
    try{pixels.assign(data,data+bytes);}catch(...){buffer->Unlock();throw;}buffer->Unlock();
   }
   if(pixels.size()<(size_t)stride*h*3/2)return E_FAIL;
-  UINT32 matrix=MFVideoTransferMatrix_BT601,range=MFNominalRange_16_235;
-  type->GetUINT32(MF_MT_YUV_MATRIX,&matrix);type->GetUINT32(MF_MT_VIDEO_NOMINAL_RANGE,&range);
-  bool full=range==MFNominalRange_0_255,bt709=matrix==MFVideoTransferMatrix_BT709;
+  D3D11_VIDEO_PROCESSOR_COLOR_SPACE color{};CHECK(yd_media_yuv_color(type.Get(),&color));
   out->size=(size_t)w*h*4;out->data=(unsigned char*)malloc(out->size);if(!out->data)return E_OUTOFMEMORY;out->width=w;out->height=h;
-  auto clamp=[](int v)->unsigned char{return (unsigned char)std::max(0,std::min(255,v));};
   for(UINT32 y=0;y<h;y++)for(UINT32 x=0;x<w;x++){
-   int l=pixels[(size_t)y*stride+x],u=pixels[(size_t)stride*h+(y/2)*stride+(x&~1)]-128,v=pixels[(size_t)stride*h+(y/2)*stride+(x&~1)+1]-128;
-   int c=full?256*l:298*(l-16);
+   int l=pixels[(size_t)y*stride+x],u=pixels[(size_t)stride*h+(y/2)*stride+(x&~1)],v=pixels[(size_t)stride*h+(y/2)*stride+(x&~1)+1];
    size_t p=((size_t)y*w+x)*4;
-   out->data[p]=clamp((c+(full?(bt709?403:359):(bt709?459:409))*v+128)>>8);
-   out->data[p+1]=clamp((c-(full?(bt709?48:88):(bt709?55:100))*u-(full?(bt709?120:183):(bt709?136:208))*v+128)>>8);
-   out->data[p+2]=clamp((c+(full?(bt709?475:454):(bt709?541:516))*u+128)>>8);out->data[p+3]=255;
+   yd_yuv_to_rgba(l,u,v,color,out->data+p);
   }
   CHECK(m->transform.finishDrain());return S_OK;
  }
@@ -388,7 +387,8 @@ static int decodeFrame(yd_media *m,const unsigned char *data,size_t size,int wid
  D3D11_TEXTURE2D_DESC desc{};texture->GetDesc(&desc);UINT32 w=0,h=0;ComPtr<IMFMediaType> type;
  CHECK(m->transform.mft->GetOutputCurrentType(m->transform.output,&type));CHECK(MFGetAttributeSize(type.Get(),MF_MT_FRAME_SIZE,&w,&h));
  if(!validSize(w,h)||w>desc.Width||h>desc.Height)return E_INVALIDARG;
- CHECK(m->gpu.convert(texture.Get(),sub,w,h,w,h,DXGI_FORMAT_R8G8B8A8_UNORM));
+ D3D11_VIDEO_PROCESSOR_COLOR_SPACE color{};CHECK(yd_media_yuv_color(type.Get(),&color));
+ CHECK(m->gpu.convert(texture.Get(),sub,w,h,w,h,DXGI_FORMAT_R8G8B8A8_UNORM,&color));
  out->size=(size_t)w*h*4;out->data=(unsigned char*)malloc(out->size);if(!out->data)return E_OUTOFMEMORY;out->width=w;out->height=h;
  return m->gpu.read(out->data,w*4);
 } catch(const std::bad_alloc &){return E_OUTOFMEMORY;} catch(...){return E_FAIL;}

@@ -66,10 +66,11 @@ func openViewerConnection(parent, handshakeCtx context.Context, sig *signaling.C
 	receivedMode := "unknown"
 
 	var stats viewerPipelineStats
-	var lastRecoveryRequest atomic.Int64
+	recovery := newFrameRecovery()
+	var jpegFrames jpegContinuity
 	var lastVideoSequence uint64
 	var lastVideoDisplay int
-	decodeFrames := streampipeline.NewConsumer(ctx, func(f p2p.Frame) {
+	decodeFrames := streampipeline.NewConsumer(ctx, func(f receivedFrame) {
 		g.mu.RLock()
 		ignore := ctx.Err() != nil || g.agentViewChanging || g.agentPaused || f.ViewID != g.agentViewID
 		g.mu.RUnlock()
@@ -83,8 +84,18 @@ func openViewerConnection(parent, handshakeCtx context.Context, sig *signaling.C
 		if f.Codec == 0 {
 			videoDecoder.Close()
 			lastVideoSequence = 0
+			allow, gap := jpegFrames.accept(f.Frame, recovery.pending())
+			if gap {
+				stats.gaps.Add(1)
+			}
+			if !allow {
+				stats.waiting.Add(1)
+				recovery.request()
+				return
+			}
 			img, e = jpegDecoder.Decode(f.JPEG)
 		} else {
+			jpegFrames = jpegContinuity{}
 			if lastVideoSequence != 0 && (f.Sequence != lastVideoSequence+1 || int(f.Display) != lastVideoDisplay) {
 				videoDecoder.Close()
 				stats.gaps.Add(1)
@@ -95,20 +106,7 @@ func openViewerConnection(parent, handshakeCtx context.Context, sig *signaling.C
 			keyframe, _ := video.IsKeyframe(video.WireCodec(f.Codec), f.JPEG)
 			if errors.Is(e, video.ErrNeedKeyframe) || (e != nil && !keyframe) {
 				stats.waiting.Add(1)
-				now := time.Now().UnixMilli()
-				previous := lastRecoveryRequest.Load()
-				if now-previous >= 2000 && lastRecoveryRequest.CompareAndSwap(previous, now) {
-					g.mu.RLock()
-					remote := g.peer
-					g.mu.RUnlock()
-					if remote != nil && remote.SupportsCommand("video.keyframe") {
-						go func() {
-							requestCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
-							defer cancel()
-							_, _ = remote.CallCommand(requestCtx, "video.keyframe")
-						}()
-					}
-				}
+				recovery.request()
 				return
 			}
 			if e == nil {
@@ -123,6 +121,10 @@ func openViewerConnection(parent, handshakeCtx context.Context, sig *signaling.C
 			}
 		}
 		if e != nil {
+			if f.Codec == 0 {
+				jpegFrames.valid = false
+				recovery.request()
+			}
 			stats.failed.Add(1)
 			slog.Warn("decode frame", "error", e)
 			return
@@ -149,6 +151,7 @@ func openViewerConnection(parent, handshakeCtx context.Context, sig *signaling.C
 		}
 		if !f.Keyframe && (g.frame == nil || g.frame.Bounds().Dx() != int(f.Width) || g.frame.Bounds().Dy() != int(f.Height)) {
 			g.mu.Unlock()
+			recovery.request()
 			return
 		}
 		if g.displayKnown && (f.Display != g.display || (g.displayPending && !f.Keyframe)) {
@@ -165,6 +168,12 @@ func openViewerConnection(parent, handshakeCtx context.Context, sig *signaling.C
 		g.frameDisplay = f.Display
 		g.width, g.height = int(f.Width), int(f.Height)
 		g.mu.Unlock()
+		if f.Keyframe {
+			restored := recovery.complete(f.recoveryEpoch)
+			if f.Codec == 0 {
+				jpegFrames.valid = restored
+			}
+		}
 		connection.readyOnce.Do(func() { close(connection.ready) })
 	})
 	connection.cleanup = func() { decodeFrames.Close(); videoDecoder.Close(); jpegDecoder.Close() }
@@ -174,7 +183,7 @@ func openViewerConnection(parent, handshakeCtx context.Context, sig *signaling.C
 		// 封包已重組為獨立記憶體，交給解碼 worker 後即可接收下一幀。
 		// 網路回呼不可等待解碼 worker；滿載時略過影格，讓
 		// DataChannel read loop 持續消費 SCTP。
-		if !decodeFrames.TrySubmit(f) {
+		if !recovery.submit(f, decodeFrames.TrySubmit) {
 			slog.Debug("遠端顯示 解碼佇列滿載，略過影格")
 		}
 	}, func(c p2p.Control) {
@@ -225,6 +234,18 @@ func openViewerConnection(parent, handshakeCtx context.Context, sig *signaling.C
 		return connection, err
 	}
 	connection.peer = peer
+	connection.workers.Add(1)
+	go func() {
+		defer connection.workers.Done()
+		recovery.run(ctx, func(requestCtx context.Context) {
+			g.mu.RLock()
+			paused := g.agentPaused || g.agentViewChanging
+			g.mu.RUnlock()
+			if !paused && peer.SupportsCommand("video.keyframe") {
+				_, _ = peer.CallCommand(requestCtx, "video.keyframe")
+			}
+		})
+	}()
 	// 定期公告可接收格式，避免初次 DataChannel 開啟時序遺失協商。
 	connection.workers.Add(1)
 	go func() {

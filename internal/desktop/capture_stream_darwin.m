@@ -87,7 +87,8 @@ void *yd_capture_open(int display,int w,int h,char *error,int length){@autorelea
  }
  snprintf(error,length,"ScreenCaptureKit 需要 macOS 13 以上");return NULL;
 }}
-int yd_capture_read(void *handle,unsigned char *out,int w,int h,char *error,int length){@autoreleasepool{
+int yd_capture_take(void *handle,void **out,int w,int h,char *error,int length){@autoreleasepool{
+ *out=NULL;
  YDLiveCapture *capture=handle;[capture->condition lock];NSDate *until=[NSDate dateWithTimeIntervalSinceNow:0.1];
  while(!capture->closed&&!capture->failure&&(!capture->latest||capture->revision==capture->consumed)){
   if(![capture->condition waitUntilDate:until])break;
@@ -97,10 +98,17 @@ int yd_capture_read(void *handle,unsigned char *out,int w,int h,char *error,int 
  if(!buffer||capture->revision==capture->consumed){[capture->condition unlock];return 0;}
  CVPixelBufferRetain(buffer);capture->consumed=capture->revision;[capture->condition unlock];
  if(CVPixelBufferGetWidth(buffer)!=w||CVPixelBufferGetHeight(buffer)!=h){CVPixelBufferRelease(buffer);snprintf(error,length,"擷取尺寸已改變");return -1;}
+ *out=buffer;return 1;
+}}
+void yd_capture_release(void *pixel){CVPixelBufferRelease((CVPixelBufferRef)pixel);}
+int yd_capture_copy(void *pixel,unsigned char *out,int w,int h,char *error,int length){@autoreleasepool{
+ CVPixelBufferRef buffer=(CVPixelBufferRef)pixel;
+ if(!buffer||!out||w<=0||h<=0||CVPixelBufferGetWidth(buffer)!=(size_t)w||CVPixelBufferGetHeight(buffer)!=(size_t)h){snprintf(error,length,"擷取尺寸無效");return -1;}
  CVReturn locked=CVPixelBufferLockBaseAddress(buffer,kCVPixelBufferLock_ReadOnly);
- if(locked!=kCVReturnSuccess){CVPixelBufferRelease(buffer);snprintf(error,length,"無法讀取擷取影像");return -1;}
+ if(locked!=kCVReturnSuccess){snprintf(error,length,"無法讀取擷取影像");return -1;}
  const unsigned char *base=CVPixelBufferGetBaseAddress(buffer);size_t stride=CVPixelBufferGetBytesPerRow(buffer);
+ if(!base||stride<(size_t)w*4){CVPixelBufferUnlockBaseAddress(buffer,kCVPixelBufferLock_ReadOnly);snprintf(error,length,"無效擷取影像");return -1;}
  for(int y=0;y<h;y++){const unsigned char *src=base+y*stride;unsigned char *dst=out+(size_t)y*w*4;for(int x=0;x<w;x++){dst[x*4]=src[x*4+2];dst[x*4+1]=src[x*4+1];dst[x*4+2]=src[x*4];dst[x*4+3]=255;}}
- CVPixelBufferUnlockBaseAddress(buffer,kCVPixelBufferLock_ReadOnly);CVPixelBufferRelease(buffer);return 1;
+ CVPixelBufferUnlockBaseAddress(buffer,kCVPixelBufferLock_ReadOnly);return 1;
 }}
 void yd_capture_close(void *handle){@autoreleasepool{YDLiveCapture *capture=handle;[capture shutdown];[capture release];}}

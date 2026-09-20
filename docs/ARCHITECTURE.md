@@ -8,6 +8,16 @@ YourDesk 是以 Go 開發的 P2P 遠端桌面，提供內嵌 HTML／JavaScript�
 
 ![YourDesk 介面預覽](../images/cap001.png)
 
+## 開發分支：接收恢復與 Android Viewer
+
+以下為 2026-09-21 同步的原始碼行為，尚未發布為新安裝包。桌面版將接收、解碼與恢復要求分開；JPEG 差分基底失效後，必須等完整影格重建，Host 的靜止 JPEG 畫面每 5 秒提供一次恢復機會。Control 的開啟、排隊與傳送維持順序，滿載回報錯誤，不丟棄已接受的按鍵事件。詳見[桌面修復與驗證](DEEP-REVIEW-FIXES-2026-09-20.md)。
+
+Android Viewer 位於 `android/`，使用獨立 Go module 與預編譯 AAR，不直接引用桌面 core。接收佇列同時限制 512 張與 32 MiB，溢位清除相依鏈並通知 UI 請求完整影格；JSON／Base64 序列化移到接收鎖外。JPEG 在配置 Bitmap 前檢查真正尺寸；H.264／HEVC 使用 MediaCodec／Surface，重建或缺幀後要求 IDR，候選解碼器耗盡時撤回能力並重新協商。佇列預算不是整個 APP 的記憶體上限，單張 JPEG 仍在 UI thread 解碼。
+
+Android 中文 IME 採獨立 `text` 控制訊息，每筆最多 16 KiB UTF-8；新版 Host 公告 `input.text-capabilities` 並以 macOS／Windows Unicode API 注入，不借用剪貼簿。舊 Host 保留可映射的 ASCII 按鍵，中文明示需更新。Android 的畫質與縮放使用完整 `stream-config` 快照及 Host ACK，不再將所有縮放比例轉成同一個布林旗標。
+
+此 Android 原始碼已做主機端測試與真實 Android API 型別編譯，但舊 AAR 尚未重建，完整 APK／16 KB／相機與 codec 實機驗收仍待完成；不能將桌面版支援範圍直接套用到 Android。建置與限制見 [Android 建置](ANDROID-BUILD.md)及[修正紀錄](ANDROID-REVIEW-FIXES-2026-09-20.md)。
+
 ## 下載與啟動
 
 從 [GitHub Releases](https://github.com/VaderChen/YourDesk/releases/latest) 下載對應平台套件。Release 名稱與 App 顯示版本一致：`1.YY.MMDD build HHmm`；標籤以 `1.YY.MMDD-build-HHmm` 表示同一版號。
@@ -79,7 +89,7 @@ macOS 低流量縮圖優先使用 Metal／Core Image GPU；初始化或運算失
 
 macOS 被控端依系統雙擊時間與游標位置累積連點次數，按下／放開事件帶有一致的 `clickState`；移動超過容許距離或切換按鍵時重新計算。按住滑鼠移動時注入對應的拖曳事件。
 
-新版 Client／遠端顯示 協商原始鍵盤模式。遠端顯示 在本機輸入法處理前擷取實體按下／放開事件，傳送來源平台掃描碼、修飾鍵旗標與按鍵重複資訊，不傳送 遠端顯示 輸入法產生的組字文字。
+桌面版 Client／遠端顯示 協商原始鍵盤模式。桌面 遠端顯示 在本機輸入法處理前擷取實體按下／放開事件，傳送來源平台掃描碼、修飾鍵旗標與按鍵重複資訊，不傳送 遠端顯示 輸入法產生的組字文字。Android 的 committed-text 路徑見上方開發分支說明。
 
 同平台使用原始碼注入；跨平台按實體鍵位置映射。左右 Shift／Ctrl／Alt／Meta 分開處理；預設啟用 MacOS/Windows 按鍵映射：Mac → Windows 將左右 Command 映射至同側 Ctrl，Windows → Mac 將左右 Ctrl 映射至同側 Command；關閉後維持實體鍵對應；輸入結果由遠端鍵盤配置與輸入法決定。
 

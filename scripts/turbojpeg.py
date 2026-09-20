@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tarfile
 import urllib.request
+import macos_build
 
 VERSION = '3.2.0'
 SHA256 = '6f30092cef9fb839779646608f4ee14ae3cbac989c47fa05e841b0841f09878e'
@@ -17,6 +18,7 @@ CACHE = ROOT / '.local-run' / 'turbojpeg'
 
 def prepare(target, env):
     """回傳含靜態函式庫路徑的建置環境，以及原始碼授權目錄。"""
+    env = macos_build.environment(target, env)
     if not shutil.which('cmake'):
         raise RuntimeError('TurboJPEG 建置需要 CMake')
     system, arch = target.split('/')
@@ -47,22 +49,25 @@ def prepare(target, env):
     build = CACHE / f'{system}-{arch}-{signature}'
     library = build / 'libturbojpeg.a'
     if not library.exists():
-        args = ['cmake', '-S', str(source), '-B', str(build), '-DCMAKE_BUILD_TYPE=Release',
+        build.mkdir(parents=True, exist_ok=True)
+        args = ['cmake', '-S', os.path.relpath(source, build), '-B', '.', '-DCMAKE_BUILD_TYPE=Release',
                 '-DENABLE_SHARED=OFF', '-DENABLE_STATIC=ON', '-DWITH_TURBOJPEG=ON',
                 '-DWITH_SIMD=ON', '-DCMAKE_POSITION_INDEPENDENT_CODE=ON',
-                f'-DCMAKE_INSTALL_PREFIX={build / "install"}',
+                '-DCMAKE_INSTALL_PREFIX=install',
                 f'-DCMAKE_C_COMPILER={compiler}']
         if system == 'windows':
             args += ['-DCMAKE_SYSTEM_NAME=Windows', f'-DCMAKE_SYSTEM_PROCESSOR={"ARM64" if arch == "arm64" else "AMD64"}']
         elif system == 'darwin':
-            args += [f'-DCMAKE_OSX_ARCHITECTURES={arch}']
-        subprocess.run(args, check=True, env=env)
-        subprocess.run(['cmake', '--build', str(build), '--target', 'turbojpeg-static', '--parallel', '4'], check=True, env=env)
+            args += [f'-DCMAKE_OSX_ARCHITECTURES={arch}',
+                     f'-DCMAKE_OSX_DEPLOYMENT_TARGET={macos_build.MINIMUM_VERSION}']
+        subprocess.run(args, cwd=build, check=True, env=env)
+        subprocess.run(['cmake', '--build', '.', '--target', 'turbojpeg-static', '--parallel', '4'], cwd=build, check=True, env=env)
         if not library.exists():
             raise RuntimeError(f'TurboJPEG 靜態函式庫不存在：{library}')
     result = dict(env)
-    result['CGO_CFLAGS'] = (result.get('CGO_CFLAGS', '') + f' -I{shlex.quote(str(source / "src"))}').strip()
-    result['CGO_LDFLAGS'] = (result.get('CGO_LDFLAGS', '') + f' -L{shlex.quote(str(build))}').strip()
+    # CGo 在不同套件目錄執行；完整路徑由專案位置推導，整個 -I/-L 參數一起加引號。
+    result['CGO_CFLAGS'] = (result.get('CGO_CFLAGS', '') + ' ' + shlex.quote('-I' + str(source / 'src'))).strip()
+    result['CGO_LDFLAGS'] = (result.get('CGO_LDFLAGS', '') + ' ' + shlex.quote('-L' + str(build))).strip()
     return result, source
 
 

@@ -9,8 +9,14 @@ import (
 // Media Foundation 的 Annex B／avcC 輸出在這裡統一轉換；容許 GOP 中的參考影格。
 // 長度前綴必須能完整解析整份資料，不能只以開頭幾個位元組猜測。
 func h264LengthNALs(data []byte) ([][]byte, error) {
+	if len(data) > 32<<20 {
+		return nil, fmt.Errorf("H.264 影格過大")
+	}
 	var result [][]byte
 	for len(data) > 0 {
+		if len(result) >= maxVideoNALs {
+			return nil, fmt.Errorf("H.264 NAL 過多")
+		}
 		if len(data) < 4 {
 			return nil, fmt.Errorf("H.264 NAL 長度不足")
 		}
@@ -39,6 +45,18 @@ func h264NALs(data []byte) ([][]byte, error) {
 }
 func h264AnnexBNALs(data []byte) ([][]byte, error) {
 	var result [][]byte
+	err := walkH264AnnexB(data, func(nal []byte) { result = append(result, nal) })
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// 逐一驗證 NAL，不先建立每個 NAL 的 slice table；尺寸解析只需保留 SPS。
+func walkH264AnnexB(data []byte, visit func([]byte)) error {
+	if len(data) > 32<<20 {
+		return fmt.Errorf("H.264 影格過大")
+	}
 	start := func(offset int) (int, int) {
 		for i := offset; i+3 <= len(data); i++ {
 			if data[i] == 0 && data[i+1] == 0 {
@@ -54,14 +72,18 @@ func h264AnnexBNALs(data []byte) ([][]byte, error) {
 	}
 	first, prefix := start(0)
 	if first < 0 {
-		return nil, fmt.Errorf("H.264 缺少 Annex B 起始碼")
+		return fmt.Errorf("H.264 缺少 Annex B 起始碼")
 	}
 	for _, v := range data[:first] {
 		if v != 0 {
-			return nil, fmt.Errorf("H.264 起始碼前資料無效")
+			return fmt.Errorf("H.264 起始碼前資料無效")
 		}
 	}
+	count := 0
 	for at, n := first, prefix; at >= 0; {
+		if count >= maxVideoNALs {
+			return fmt.Errorf("H.264 NAL 過多")
+		}
 		next, np := start(at + n)
 		end := next
 		if end < 0 {
@@ -71,16 +93,17 @@ func h264AnnexBNALs(data []byte) ([][]byte, error) {
 			end--
 		}
 		if end <= at+n {
-			return nil, fmt.Errorf("H.264 空 NAL")
+			return fmt.Errorf("H.264 空 NAL")
 		}
 		nal := data[at+n : end]
 		if nal[0]&0x80 != 0 || nal[0]&31 == 0 {
-			return nil, fmt.Errorf("H.264 NAL 標頭無效")
+			return fmt.Errorf("H.264 NAL 標頭無效")
 		}
-		result = append(result, nal)
+		visit(nal)
+		count++
 		at, n = next, np
 	}
-	return result, nil
+	return nil
 }
 func h264Config(data []byte) ([][]byte, error) {
 	if len(data) == 0 {
@@ -129,6 +152,9 @@ func packH264(data, config []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(nals)+2 > maxVideoNALs {
+		return nil, fmt.Errorf("H.264 NAL 過多")
+	}
 	sets, err := h264Config(config)
 	if err != nil {
 		return nil, err
@@ -170,8 +196,9 @@ func packH264(data, config []byte) ([]byte, error) {
 	return out, nil
 }
 func unpackH264(data []byte) ([]byte, error) {
-	if len(data) < 1 || len(data) > 32<<20 || data[0] != 2 {
-		return nil, fmt.Errorf("無效的 H.264 封包")
+	// 先以零配置的 wire parser 驗證長度及 NAL 數，才配置 Annex B。
+	if _, err := IsKeyframe(WireH264, data); err != nil {
+		return nil, err
 	}
 	data = data[1:]
 	out := make([]byte, 0, len(data))

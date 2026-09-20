@@ -17,7 +17,7 @@ finish() {
   trap - EXIT
   if [[ -n "$BUILD_STAGE" ]]; then rm -rf "$BUILD_STAGE"; fi
   if [[ "$result" -ne 0 ]]; then
-    echo "啟動失敗（結束碼：$result），請查看上方訊息。" >&2
+    echo "啟動失敗（結束碼：${result}），請查看上方訊息。" >&2
     if [[ -t 0 && "$result" -ne 130 && "$result" -ne 143 ]]; then
       read -r -p "按 Enter 關閉視窗……" _ || true
     fi

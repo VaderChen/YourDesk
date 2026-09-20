@@ -72,7 +72,7 @@ func prepareAutomaticUpdate(ctx context.Context, archive string) error {
 	if closeErr != nil {
 		return closeErr
 	}
-	config, _ := json.Marshal(map[string]any{"parent": os.Getpid(), "target": target})
+	config, _ := json.Marshal(map[string]any{"parent": os.Getpid(), "target": target, "files": windowsManagedUpdateFiles})
 	if err = os.WriteFile(filepath.Join(dir, "config.json"), config, 0600); err != nil {
 		return err
 	}
@@ -86,7 +86,7 @@ func prepareAutomaticUpdate(ctx context.Context, archive string) error {
 	return startUpdateHelper(ctx, cmd, dir)
 }
 
-const windowsUpdateScript = `
+const windowsUpdateScript = windowsRollbackScript + `
 $ErrorActionPreference = 'Stop'
 $dir = $PSScriptRoot
 $backup = Join-Path $dir 'previous'
@@ -112,11 +112,7 @@ try {
    Start-Sleep -Milliseconds 500
   }
  }
- New-Item -ItemType Directory -Path $backup | Out-Null
- foreach ($name in @('YourDesk.exe','yourdesk-client.exe','yourdesk-remote.exe','ThirdPartyLicenses','README.txt','使用說明.txt','Uninstall.exe')) {
-  $file = Join-Path $config.target $name
-  if (Test-Path -LiteralPath $file) { Copy-Item -LiteralPath $file -Destination $backup -Recurse }
- }
+ Backup-ManagedFiles $config.target $backup $config.files
  $installed = $true
  # NSIS 的 /D 必須最後傳入，且即使路徑有空白也不能再加引號。
  Write-Output 'Starting silent installer.'
@@ -131,7 +127,7 @@ try {
 } catch {
  $_ | Out-String | Add-Content -LiteralPath (Join-Path $dir 'update.log')
  if ($installed -and (Test-Path -LiteralPath $backup)) {
-  try { Get-ChildItem -LiteralPath $backup | Copy-Item -Destination $config.target -Recurse -Force } catch { $_ | Out-String | Add-Content -LiteralPath (Join-Path $dir 'update.log') }
+  try { Restore-ManagedFiles $config.target $backup $config.files } catch { $_ | Out-String | Add-Content -LiteralPath (Join-Path $dir 'update.log') }
  }
  Add-Type -AssemblyName PresentationFramework
  [System.Windows.MessageBox]::Show(('YourDesk update failed. Please install the downloaded package manually. Log: ' + (Join-Path $dir 'update.log')), 'YourDesk') | Out-Null

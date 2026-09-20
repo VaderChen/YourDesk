@@ -19,6 +19,7 @@ from zoneinfo import ZoneInfo
 import turbojpeg
 import ffmpeg
 import windows_runtime
+import macos_build
 
 ROOT = Path(__file__).resolve().parent.parent
 DIST = ROOT / 'dist'
@@ -98,7 +99,7 @@ def windows_tool(arch, kind):
 
 def environment(target, gui):
     system, arch = target.split('/')
-    env = dict(os.environ, GOOS=system, GOARCH=arch, CGO_ENABLED='1' if gui else '0')
+    env = macos_build.environment(target, dict(os.environ, GOOS=system, GOARCH=arch, CGO_ENABLED='1' if gui else '0'))
     if not gui:
         return env
     host = capture(['go', 'env', 'GOHOSTOS'])
@@ -115,7 +116,7 @@ def environment(target, gui):
         for key in ('CC', 'CXX'):
             if not shutil.which(shlex.split(env[key])[0]):
                 raise ValueError(f'{target} 缺少 {env[key]}；請設定 YOURDESK_{key}_{suffix}')
-    return env
+    return macos_build.environment(target, env)
 
 
 def compile_program(name, folder, target, version):
@@ -157,7 +158,9 @@ def compile_program(name, folder, target, version):
                 ffmpeg.copy_runtime(ffmpeg_prefix, folder)
         run(['go', 'build', *tags, '-buildvcs=false', '-trimpath', '-ldflags', flags, '-o', folder / output, './cmd/' + name], env)
         if system == 'darwin':
-            run([ROOT / 'scripts/sign-local.sh', *sorted(folder.glob('*.dylib')), folder / output])
+            macos_build.verify_binary(folder / output)
+            libraries = [folder / name for name in macos_build.RUNTIME_LIBRARIES if (folder / name).exists()]
+            run([ROOT / 'scripts/sign-local.sh', *libraries, folder / output])
     finally:
         if resource is not None:
             resource.unlink(missing_ok=True)
@@ -250,7 +253,7 @@ def mac_bundle(folder, version):
     info = dict(CFBundleIdentifier='com.yourdesk.desktop', CFBundleName='YourDesk',
                 CFBundleDisplayName='YourDesk', CFBundleExecutable='YourDesk', CFBundlePackageType='APPL',
                 CFBundleShortVersionString=numeric, CFBundleVersion=numeric + '.' + version[-4:],
-                CFBundleGetInfoString=version, NSHighResolutionCapable=True, LSMinimumSystemVersion='12.0',
+                CFBundleGetInfoString=version, NSHighResolutionCapable=True, LSMinimumSystemVersion=macos_build.MINIMUM_VERSION,
                 NSScreenCaptureUsageDescription='YourDesk 需要擷取螢幕以提供遠端桌面。',
                 NSNetworkVolumesUsageDescription='YourDesk 需要存取網路卷宗，讓 Finder 在您貼上時讀取遠端檔案。')
     icon = os.environ.get('YOURDESK_MAC_ICON_PATH')
@@ -279,10 +282,11 @@ def mac_bundle(folder, version):
     identity = signing_identity()
     import siri
     siri.build(app, numeric + '.' + version[-4:], identity)
+    macos_build.verify_application(app)
     signing = ['--timestamp', '--options', 'runtime'] if identity != '-' else []
-    for library in frameworks.iterdir():
+    for library in (frameworks / name for name in macos_build.RUNTIME_LIBRARIES):
         run(['codesign', '--force', '--sign', identity, *signing, library])
-    for executable in mac.iterdir():
+    for executable in (mac / name for name in ('YourDesk', 'yourdesk-client', 'yourdesk-remote')):
         run(['codesign', '--force', '--sign', identity, *signing, executable])
     run(['codesign', '--force', '--sign', identity, *signing, app])
     run(['codesign', '--verify', '--deep', '--strict', app])
@@ -556,6 +560,7 @@ def pack(release, targets=None):
         copy_notes_to_folder(folder, release)
         stem = f'YourDesk-{version_name(version)}-{folder.name}'
         if system == 'darwin':
+            macos_build.verify_application(folder / 'YourDesk.app')
             with tempfile.TemporaryDirectory(prefix='yourdesk-dmg-') as temporary:
                 stage = Path(temporary)
                 app = stage / 'YourDesk.app'
@@ -570,7 +575,7 @@ def pack(release, targets=None):
                 notarize_app(app)
                 (stage / 'Applications').symlink_to('/Applications')
                 output = folder / (stem + '.dmg')
-                # LZMA 映像由 macOS 10.15 起支援；產品最低版本為 macOS 12。
+                # LZMA 映像由 macOS 10.15 起支援；產品最低版本為 macOS 13。
                 run(['hdiutil', 'create', '-volname', 'YourDesk', '-srcfolder', stage, '-ov', '-format', 'ULMO', output])
                 run(['codesign', '--force', '--timestamp', '--sign', identity, output])
                 run(['codesign', '--verify', '--strict', output])

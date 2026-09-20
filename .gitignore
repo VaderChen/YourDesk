@@ -46,8 +46,14 @@ sites.json
 /remote.exe
 /client.exe
 
-# Android 開發暫不發布；本機編譯輸出不提交。
-/android/
+# Android 原始碼已追蹤；僅忽略本機工具、編譯輸出及裝置設定。
+/android/.gradle/
+/android/.kotlin/
+/android/**/build/
+/android/local.properties
+/android/libs/.*
+/android/libs/*.aar
+/android/libs/*-sources.jar
 /androidcore/
 /client
 # Release 附加更新重點：只在本機封裝時提供，不提交原始碼。

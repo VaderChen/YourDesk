@@ -52,13 +52,29 @@ func (c *dxgiCapture) capture(bounds image.Rectangle) (image.Image, error) {
 		}
 		slog.Info("Windows 硬體擷取啟用", "backend", "DXGI Desktop Duplication", "width", bounds.Dx(), "height", bounds.Dy())
 	}
-	out := image.NewRGBA(image.Rect(0, 0, bounds.Dx(), bounds.Dy()))
-	hr := C.yd_dxgi_read(c.native, (*C.uchar)(unsafe.Pointer(&out.Pix[0])), C.int(bounds.Dx()), C.int(bounds.Dy()))
+	var hr C.int
+	out, err := capturePendingRGBA(bounds, func() error {
+		hr = C.yd_dxgi_take(c.native, C.int(bounds.Dx()), C.int(bounds.Dy()))
+		if hr == 1 {
+			return ErrNoNewFrame
+		}
+		if hr < 0 {
+			return fmt.Errorf("DXGI 取得影格失敗")
+		}
+		return nil
+	}, func(out *image.RGBA) error {
+		hr = C.yd_dxgi_copy(c.native, (*C.uchar)(unsafe.Pointer(&out.Pix[0])), C.int(bounds.Dx()), C.int(bounds.Dy()))
+		if hr < 0 {
+			return fmt.Errorf("DXGI 複製影格失敗")
+		}
+		return nil
+	}, func() { C.yd_dxgi_release(c.native) })
+	// capturePendingRGBA 已完成 Unmap，之後才可關閉原生工作階段。
 	if hr < 0 {
 		return nil, c.fail(hr)
 	}
-	if hr == 1 {
-		return nil, ErrNoNewFrame
+	if err != nil {
+		return nil, err
 	}
 	return out, nil
 }

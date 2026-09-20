@@ -149,6 +149,11 @@ func (s *server) mcpServer() *mcp.Server {
 		return nil, out, err
 	})
 	mcp.AddTool(srv, &mcp.Tool{Name: "remote_action", Description: "操作已連線的遠端：screenshot 回傳 PNG；move/button 使用 0～1 相對座標；key/button 必須成對按下與放開；text 經剪貼簿貼上並取代兩端剪貼簿。display 切換後需重新取畫面。F12 停用控制時不接受輸入。"}, func(ctx context.Context, r *mcp.CallToolRequest, in mcpAction) (*mcp.CallToolResult, any, error) {
+		switch in.Action {
+		case "show", "hide", "screenshot", "move", "button", "key", "scroll", "text", "display":
+		default:
+			return nil, nil, fmt.Errorf("不支援的桌面操作；命令列請使用 remote_terminal")
+		}
 		result, err := s.callRemoteAgent(ctx, in)
 		if err != nil {
 			return nil, nil, err
@@ -208,11 +213,16 @@ func (s *server) callRemoteAgent(ctx context.Context, in mcpAction) (agentremote
 		p.mcpVisible = true
 	}
 	p.agentPending[id] = ch
-	_, err = p.stdin.Write(append(data, '\n'))
+	input, ok := p.stdin.(*processInput)
+	if !ok {
+		input = newProcessInput(p.stdin)
+		p.stdin = input
+	}
 	s.mu.Unlock()
 	defer func() { s.mu.Lock(); delete(p.agentPending, id); s.mu.Unlock() }()
+	err = input.Send(ctx, append(data, '\n'))
 	if err != nil {
-		return agentremote.Response{}, fmt.Errorf("無法傳送操作")
+		return agentremote.Response{}, fmt.Errorf("無法傳送操作：%w；請確認遠端狀態，勿直接重送", err)
 	}
 	select {
 	case out := <-ch:
@@ -222,6 +232,8 @@ func (s *server) callRemoteAgent(ctx context.Context, in mcpAction) (agentremote
 		return out, nil
 	case <-p.done:
 		return agentremote.Response{}, fmt.Errorf("遠端連線已結束")
+	case <-input.done:
+		return agentremote.Response{}, fmt.Errorf("子程序控制管線已關閉；請確認遠端狀態，勿直接重送")
 	case <-ctx.Done():
 		return agentremote.Response{}, fmt.Errorf("操作逾時或取消；請重新取得畫面確認結果，勿直接重送")
 	}

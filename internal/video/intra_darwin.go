@@ -236,17 +236,17 @@ func (d *platformDecoder) decode(payload []byte) (image.Image, string, error) {
 	default:
 		return nil, "unknown", ErrVideoUnavailable
 	}
-	var output *C.uchar
+	var output C.CVPixelBufferRef
 	var w, h, hardware C.int
 	var policy *C.yd_decode_policy
 	if len(d.policy) > 0 {
 		policy = &d.policy[0]
 	}
 	status := C.yd_intra_decode(&d.native, kind, (*C.uchar)(unsafe.Pointer(&payload[0])), C.size_t(len(payload)), policy, C.int(len(d.policy)), &output, &w, &h, &hardware)
-	if output != nil {
-		defer C.free(unsafe.Pointer(output))
+	if output != 0 {
+		defer C.yd_pixel_close(C.uintptr_t(output))
 	}
-	if status != 0 || output == nil {
+	if status != 0 || output == 0 {
 		return nil, "unknown", fmt.Errorf("VideoToolbox 解碼失敗：%d", status)
 	}
 	mode := "unknown"
@@ -255,5 +255,9 @@ func (d *platformDecoder) decode(payload []byte) (image.Image, string, error) {
 	} else if hardware == 0 {
 		mode = "software"
 	}
-	return &image.RGBA{Pix: C.GoBytes(unsafe.Pointer(output), C.int(w*h*4)), Stride: int(w) * 4, Rect: image.Rect(0, 0, int(w), int(h))}, mode, nil
+	frame := image.NewRGBA(image.Rect(0, 0, int(w), int(h)))
+	if status = C.yd_decoded_copy(C.uintptr_t(output), (*C.uchar)(unsafe.Pointer(&frame.Pix[0])), C.size_t(len(frame.Pix))); status != 0 {
+		return nil, "unknown", fmt.Errorf("VideoToolbox 像素轉換失敗：%d", status)
+	}
+	return frame, mode, nil
 }

@@ -41,16 +41,14 @@ func (b *h264Bits) se() int {
 
 // 僅解析初始化解碼器所需的尺寸，不依賴被控端是否也有編碼能力。
 func h264Dimensions(annexB []byte) (int, int, error) {
-	nals, err := h264AnnexBNALs(annexB)
+	var sps []byte
+	err := walkH264AnnexB(annexB, func(nal []byte) {
+		if sps == nil && nal[0]&31 == 7 {
+			sps = nal[1:]
+		}
+	})
 	if err != nil {
 		return 0, 0, err
-	}
-	var sps []byte
-	for _, nal := range nals {
-		if nal[0]&31 == 7 {
-			sps = nal[1:]
-			break
-		}
 	}
 	if len(sps) == 0 || len(sps) > 65536 {
 		return 0, 0, fmt.Errorf("H.264 SPS 無效")

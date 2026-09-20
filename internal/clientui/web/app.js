@@ -1198,18 +1198,20 @@ function renderRelease(value, manual=false) {
  const progressText=`${percent}% · ${formatSize(downloaded)} / ${formatSize(total)}`;
  $('#release-progress-label').textContent=progressText;
  $('#release-progress').setAttribute('aria-valuetext',progressText);
- const openingLabel='正在準備自動安裝…';
- const label=value.downloading?downloadLabel:value.opening?openingLabel:countdown?'立即更新':value.downloadPath?'開始更新':'下載並自動更新';
+ const automatic=value.automaticInstall===true;
+ const openingLabel=automatic?'正在準備自動安裝…':'正在開啟下載檔案…';
+ const label=value.downloading?downloadLabel:value.opening?openingLabel:countdown?'立即更新':value.downloadPath?(automatic?'開始更新':'開啟下載檔案'):(automatic?'下載並自動更新':'下載並開啟');
  $('#release-title').textContent=i18n.t(value.showNotes?'更新重點':value.downloadPath?'下載完成':value.available?'發現新版本':'');
- const message=value.downloading?downloadLabel:value.opening?openingLabel:value.downloadError || value.openError || (value.available && value.asset?.browser_download_url?'下載完成後將自動關閉程式、安裝新版並重新啟動。遠端連線會中斷。':value.message);
+ const updateHint=automatic?'下載完成後將自動關閉程式、安裝新版並重新啟動。遠端連線會中斷。':'下載完成後將開啟解壓縮目錄，請手動更新。程式與遠端連線不會自動關閉。';
+ const message=value.downloading?downloadLabel:value.opening?openingLabel:value.downloadError || value.openError || (value.available && value.asset?.browser_download_url?updateHint:value.message);
  $('#release-status').classList.toggle('update-countdown',countdown);
  $('#release-status').hidden=showingNotes;
  $('#release-status').textContent=countdown?i18n.t('即將自動更新，可按取消。')+' '+Math.max(0,Math.ceil((Number(value.installAt)-Date.now())/1000))+' s':i18n.t(message || '');
  $('#release-path').textContent=value.downloadPath ? i18n.t('下載目錄：')+'\n'+value.downloadPath : '';
  $('#release-download').disabled=!showingNotes && (busy || !value.available || !value.asset?.browser_download_url);
  $('#release-download').textContent=i18n.t(showingNotes?'確定':label);
- $('#release-download').classList.toggle('danger',!!value.downloadPath);
- $('#release-download').classList.toggle('primary',!value.downloadPath);
+ $('#release-download').classList.toggle('danger',!!value.downloadPath && automatic);
+ $('#release-download').classList.toggle('primary',!value.downloadPath || !automatic);
  $('#download-update').disabled=busy;
  $('#download-update').textContent=i18n.t(label);
 }

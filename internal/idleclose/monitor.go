@@ -33,7 +33,7 @@ func (m *Monitor) Input(now time.Time, kind string, x, y float64, down bool) {
 		}
 	case "key", "raw-key", "button":
 		activity = down
-	case "wheel":
+	case "wheel", "text":
 		activity = true
 	}
 	if activity && m.active {

@@ -50,6 +50,7 @@ type EnhancementReport struct {
 	Bitrate        int    `json:"bitrate"`
 }
 type Control struct {
+	Text                      string                     `json:"text,omitempty"`
 	ClipboardPriorityConsumed uint64                     `json:"clipboardPriorityConsumed,omitempty"`
 	ClipboardConsumed         uint64                     `json:"clipboardConsumed,omitempty"`
 	ViewID                    uint64                     `json:"viewID,omitempty"`
@@ -114,8 +115,7 @@ type Peer struct {
 	closed              bool
 	done                chan struct{}
 	doneOnce            sync.Once
-	controlMu           sync.Mutex
-	pendingControl      [][]byte
+	controlSender       orderedControlSender
 	controlCongested    atomic.Bool
 }
 
@@ -479,32 +479,21 @@ func (p *Peer) SendControl(c Control) error {
 	if err != nil {
 		return err
 	}
-	if dc.ReadyState() != webrtc.DataChannelStateOpen {
-		p.controlMu.Lock()
-		if len(p.pendingControl) >= 64 {
-			p.pendingControl = p.pendingControl[len(p.pendingControl)-63:]
-		}
-		p.pendingControl = append(p.pendingControl, b)
-		p.controlMu.Unlock()
-		return nil
-	}
-	return p.sendData(dc, b)
+	return p.controlSender.send(func() bool {
+		return dc.ReadyState() == webrtc.DataChannelStateOpen
+	}, func(b []byte) error { return p.sendData(dc, b) }, b)
 }
 
 func (p *Peer) flushControl() {
 	p.mu.RLock()
 	dc := p.control
 	p.mu.RUnlock()
-	if dc == nil || dc.ReadyState() != webrtc.DataChannelStateOpen {
+	if dc == nil {
 		return
 	}
-	p.controlMu.Lock()
-	queued := p.pendingControl
-	p.pendingControl = nil
-	p.controlMu.Unlock()
-	for _, b := range queued {
-		_ = p.sendData(dc, b)
-	}
+	_ = p.controlSender.flush(func() bool {
+		return dc.ReadyState() == webrtc.DataChannelStateOpen
+	}, func(b []byte) error { return p.sendData(dc, b) })
 }
 
 // Done 在 P2P 工作階段失敗或結束時關閉，供上層統一處理生命週期。

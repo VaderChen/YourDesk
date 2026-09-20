@@ -1,7 +1,6 @@
 package com.yourdesk.android;
 
 import android.annotation.SuppressLint;
-import android.app.Activity;
 import android.content.Context;
 import android.content.pm.ActivityInfo;
 import android.graphics.Bitmap;
@@ -57,7 +56,7 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
-import androidx.lifecycle.ProcessLifecycleOwner;
+import androidx.activity.ComponentActivity;
 
 import com.yourdesk.androidcore.core.TerminalSession;
 import com.yourdesk.androidcore.core.Viewer;
@@ -67,7 +66,7 @@ import com.yourdesk.android.video.FfmpegRuntime;
 import com.yourdesk.android.video.MediaCodecVideoDecoder;
 
 /** Android Viewer：WebView 負責介面，原生畫面元件負責合成 JPEG 差分影格。 */
-public final class MainActivity extends Activity {
+public final class MainActivity extends ComponentActivity {
   private WebView web;
   private View contentRoot;
   private DeltaImageView nativeScreen;
@@ -79,6 +78,13 @@ public final class MainActivity extends Activity {
   private int videoHeight;
   private boolean videoMode;
   private boolean videoKeyframeRequested;
+  private long lastKeyframeRequestMs;
+  private final java.util.concurrent.atomic.AtomicBoolean keyframeCommandPending = new java.util.concurrent.atomic.AtomicBoolean();
+  private int disabledVideoCodecs;
+  private boolean capabilityUpdatePending;
+  private boolean capabilityUpdateInFlight;
+  private long lastCapabilityUpdateMs;
+  private int pumpRenderedFrames;
   private long videoSequence;
   private Button nativeBack;
   private LinearLayout desktopTools;
@@ -96,14 +102,19 @@ public final class MainActivity extends Activity {
   private android.window.OnBackInvokedCallback systemBackCallback;
   private android.graphics.Typeface faTypeface;
   private String selectedScale = "1/1", selectedQuality = "標準";
+  private String appliedScale = "1/1", appliedQuality = "標準";
+  private long streamRequestStartedMs;
   private final android.os.Handler uiHandler = new android.os.Handler(android.os.Looper.getMainLooper());
   private volatile Viewer viewer = new Viewer();
   private TerminalSession terminal;
   private boolean inTerminal;
   private boolean inDesktop;
   private ProcessCameraProvider qrCameraProvider;
+  private ImageAnalysis qrAnalysis;
   private BarcodeScanner qrScanner;
   private boolean qrScanning;
+  private int qrGeneration;
+  private boolean cameraPermissionPending;
   private long lastCameraJpegMs;
   private PreviewView qrPreview;
   private boolean desktopPageReady;
@@ -132,6 +143,7 @@ public final class MainActivity extends Activity {
   private int composedHeight;
   private int composedDisplay = Integer.MIN_VALUE;
   private long composedSequence;
+  private final FramePolicy jpegPolicy = new FramePolicy();
   private long statsLastSampleNanos;
   private long statsLastTrafficNanos;
   private long statsFrameCount;
@@ -140,6 +152,9 @@ public final class MainActivity extends Activity {
   private double statsFps;
   private double statsTx;
   private double statsRx;
+  private long lastStreamResultRevision;
+  private String lastStreamResult = "";
+  private String lastStreamSession = "";
 
   @SuppressLint("SetJavaScriptEnabled")
   public void onCreate(Bundle b) {
@@ -219,6 +234,7 @@ public final class MainActivity extends Activity {
         if (videoSurface != null) videoSurface.release();
         videoSurface = new Surface(texture);
         if (pendingVideoFrame != null) presentVideoFrame(pendingVideoFrame);
+        if (videoMode && videoDecoder.needsKeyframe()) requestVideoKeyframe();
       }
 
       @Override public void onSurfaceTextureSizeChanged(android.graphics.SurfaceTexture texture, int width, int height) {
@@ -228,6 +244,7 @@ public final class MainActivity extends Activity {
       @Override public boolean onSurfaceTextureDestroyed(android.graphics.SurfaceTexture texture) {
         videoDecoder.reset();
         videoKeyframeRequested = false;
+        lastKeyframeRequestMs = 0;
         if (videoSurface != null) {
           videoSurface.release();
           videoSurface = null;
@@ -428,22 +445,35 @@ public final class MainActivity extends Activity {
       }
     }
   }
-  private void sendStreamPreference(String scale, String quality) {
-    String profile = "standard"; if ("低畫質".equals(quality)) profile = "fast"; else if ("高畫質".equals(quality)) profile = "high";
-    int percent = "3/4".equals(scale) ? 75 : "3/5".equals(scale) ? 60 : "1/2".equals(scale) ? 50 : 100;
-    try { org.json.JSONObject c = new org.json.JSONObject().put("type", "quality-profile").put("profile", profile).put("viewWidth", 1920).put("viewHeight", 1080).put("imageEnhancement", percent < 100); viewer.sendControlJSON(c.toString()); } catch (Exception ignored) { }
+  private boolean sendStreamPreference(String scale, String quality) {
+    String actualQuality = quality == null ? selectedQuality : quality;
+    String actualScale = scale == null ? selectedScale : scale;
+    String profile = "低畫質".equals(actualQuality) ? "fast" : "高畫質".equals(actualQuality) ? "high" : "standard";
+    int percent = "3/4".equals(actualScale) ? 75 : "3/5".equals(actualScale) ? 60 : "1/2".equals(actualScale) ? 50 : 100;
+    try {
+      viewer.sendStreamPreferences(profile, percent);
+      selectedScale = actualScale;
+      selectedQuality = actualQuality;
+      streamRequestStartedMs = android.os.SystemClock.uptimeMillis();
+      scaleButton.setText("\uf390  " + selectedScale + " …");
+      return true;
+    }
+    catch (Exception error) {
+      android.widget.Toast.makeText(this, "Host 尚未接受串流設定", android.widget.Toast.LENGTH_SHORT).show();
+      return false;
+    }
   }
 
   private void showScaleMenu(View anchor) {
     PopupMenu menu = new PopupMenu(this, anchor);
     for (String value : new String[]{"1/1", "3/4", "3/5", "1/2"}) { android.view.MenuItem i = menu.getMenu().add(value); i.setCheckable(true).setChecked(value.equals(selectedScale)); }
-    menu.setOnMenuItemClickListener(item -> { selectedScale = item.getTitle().toString(); scaleButton.setText("\uf390  " + selectedScale); sendStreamPreference(selectedScale, null); return true; });
+    menu.setOnMenuItemClickListener(item -> { sendStreamPreference(item.getTitle().toString(), null); return true; });
     menu.show();
   }
   private void showQualityMenu(View anchor) {
     PopupMenu menu = new PopupMenu(this, anchor);
     for (String value : new String[]{"低畫質", "標準", "高畫質"}) { android.view.MenuItem i = menu.getMenu().add(value); i.setCheckable(true).setChecked(value.equals(selectedQuality)); }
-    menu.setOnMenuItemClickListener(item -> { selectedQuality = item.getTitle().toString(); sendStreamPreference(null, selectedQuality); return true; });
+    menu.setOnMenuItemClickListener(item -> { sendStreamPreference(null, item.getTitle().toString()); return true; });
     menu.show();
   }
 
@@ -588,14 +618,26 @@ public final class MainActivity extends Activity {
     composedWidth = composedHeight = 0;
     composedDisplay = Integer.MIN_VALUE;
     composedSequence = 0;
+    jpegPolicy.reset();
     resetStats();
     if (nativeScreen != null) nativeScreen.clearFrame();
     pendingVideoFrame = null;
     videoWidth = videoHeight = 0;
     videoMode = false;
     videoKeyframeRequested = false;
+    lastKeyframeRequestMs = 0;
+    disabledVideoCodecs = 0;
+    capabilityUpdatePending = capabilityUpdateInFlight = false;
+    lastCapabilityUpdateMs = 0;
+    lastStreamResultRevision = 0;
+    lastStreamResult = "";
+    lastStreamSession = "";
+    streamRequestStartedMs = 0;
+    selectedScale = appliedScale = "1/1";
+    selectedQuality = appliedQuality = "標準";
+    if (scaleButton != null) scaleButton.setText("\uf390  " + selectedScale);
     videoSequence = 0;
-    videoDecoder.reset();
+    videoDecoder.resetSession();
     if (nativeVideo != null) nativeVideo.setVisibility(View.GONE);
   }
 
@@ -627,18 +669,21 @@ public final class MainActivity extends Activity {
   }
 
   private boolean presentVideoFrame(EncodedVideoFrame frame) {
+    if ((disabledVideoCodecs & (1 << frame.codec)) != 0) return false;
     pendingVideoFrame = frame;
     videoMode = true;
     videoWidth = frame.width;
     videoHeight = frame.height;
     updateVideoTransform();
-    if (videoSurface == null || !videoSurface.isValid()) return true;
+    if (videoSurface == null || !videoSurface.isValid()) return false;
     int rendered = videoDecoder.queue(frame, videoSurface);
     if (rendered < 0) {
-      Log.w("YourDeskVideo", "MediaCodec 無法解碼 " + frame.codec + "，等待下一個 keyframe");
+      withdrawFailedVideoCodec();
       requestVideoKeyframe();
       return false;
     }
+    if (videoDecoder.needsKeyframe()) requestVideoKeyframe();
+    pumpRenderedFrames += rendered;
     if (rendered > 0 && web != null) {
       String label = frame.codec == 1 ? "H.264" : "HEVC";
       web.evaluateJavascript("window.desktopFrameStatus&&window.desktopFrameStatus(" + frame.width + "," + frame.height + ",false,'" + label + "'," + 0 + ")", null);
@@ -649,15 +694,66 @@ public final class MainActivity extends Activity {
 
   /** 解碼器重建或 Surface 回來後，請 Host 優先送出新的 IDR。 */
   private void requestVideoKeyframe() {
-    if (videoKeyframeRequested || viewer == null || !inDesktop) return;
+    long now = android.os.SystemClock.uptimeMillis();
+    if (viewer == null || !inDesktop || isDestroyed() || io.isShutdown()
+        || (lastKeyframeRequestMs != 0 && now - lastKeyframeRequestMs < 1500)
+        || !keyframeCommandPending.compareAndSet(false, true)) return;
+    final Viewer session = viewer;
+    final int epoch = generation;
+    lastKeyframeRequestMs = now;
     videoKeyframeRequested = true;
     io.execute(() -> {
       try {
-        viewer.callCommand("video.keyframe");
+        if (session == viewer && epoch == generation) session.callCommand("video.keyframe");
       } catch (Exception ignored) {
-        // 舊版 Host 沒有此指令時，仍等待週期性 keyframe。
+        // 有界節流重試；遺失一次要求不能永久卡在等待 IDR。
+      } finally {
+        keyframeCommandPending.set(false);
       }
     });
+  }
+
+  private void withdrawFailedVideoCodec() {
+    int failed = videoDecoder.failedWireCodec();
+    if (failed <= 0 || (disabledVideoCodecs & (1 << failed)) != 0) return;
+    disabledVideoCodecs |= 1 << failed;
+    pendingVideoFrame = null;
+    capabilityUpdatePending = true;
+    sendPendingVideoCapabilities();
+  }
+
+  private void sendPendingVideoCapabilities() {
+    long now = android.os.SystemClock.uptimeMillis();
+    if (!capabilityUpdatePending || capabilityUpdateInFlight || io.isShutdown()
+        || (lastCapabilityUpdateMs != 0 && now - lastCapabilityUpdateMs < 1500)) return;
+    capabilityUpdateInFlight = true;
+    lastCapabilityUpdateMs = now;
+    final int sentMask = disabledVideoCodecs;
+    byte[] supported = filterVideoCodecs(DecoderSupport.supportedWireCodecs());
+    byte[] hardware = filterVideoCodecs(DecoderSupport.hardwareWireCodecs());
+    final Viewer session = viewer;
+    final int epoch = generation;
+    io.execute(() -> {
+      boolean sent = false;
+      try {
+        if (session == viewer && epoch == generation) {
+          session.sendVideoCapabilities(supported, hardware);
+          sent = true;
+        }
+      } catch (Exception error) { Log.w("YourDeskVideo", "解碼降級協商失敗，稍後重試", error); }
+      final boolean succeeded = sent;
+      uiHandler.post(() -> {
+        if (session != viewer || epoch != generation || isDestroyed()) return;
+        capabilityUpdateInFlight = false;
+        if (succeeded && sentMask == disabledVideoCodecs) capabilityUpdatePending = false;
+      });
+    });
+  }
+
+  private byte[] filterVideoCodecs(byte[] codecs) {
+    java.io.ByteArrayOutputStream result = new java.io.ByteArrayOutputStream();
+    for (byte codec : codecs) if ((disabledVideoCodecs & (1 << codec)) == 0) result.write(codec);
+    return result.toByteArray();
   }
 
   private void resetStats() {
@@ -692,10 +788,23 @@ public final class MainActivity extends Activity {
     uiHandler.post(new Runnable() {
       @Override public void run() {
         if (epoch != generation || !inDesktop || session != viewer) return;
-        if (videoMode && videoDecoder.drainOutput() < 0) requestVideoKeyframe();
-        // 一次排空佇列，避免一個輪詢週期只取一塊而造成差分延遲。
+        pumpRenderedFrames = 0;
+        sendPendingVideoCapabilities();
+        if (session.consumeFrameRecoveryRequest()) {
+          jpegPolicy.invalidate();
+          videoDecoder.reset();
+          requestVideoKeyframe();
+        }
+        if (videoMode) {
+          int drained = videoDecoder.drainOutput();
+          if (drained < 0) { withdrawFailedVideoCodec(); requestVideoKeyframe(); }
+          else pumpRenderedFrames += drained;
+          if (videoDecoder.needsKeyframe()) requestVideoKeyframe();
+        } else if (jpegPolicy.needsKeyframe()) requestVideoKeyframe();
+        // 限制單輪工作量，讓觸控／生命週期事件有機會執行；Go 端另有 bytes 上限。
         boolean presented = false;
-        for (int i = 0; i < 32; i++) {
+        long deadline = System.nanoTime() + 8_000_000L;
+        for (int i = 0; i < 4 && System.nanoTime() < deadline; i++) {
           String json;
           try {
             json = session.readFrameJSON();
@@ -706,8 +815,8 @@ public final class MainActivity extends Activity {
           presented |= applyFrameJSON(json);
         }
         if ((presented || videoMode || composedFrame != null) && inDesktop && !desktopPageReady) showDesktopPage(session, epoch);
-        updateDesktopStats(session, presented);
-        uiHandler.postDelayed(this, 50);
+        updateDesktopStats(session, pumpRenderedFrames);
+        uiHandler.postDelayed(this, 16);
       }
     });
   }
@@ -731,7 +840,7 @@ public final class MainActivity extends Activity {
     }, 250);
   }
 
-  private void updateDesktopStats(Viewer session, boolean presented) {
+  private void updateDesktopStats(Viewer session, int renderedFrames) {
     long now = System.nanoTime();
     if (statsLastSampleNanos == 0) {
       statsLastSampleNanos = now;
@@ -742,7 +851,7 @@ public final class MainActivity extends Activity {
         statsLastReceived = t.optLong("receivedBytes", 0);
       } catch (Exception ignored) { }
     }
-    if (presented) statsFrameCount++;
+    statsFrameCount += renderedFrames;
     long elapsedNanos = now - statsLastSampleNanos;
     if (elapsedNanos < 500_000_000L) return;
     double elapsed = elapsedNanos / 1_000_000_000.0;
@@ -760,7 +869,54 @@ public final class MainActivity extends Activity {
       statsLastTrafficNanos = now;
     } catch (Exception ignored) { }
     statsLastSampleNanos = now;
+    updateStreamResult(session);
+    web.evaluateJavascript("window.desktopInputCapabilities&&window.desktopInputCapabilities("
+        + session.supportsCommand("input.text-capabilities") + ")", null);
     web.evaluateJavascript("window.desktopStats&&window.desktopStats(" + statsFps + "," + statsTx + "," + statsRx + ")", null);
+  }
+
+  private void updateStreamResult(Viewer session) {
+    try {
+      org.json.JSONObject state = new org.json.JSONObject(session.streamPreferencesJSON());
+      org.json.JSONObject result = state.optJSONObject("result");
+      if (result != null && !result.optString("sessionId").equals(lastStreamSession)) {
+        lastStreamSession = result.optString("sessionId");
+        lastStreamResultRevision = 0;
+        lastStreamResult = "";
+      }
+      if (state.optBoolean("pending") && streamRequestStartedMs != 0
+          && android.os.SystemClock.uptimeMillis() - streamRequestStartedMs > 5000) {
+        streamRequestStartedMs = 0;
+        scaleButton.setText("\uf390  " + selectedScale + " ?");
+        android.widget.Toast.makeText(this, "尚未收到 Host 串流設定確認", android.widget.Toast.LENGTH_SHORT).show();
+      }
+      if (result == null || result.optLong("revision") < lastStreamResultRevision
+          || result.toString().equals(lastStreamResult)) return;
+      lastStreamResultRevision = result.getLong("revision");
+      lastStreamResult = result.toString();
+      streamRequestStartedMs = 0;
+      if (!result.optBoolean("accepted")) {
+        selectedScale = appliedScale;
+        selectedQuality = appliedQuality;
+        android.widget.Toast.makeText(this, "Host 拒絕串流設定：" + result.optString("error"), android.widget.Toast.LENGTH_LONG).show();
+      } else {
+        org.json.JSONObject request = state.optJSONObject("request");
+        if (request != null && request.optLong("revision") == lastStreamResultRevision) {
+          String profile = request.optString("profile", "standard");
+          org.json.JSONObject source = request.optJSONObject("source");
+          org.json.JSONObject resolution = source == null ? null : source.optJSONObject("resolution");
+          int percent = resolution == null ? 100 : resolution.optInt("scalePercent", 100);
+          appliedScale = percent == 75 ? "3/4" : percent == 60 ? "3/5" : percent == 50 ? "1/2" : "1/1";
+          appliedQuality = "fast".equals(profile) ? "低畫質" : "high".equals(profile) ? "高畫質" : "標準";
+          selectedScale = appliedScale;
+          selectedQuality = appliedQuality;
+        }
+        org.json.JSONObject effective = result.optJSONObject("effective");
+        if (effective != null && scaleButton != null)
+          scaleButton.setContentDescription("來源解析度 " + effective.optInt("width") + " × " + effective.optInt("height"));
+      }
+      scaleButton.setText("\uf390  " + selectedScale);
+    } catch (Exception ignored) { }
   }
 
   /** 依 PC 版 compositeDecodedFrame 的規則，把 JPEG 區塊貼回完整 Bitmap。 */
@@ -776,21 +932,36 @@ public final class MainActivity extends Activity {
       int y = o.optInt("y", 0);
       boolean keyframe = o.optBoolean("keyframe", false);
       if (sequence <= 0 || fullWidth <= 0 || fullHeight <= 0 || x < 0 || y < 0) return false;
-      if (fullWidth > 8192 || fullHeight > 8192) return false;
-      if ((long) fullWidth * (long) fullHeight > 32L * 1024L * 1024L) return false;
+      if (!FramePolicy.dimensions(fullWidth, fullHeight)) return false;
+      String encoded = o.getString("data");
+      if (encoded.length() > ((long) FramePolicy.MAX_ENCODED_BYTES + 2) / 3 * 4) {
+        jpegPolicy.invalidate();
+        requestVideoKeyframe();
+        return false;
+      }
       if (codec == 1 || codec == 2) {
         // H.264／HEVC 影格由 MediaCodec 直接輸出到 TextureView；這類影格不參與
         // JPEG 差分基底，避免兩種 renderer 互相覆蓋。
         if (x != 0 || y != 0) return false;
-        byte[] payload = Base64.decode(o.getString("data"), Base64.DEFAULT);
+        if (videoSequence > 0 && sequence <= videoSequence) return false;
+        if ((disabledVideoCodecs & (1 << codec)) != 0) return false;
+        byte[] payload = Base64.decode(encoded, Base64.DEFAULT);
         EncodedVideoFrame frame = EncodedVideoFrame.parse(codec, fullWidth, fullHeight, payload, keyframe);
-        if (frame == null) return false;
+        if (frame == null) {
+          videoDecoder.reset();
+          requestVideoKeyframe();
+          return false;
+        }
         if (composedFrame != null) {
           if (!composedFrame.isRecycled()) composedFrame.recycle();
           composedFrame = null;
         }
-        if (videoSequence > 0 && sequence <= videoSequence) return false;
         composedSequence = sequence;
+        jpegPolicy.invalidate();
+        if (videoSequence > 0 && sequence != videoSequence + 1) {
+          videoDecoder.reset();
+          requestVideoKeyframe();
+        }
         videoSequence = sequence;
         boolean rendered = presentVideoFrame(frame);
         if (desktopPageReady) {
@@ -810,18 +981,15 @@ public final class MainActivity extends Activity {
         nativeVideo.setVisibility(View.GONE);
         if (desktopPageReady) nativeScreen.setVisibility(View.VISIBLE);
       }
-      if (composedSequence > 0 && sequence <= composedSequence) return false;
-      // 遺失差分時不能拿錯誤基底繼續畫；等下一個完整 keyframe 重建。
-      if (!keyframe && (composedFrame == null || composedWidth != fullWidth || composedHeight != fullHeight
-          || composedDisplay != display || (composedSequence > 0 && sequence != composedSequence + 1))) {
-        composedSequence = sequence;
+      if (!jpegPolicy.accept(sequence, fullWidth, fullHeight, display, keyframe)) {
+        if (jpegPolicy.needsKeyframe()) requestVideoKeyframe();
         return false;
       }
-      byte[] data = Base64.decode(o.getString("data"), Base64.DEFAULT);
-      Bitmap patch = decodeJpeg(data);
-      if (patch == null || patch.getWidth() <= 0 || patch.getHeight() <= 0) return false;
-      if (x + patch.getWidth() > fullWidth || y + patch.getHeight() > fullHeight) {
-        patch.recycle();
+      byte[] data = Base64.decode(encoded, Base64.DEFAULT);
+      Bitmap patch = decodeJpeg(data, fullWidth, fullHeight, x, y, keyframe);
+      if (patch == null) {
+        jpegPolicy.invalidate();
+        requestVideoKeyframe();
         return false;
       }
 
@@ -829,18 +997,23 @@ public final class MainActivity extends Activity {
           || composedDisplay != display;
       if (replace) {
         Bitmap old = composedFrame;
-        composedFrame = Bitmap.createBitmap(fullWidth, fullHeight, Bitmap.Config.ARGB_8888);
+        // 完整 keyframe 本身就是可變基底，避免同時配置兩張全尺寸 bitmap。
+        composedFrame = patch;
         composedWidth = fullWidth;
         composedHeight = fullHeight;
         composedDisplay = display;
         if (old != null && !old.isRecycled()) old.recycle();
+      } else {
+        Canvas canvas = new Canvas(composedFrame);
+        canvas.drawBitmap(patch, x, y, null);
       }
-      Canvas canvas = new Canvas(composedFrame);
-      canvas.drawBitmap(patch, x, y, null);
       int patchWidth = patch.getWidth();
       int patchHeight = patch.getHeight();
-      patch.recycle();
+      if (patch != composedFrame) patch.recycle();
       composedSequence = sequence;
+      jpegPolicy.commit(sequence, fullWidth, fullHeight, display);
+      videoKeyframeRequested = false;
+      pumpRenderedFrames++;
       Rect dirty = new Rect(x, y, x + patchWidth, y + patchHeight);
       nativeScreen.setFrame(composedFrame, dirty, replace);
       if (keyframe) {
@@ -848,7 +1021,17 @@ public final class MainActivity extends Activity {
       }
       return true;
     } catch (Exception ignored) {
-      // 收到損壞的單一影格時丟棄該影格，後續 keyframe 仍可恢復。
+      jpegPolicy.invalidate();
+      if (videoMode) videoDecoder.reset();
+      requestVideoKeyframe();
+      return false;
+    } catch (OutOfMemoryError error) {
+      // 即使 dimensions 合法，低記憶體手機仍可能拒絕配置；丟棄基底並恢復。
+      if (nativeScreen != null) nativeScreen.clearFrame();
+      if (composedFrame != null && !composedFrame.isRecycled()) composedFrame.recycle();
+      composedFrame = null;
+      jpegPolicy.invalidate();
+      requestVideoKeyframe();
       return false;
     }
   }
@@ -858,8 +1041,15 @@ public final class MainActivity extends Activity {
    * ALLOCATOR_HARDWARE 是儲存位置選項，不代表 JPEG 硬解，且不能作為
    * 這個軟體 Canvas 的來源。影片硬解另走 MediaCodec／Surface 路徑。
    */
-  private static Bitmap decodeJpeg(byte[] data) {
+  private static Bitmap decodeJpeg(byte[] data, int width, int height, int x, int y, boolean keyframe) {
+    if (data.length == 0 || data.length > FramePolicy.MAX_ENCODED_BYTES) return null;
     BitmapFactory.Options options = new BitmapFactory.Options();
+    options.inJustDecodeBounds = true;
+    BitmapFactory.decodeByteArray(data, 0, data.length, options);
+    if (!"image/jpeg".equals(options.outMimeType)
+        || !FramePolicy.patch(width, height, x, y, options.outWidth, options.outHeight, keyframe)) return null;
+    options.inJustDecodeBounds = false;
+    options.inMutable = true;
     options.inPreferredConfig = Bitmap.Config.ARGB_8888;
     return BitmapFactory.decodeByteArray(data, 0, data.length, options);
   }
@@ -941,6 +1131,108 @@ public final class MainActivity extends Activity {
     }
   }
 
+  private void requestCameraPermissionOnMain() {
+    if (isDestroyed() || cameraPermissionPending
+        || checkSelfPermission(android.Manifest.permission.CAMERA) == android.content.pm.PackageManager.PERMISSION_GRANTED) return;
+    cameraPermissionPending = true;
+    requestPermissions(new String[]{android.Manifest.permission.CAMERA}, 7001);
+  }
+
+  @Override public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+    super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+    if (requestCode != 7001) return;
+    cameraPermissionPending = false;
+    if (!qrScanning || isDestroyed()) return;
+    if (grantResults.length > 0 && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED)
+      startQrScannerOnMain();
+    else stopQrScannerOnMain();
+  }
+
+  private void startQrScannerOnMain() {
+    if (isDestroyed() || isFinishing()) return;
+    qrScanning = true;
+    if (checkSelfPermission(android.Manifest.permission.CAMERA) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+      requestCameraPermissionOnMain();
+      return;
+    }
+    if (qrScanner != null) return;
+    final int epoch = ++qrGeneration;
+    try {
+      qrScanner = BarcodeScanning.getClient();
+      final com.google.common.util.concurrent.ListenableFuture<ProcessCameraProvider> future = ProcessCameraProvider.getInstance(this);
+      future.addListener(() -> {
+        if (!qrScanning || epoch != qrGeneration || isDestroyed() || isFinishing()) return;
+        try {
+          qrCameraProvider = future.get();
+          qrAnalysis = new ImageAnalysis.Builder().setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST).build();
+          qrAnalysis.setAnalyzer(ContextCompat.getMainExecutor(this), image -> analyzeQr(image, epoch));
+          qrCameraProvider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, qrAnalysis);
+        } catch (Exception error) {
+          Log.w("YourDeskCamera", "相機初始化失敗", error);
+          stopQrScannerOnMain();
+        }
+      }, ContextCompat.getMainExecutor(this));
+    } catch (Exception error) {
+      stopQrScannerOnMain();
+    }
+  }
+
+  private void stopQrScannerOnMain() {
+    qrScanning = false;
+    qrGeneration++;
+    if (qrPreview != null) qrPreview.setVisibility(View.GONE);
+    if (qrAnalysis != null) {
+      qrAnalysis.clearAnalyzer();
+      if (qrCameraProvider != null) qrCameraProvider.unbind(qrAnalysis);
+      qrAnalysis = null;
+    }
+    qrCameraProvider = null;
+    if (qrScanner != null) { qrScanner.close(); qrScanner = null; }
+  }
+
+  private void analyzeQr(ImageProxy proxy, int epoch) {
+    final BarcodeScanner scanner = qrScanner;
+    if (!qrScanning || epoch != qrGeneration || scanner == null || proxy.getImage() == null || isDestroyed()) {
+      proxy.close(); return;
+    }
+    long nowMs = android.os.SystemClock.uptimeMillis();
+    if (nowMs - lastCameraJpegMs > 350) {
+      lastCameraJpegMs = nowMs;
+      Bitmap source = null, thumbnail = null;
+      try {
+        source = proxy.toBitmap();
+        float scale = Math.min(1f, 640f / Math.max(source.getWidth(), source.getHeight()));
+        Matrix transform = new Matrix();
+        transform.postScale(scale, scale);
+        transform.postRotate(proxy.getImageInfo().getRotationDegrees());
+        thumbnail = Bitmap.createBitmap(source, 0, 0, source.getWidth(), source.getHeight(), transform, true);
+        java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream();
+        thumbnail.compress(Bitmap.CompressFormat.JPEG, 45, output);
+        String data = "data:image/jpeg;base64," + Base64.encodeToString(output.toByteArray(), Base64.NO_WRAP);
+        web.evaluateJavascript("window.cameraFrame&&window.cameraFrame(" + org.json.JSONObject.quote(data) + ")", null);
+      } catch (RuntimeException error) {
+        Log.w("YourDeskCamera", "相機縮圖轉換失敗", error);
+      } finally {
+        if (thumbnail != null && thumbnail != source) thumbnail.recycle();
+        if (source != null) source.recycle();
+      }
+    }
+    try {
+      InputImage image = InputImage.fromMediaImage(proxy.getImage(), proxy.getImageInfo().getRotationDegrees());
+      scanner.process(image).addOnSuccessListener(ContextCompat.getMainExecutor(this), codes -> {
+        if (!qrScanning || epoch != qrGeneration || isDestroyed()) return;
+        for (com.google.mlkit.vision.barcode.common.Barcode code : codes) {
+          String value = code.getRawValue();
+          if (value != null && value.toLowerCase(java.util.Locale.ROOT).contains("yourdesk:")) {
+            web.evaluateJavascript("window.qrCodeDetected&&window.qrCodeDetected(" + org.json.JSONObject.quote(value) + ")", null);
+            stopQrScannerOnMain();
+            break;
+          }
+        }
+      }).addOnCompleteListener(t -> proxy.close());
+    } catch (RuntimeException error) { proxy.close(); }
+  }
+
   final class Bridge {
     @JavascriptInterface public String loadSites() {
       return getPreferences(0).getString("siteLibrary", "[]");
@@ -966,59 +1258,17 @@ public final class MainActivity extends Activity {
     }
 
     @JavascriptInterface public void startQrScanner() {
-      if (qrScanning) return;
-      qrScanning = true;
+      runOnUiThread(MainActivity.this::startQrScannerOnMain);
+    }
+    @JavascriptInterface public void stopQrScanner() { runOnUiThread(MainActivity.this::stopQrScannerOnMain); }
+    @JavascriptInterface public void setSiteDialogVisible(boolean visible) {
       runOnUiThread(() -> {
-        try {
-          qrScanner = BarcodeScanning.getClient();
-          ProcessCameraProvider.getInstance(MainActivity.this).addListener(() -> {
-            try {
-              qrCameraProvider = ProcessCameraProvider.getInstance(MainActivity.this).get();
-              ImageAnalysis analysis = new ImageAnalysis.Builder().setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST).build();
-              analysis.setAnalyzer(ContextCompat.getMainExecutor(MainActivity.this), image -> analyzeQr(image));
-              qrCameraProvider.unbindAll();
-              qrCameraProvider.bindToLifecycle(ProcessLifecycleOwner.get(), CameraSelector.DEFAULT_BACK_CAMERA, analysis);
-              qrPreview.setVisibility(View.GONE);
-            } catch (Exception e) { qrScanning = false; }
-          }, ContextCompat.getMainExecutor(MainActivity.this));
-        } catch (Exception e) { qrScanning = false; }
+        if (nativeScreen == null || nativeVideo == null || isDestroyed()) return;
+        if (visible) { nativeScreen.setVisibility(View.GONE); nativeVideo.setVisibility(View.GONE); }
       });
     }
-    private void analyzeQr(ImageProxy proxy) {
-      if (!qrScanning || qrScanner == null || proxy.getImage() == null) { proxy.close(); return; }
-      long nowMs = android.os.SystemClock.uptimeMillis();
-      if (nowMs - lastCameraJpegMs > 350) {
-        lastCameraJpegMs = nowMs;
-        Bitmap source = null, thumbnail = null;
-        try {
-          source = proxy.toBitmap();
-          float scale = Math.min(1f, 640f / Math.max(source.getWidth(), source.getHeight()));
-          Matrix transform = new Matrix();
-          transform.postScale(scale, scale);
-          transform.postRotate(proxy.getImageInfo().getRotationDegrees());
-          thumbnail = Bitmap.createBitmap(source, 0, 0, source.getWidth(), source.getHeight(), transform, true);
-          java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream();
-          thumbnail.compress(Bitmap.CompressFormat.JPEG, 45, output);
-          String data = "data:image/jpeg;base64," + Base64.encodeToString(output.toByteArray(), Base64.NO_WRAP);
-          web.evaluateJavascript("window.cameraFrame&&window.cameraFrame(" + org.json.JSONObject.quote(data) + ")", null);
-        } catch (RuntimeException e) {
-          Log.w("YourDeskCamera", "相機縮圖轉換失敗", e);
-        } finally {
-          if (thumbnail != null && thumbnail != source) thumbnail.recycle();
-          if (source != null) source.recycle();
-        }
-      }
-      InputImage image = InputImage.fromMediaImage(proxy.getImage(), proxy.getImageInfo().getRotationDegrees());
-      qrScanner.process(image).addOnSuccessListener(codes -> { for (com.google.mlkit.vision.barcode.common.Barcode code : codes) { String value = code.getRawValue(); if (value != null && value.toLowerCase(java.util.Locale.ROOT).contains("yourdesk:")) { qrScanning = false; web.evaluateJavascript("window.qrCodeDetected&&window.qrCodeDetected(" + org.json.JSONObject.quote(value) + ")", null); stopQrScanner(); break; } } }).addOnCompleteListener(t -> proxy.close());
-    }
-    @JavascriptInterface public void stopQrScanner() { qrScanning = false; if (qrPreview != null) qrPreview.setVisibility(View.GONE); if (qrCameraProvider != null) { qrCameraProvider.unbindAll(); qrCameraProvider = null; } if (qrScanner != null) { qrScanner.close(); qrScanner = null; } }
-    @JavascriptInterface public void setSiteDialogVisible(boolean visible) {
-      if (nativeScreen == null || nativeVideo == null) return;
-      if (visible) { nativeScreen.setVisibility(View.GONE); nativeVideo.setVisibility(View.GONE); }
-    }
     @JavascriptInterface public void requestCameraPermission() {
-      if (android.os.Build.VERSION.SDK_INT >= 23 && checkSelfPermission(android.Manifest.permission.CAMERA) != android.content.pm.PackageManager.PERMISSION_GRANTED)
-        requestPermissions(new String[]{android.Manifest.permission.CAMERA}, 7001);
+      runOnUiThread(MainActivity.this::requestCameraPermissionOnMain);
     }
     private final Object credentialLock = new Object();
 
@@ -1092,12 +1342,17 @@ public final class MainActivity extends Activity {
     }
 
     @JavascriptInterface public boolean setStreamPreferences(String profile, int scalePercent) {
+      if (scalePercent != 100 && scalePercent != 75 && scalePercent != 60 && scalePercent != 50) return false;
+      final int epoch = generation;
       try {
-        org.json.JSONObject c = new org.json.JSONObject();
-        c.put("type", "quality-profile").put("profile", profile == null ? "standard" : profile);
-        c.put("viewWidth", 1920).put("viewHeight", 1080);
-        c.put("imageEnhancement", scalePercent < 100);
-        viewer.sendControlJSON(c.toString());
+        viewer.sendStreamPreferences(profile == null ? "standard" : profile, scalePercent);
+        runOnUiThread(() -> {
+          if (epoch != generation || isDestroyed()) return;
+          selectedScale = scalePercent == 75 ? "3/4" : scalePercent == 60 ? "3/5" : scalePercent == 50 ? "1/2" : "1/1";
+          selectedQuality = "fast".equals(profile) ? "低畫質" : "high".equals(profile) ? "高畫質" : "標準";
+          streamRequestStartedMs = android.os.SystemClock.uptimeMillis();
+          scaleButton.setText("\uf390  " + selectedScale + " …");
+        });
         return true;
       } catch (Exception e) { return false; }
     }
@@ -1111,6 +1366,10 @@ public final class MainActivity extends Activity {
         return "ok";
       }
       catch (Exception e) { return e.getMessage() == null ? "send failed" : e.getMessage(); }
+    }
+
+    @JavascriptInterface public boolean supportsTextInput() {
+      return viewer.supportsCommand("input.text-capabilities");
     }
 
     @JavascriptInterface public String readFrameJSON() {
@@ -1163,7 +1422,7 @@ public final class MainActivity extends Activity {
             String mode = in.getString("mode");
             if (!mode.equals("shell") && !mode.equals("desktop")) throw new Exception("模式無效");
             if (epoch != generation) return;
-            session.connect("wss://desktop.mars-cloud.com:8080/ws", in.getString("room"), in.getString("secret"));
+            session.connect(SignalingAddress.validate(in.optString("signal", "")), in.getString("room"), in.getString("secret"));
             if (epoch != generation) { session.close(); return; }
             if (mode.equals("desktop")) {
               // 讓 Host 只選擇 Android 已實際找到的 decoder；JPEG 永遠保留備援。
@@ -1232,6 +1491,8 @@ public final class MainActivity extends Activity {
   }
 
   @Override protected void onDestroy() {
+    stopQrScannerOnMain();
+    uiHandler.removeCallbacksAndMessages(null);
     if (fullscreenExitGesture != null) fullscreenExitGesture.reset();
     if (android.os.Build.VERSION.SDK_INT >= 33 && systemBackCallback != null) {
       getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(systemBackCallback);
@@ -1240,7 +1501,7 @@ public final class MainActivity extends Activity {
     clearComposedFrame();
     new Thread(viewer::close).start();
     io.shutdown();
-    web.destroy();
+    if (web != null) { web.removeJavascriptInterface("YourDesk"); web.destroy(); }
     super.onDestroy();
   }
 

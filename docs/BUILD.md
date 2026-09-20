@@ -1,6 +1,8 @@
 # 跨平台建置與打包
 
-本輪修正隨 [1.26.0914 build 1049](RELEASE-1.26.0914-build-1049.md) 發行；下方保留修正過程與歷史測試條件。
+早期跨平台修正隨 [1.26.0914 build 1049](RELEASE-1.26.0914-build-1049.md) 發行；下方亦保留歷史測試條件，不能將開發分支變更視為已發布套件。
+
+2026-09-21 原始碼同步包含[桌面深度檢查修復](DEEP-REVIEW-FIXES-2026-09-20.md)、[記憶體最佳化](MEMORY-OPTIMIZATION-2026-09-19.md)及 [Android 修正](ANDROID-REVIEW-FIXES-2026-09-20.md)。本次不建立 Release、更新版號或發布安裝包；Android AAR／APK 與實機驗收仍未完成。
 
 AV1 更新：已補上 Windows／macOS 軟體編碼、macOS VideoToolbox 硬解與軟解備援；編解碼分析頁面隱藏 128×128，但保留內部快速探測。最新支援範圍、建置與驗證限制見 [AV1 編解碼](AV1.md)。
 
@@ -24,7 +26,23 @@ buildMac.command／buildWin.command／buildLinux.command 與 pack.command 統一
 
 需要 Go 1.27.1 以上、Python 3.9 以上、zsh。macOS 桌面版使用 Xcode Command Line Tools。從 macOS 建置 Windows x64 桌面版需要 MinGW 的 gcc、g++、windres；Windows 封裝改用 NSIS 產生 Installer EXE，需要 makensis（macOS：brew install nsis）；可用 YOURDESK_MAKENSIS 指定編譯器。
 
+macOS 本機 `runUITest.command` 也會建置 FFmpeg／libaom 與 TurboJPEG；首次建置前須安裝 CMake 與 pkg-config：
+
+```sh
+brew install cmake pkgconf
+```
+
+Homebrew 的 `pkgconf` 提供 `pkg-config` 指令。x64 原生影音建置另外需要 `nasm`；`make` 與 C/C++ 編譯器由 Xcode Command Line Tools 提供。缺少工具時會在下載來源前停止並列出原因，不會自動安裝全域套件。
+
+原生影音產物保留在專案內的 `.local-run/software-video` 與 `.local-run/turbojpeg`。建置指令使用相對目錄，依賴 FFmpeg／CMake 的標準流程，不預先建立來源別名或覆寫 pkg-config prefix；專案應置於不含空白的本機路徑。
+libaom 的 `aom.pc` 使用標準 `${pcfiledir}` 變數定位相鄰安裝目錄，避免記錄搬移前的路徑，也避免 FFmpeg 的 C locale 將中文路徑轉義後找不到標頭。
+FFmpeg 的 `install/`（二進位、連結庫及標頭）與 `metadata/`（組態、授權與內容指紋）會長期保留。來源版本／內容、FFmpeg 編譯腳本、編譯器路徑／檔案、建置旗標改變，或產物遺失／內容損壞時才重建；一般 YourDesk 程式或產物清理邏輯修改不重編 FFmpeg。舊版已完成產物會直接接管，不因新增此機制重編。
+每次 FFmpeg 建置或重用成功後，只清除該平台的 `aom/`、`ffmpeg/` 工作目錄（物件檔、CMake／Make 快取）；失敗時保留診斷資料。固定雜湊的來源封存、已解壓來源與授權資料保留，用於離線重建、偵測來源修改及隨包提供來源，不清理 Go 全域快取或其他專案。不要整個刪除 `.local-run/software-video`；那會連已保存的二進位一起刪除。
+Go／CGo 會切換到不同套件目錄，標頭／函式庫搜尋路徑於執行時由專案位置推導，並對整個 `-I`／`-L` 參數加引號；沒有寫死磁碟名稱或使用者路徑。
+
 macOS 僅支援 Apple Silicon（arm64），不支援 Intel（x64）；手動指定 darwin/x64 也會拒絕建置與封裝。
+
+macOS 主程式、FFmpeg／libaom、TurboJPEG 統一最低版本為 13.0；專案指定的 [Go 1.27 已不支援 macOS 12](https://go.dev/doc/go1.27#darwin)，僅降低 C 編譯旗標無法恢復舊系統支援。`scripts/macos_build.py` 設定 CGo、CMake 與 FFmpeg 的 deployment target，並直接核對 Mach-O load commands。高於最低支援版本或非 arm64 macOS 的產物會阻止本機建置／正式封裝，不能只靠 Info.plist 宣告相容。Siri extension 同樣為 13.0，較新的系統功能仍須執行期可用性檢查。變更最低版本會產生新的原生建置快取，不覆蓋舊版二進位；新快取完成後照常重用。
 
 pack.command 預設目標：
 
@@ -171,7 +189,13 @@ Linux CLI 目標為 `linux/x64`、`linux/arm64`，兩者均包含於預設全平
 
 Windows 桌面 Client／顯示區域 正式建置使用 `turbojpeg,ffmpeg` tags，附帶三個 FFmpeg 動態庫、授權與來源封存。快取以來源版本、編譯器與組態識別；命中有效快取便不重新編譯。DLL 相依閉包檢查會阻止缺檔套件發布。macOS 的 AV1 透過 FFmpeg 接入 VideoToolbox 硬解與 libaom 軟體編解碼，隨附三個 dylib；H.264／HEVC 保留原生 VideoToolbox。詳見 [編解碼分析](HARDWARE-DETECTION.md)。
 
-目前發布排除 `android/`、`androidcore/` 與本機編譯輸出；預設六個平台維持不變。
+桌面 Release 打包不包含 `android/`、`androidcore/` 與本機編譯輸出；預設六個平台維持不變。這是封裝範圍，不代表 Android 原始碼未納入 Git。
+
+## Android Viewer（開發中）
+
+Android 使用獨立的 `android/core` Go module，不會自動取得桌面 core 的變更；Java APP 依賴 `android/libs/androidcore.aar`。目前加入的 Go API 必須先重建 AAR 才能進入 APK，不能只執行 `assembleRelease` 沿用舊核心。
+
+完整環境、來源驗證、16 KB 原生庫檢查與回歸命令見 [Android 建置與測試](ANDROID-BUILD.md)。主機端邏輯測試與真實 Android API 型別編譯已完成，但新的 JNI／AAR、完整 Gradle／APK、不同 codec 裝置及 16 KB 系統尚未驗收。既有 FFmpeg 二進位保留，不因一般 Java／Go 程式修改強制重建。
 
 ## Siri 擴充
 
@@ -179,7 +203,7 @@ macOS 正式 App 封裝現在需要完整 Xcode 27 SDK，用於編譯 App Intent
 
 ## 封裝體積與共用版號
 
-macOS DMG 使用 ULMO（LZMA）壓縮，支援範圍涵蓋產品要求的 macOS 12 以上；Windows 免安裝、WinPE 與 Linux ZIP 使用標準 Deflate 第 9 級。Windows 安裝程式維持既有的 solid LZMA。壓縮在封裝階段執行，可能增加建包時間；不改變解壓後的功能或資料。
+macOS DMG 使用 ULMO（LZMA）壓縮，支援範圍涵蓋產品要求的 macOS 13 以上；Windows 免安裝、WinPE 與 Linux ZIP 使用標準 Deflate 第 9 級。Windows 安裝程式維持既有的 solid LZMA。壓縮在封裝階段執行，可能增加建包時間；不改變解壓後的功能或資料。
 
 共用版號位於 `internal/buildinfo`，正式建置以 `-X 'yourdesk/internal/buildinfo.Version=1.YY.MMDD build HHmm'` 注入；顯示區域 不再為了讀取版號而依賴整個 `clientui`。自行建置的腳本應同步使用此符號。未注入版號時，仍採執行檔修改時間產生開發版號。
 

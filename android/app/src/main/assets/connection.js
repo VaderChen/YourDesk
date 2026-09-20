@@ -1,11 +1,13 @@
 'use strict';
-const connectionUI={mode:'shell',waiting:false,timer:null};
+const connectionUI={mode:'shell',room:'',signal:'',waiting:false,timer:null};
 const connectionElement=id=>document.getElementById(id);
 function stopConnectionWait(){clearInterval(connectionUI.timer);connectionUI.waiting=false;connectionElement('connect-progress').hidden=true;}
-function openConnection(room,mode){
+function openConnection(room,mode,signal=''){
  if(connectionUI.waiting)return;
  const normalizedRoom=(room||'').trim();
  connectionUI.mode=mode;
+ connectionUI.room=normalizedRoom;
+ connectionUI.signal=typeof signal==='string'?signal.trim():'';
  connectionElement('connect-title').textContent=mode==='desktop'?'遠端桌面連線':'Shell 連線';
  connectionElement('connect-room').value=normalizedRoom;
  connectionElement('connect-secret').value='';
@@ -39,7 +41,9 @@ connectionElement('connection-form').onsubmit=e=>{
  connectionUI.waiting=true;connectionElement('connect-overlay').hidden=true;
  connectionElement('connect-progress').hidden=false;connectionElement('connect-elapsed').textContent='0';
  const start=Date.now();connectionUI.timer=setInterval(()=>{connectionElement('connect-elapsed').textContent=Math.floor((Date.now()-start)/1000);},250);
- try{window.YourDesk.connectSession(JSON.stringify({mode:connectionUI.mode,room,secret}));}catch{window.connectionFailed();}
+ // 手動改成另一個 room 時，不沿用先前站台的 signaling。
+ const signal=room===connectionUI.room?connectionUI.signal:'';
+ try{window.YourDesk.connectSession(JSON.stringify({mode:connectionUI.mode,room,secret,signal}));}catch{window.connectionFailed();}
 };
 window.connectionFailed=()=>{stopConnectionWait();connectionElement('connect-status').textContent='連線失敗，請確認遠端、密碼及網路後重試。';connectionElement('connect-overlay').hidden=false;};
 connectionElement('connect-abort').onclick=()=>{window.YourDesk.abortConnection();stopConnectionWait();connectionElement('connect-status').textContent='已中止連線';connectionElement('connect-overlay').hidden=false;};

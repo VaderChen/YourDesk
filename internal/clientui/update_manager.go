@@ -29,25 +29,27 @@ type releaseAsset struct {
 	Digest string `json:"digest"`
 }
 type updateStatus struct {
-	InstallAt       int64               `json:"installAt"`
-	Available       bool                `json:"available"`
-	Version         string              `json:"version"`
-	Message         string              `json:"message"`
-	CheckedAt       time.Time           `json:"checkedAt"`
-	NotifiedVersion string              `json:"notifiedVersion"`
-	Asset           releaseAsset        `json:"asset"`
-	Notes           map[string][]string `json:"notes,omitempty"`
-	NotesVersion    string              `json:"notesVersion,omitempty"`
-	ShowNotes       bool                `json:"showNotes,omitempty"`
-	NotesTest       bool                `json:"notesTest,omitempty"`
-	Downloading     bool                `json:"downloading"`
-	DownloadBytes   int64               `json:"downloadBytes"`
-	DownloadPath    string              `json:"downloadPath"`
-	DownloadError   string              `json:"downloadError"`
-	OpenError       string              `json:"openError"`
-	Opening         bool                `json:"opening"`
+	AutomaticInstall bool                `json:"automaticInstall"`
+	InstallAt        int64               `json:"installAt"`
+	Available        bool                `json:"available"`
+	Version          string              `json:"version"`
+	Message          string              `json:"message"`
+	CheckedAt        time.Time           `json:"checkedAt"`
+	NotifiedVersion  string              `json:"notifiedVersion"`
+	Asset            releaseAsset        `json:"asset"`
+	Notes            map[string][]string `json:"notes,omitempty"`
+	NotesVersion     string              `json:"notesVersion,omitempty"`
+	ShowNotes        bool                `json:"showNotes,omitempty"`
+	NotesTest        bool                `json:"notesTest,omitempty"`
+	Downloading      bool                `json:"downloading"`
+	DownloadBytes    int64               `json:"downloadBytes"`
+	DownloadPath     string              `json:"downloadPath"`
+	DownloadError    string              `json:"downloadError"`
+	OpenError        string              `json:"openError"`
+	Opening          bool                `json:"opening"`
 }
 type updateManager struct {
+	openPackage func(context.Context, string) error
 	decision    chan bool
 	downloads   sync.WaitGroup
 	mu          sync.Mutex
@@ -60,7 +62,7 @@ type updateManager struct {
 }
 
 func newUpdateManager(ctx context.Context, dir string) *updateManager {
-	u := &updateManager{ctx: ctx, path: filepath.Join(dir, "updates.json"), notify: make(chan struct{}, 1)}
+	u := &updateManager{ctx: ctx, path: filepath.Join(dir, "updates.json"), notify: make(chan struct{}, 1), openPackage: openUpdatePackage}
 	// 本機啟動器每次從下載前開始，且不讀寫正式更新紀錄。
 	u.forceUpdate = os.Getenv("YOURDESK_TEST_UPDATE") == "1"
 	if os.Getenv("YOURDESK_TEST_UPDATE_NOTES") == "1" {
@@ -130,7 +132,22 @@ func readLocalReleaseNotes() map[string][]string {
 	}
 	return notes
 }
-func (u *updateManager) snapshot() updateStatus { u.mu.Lock(); defer u.mu.Unlock(); return u.state }
+func automaticUpdateSupported(system, name string) bool {
+	name = strings.ToLower(name)
+	return (system == "darwin" && strings.HasSuffix(name, ".dmg")) || (system == "windows" && strings.HasSuffix(name, "-setup.exe"))
+}
+
+func (u *updateManager) snapshotLocked() updateStatus {
+	state := u.state
+	// 能力依目前平台／套件推導，不信任上一版寫入的狀態。
+	state.AutomaticInstall = automaticUpdateSupported(runtime.GOOS, state.Asset.Name)
+	return state
+}
+func (u *updateManager) snapshot() updateStatus {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	return u.snapshotLocked()
+}
 func (u *updateManager) saveLocked() {
 	if u.forceUpdate {
 		return
@@ -183,7 +200,7 @@ func (u *updateManager) check(ctx context.Context, manual bool, force ...bool) u
 	}
 	u.mu.Lock()
 	if u.state.Downloading || u.state.Opening || u.state.InstallAt > 0 {
-		state := u.state
+		state := u.snapshotLocked()
 		u.mu.Unlock()
 		return state
 	}
@@ -203,7 +220,7 @@ func (u *updateManager) check(ctx context.Context, manual bool, force ...bool) u
 		u.state.Available, u.state.Version, u.state.Asset, u.state.Message = result.Available, result.Version, result.Asset, result.Message
 	}
 	u.saveLocked()
-	state := u.state
+	state := u.snapshotLocked()
 	u.mu.Unlock()
 	return state
 }
@@ -402,6 +419,18 @@ func (u *updateManager) startDownload(onOpened func()) error {
 		u.saveLocked()
 		u.mu.Unlock()
 		if err != nil {
+			return
+		}
+		if !automaticUpdateSupported(runtime.GOOS, asset.Name) {
+			// Portable ZIP 只開啟獨立解壓目錄，沒有倒數，也不結束現有 APP。
+			err = u.openPackage(u.ctx, path)
+			u.mu.Lock()
+			u.state.Opening = false
+			if err != nil {
+				u.state.OpenError = "無法開啟下載檔案：" + err.Error()
+			}
+			u.saveLocked()
+			u.mu.Unlock()
 			return
 		}
 		{

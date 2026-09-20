@@ -12,6 +12,8 @@ YourDesk 是支援 macOS 與 Windows 的遠端桌面工具。從連線、站台�
 
 **1.26.0919 build 0535：修正更新完成通知誤顯示下載按鈕，保留 Finder 貼上進度調整與系統快捷鍵選擇。**保留傳輸背壓，Finder 進度改善仍待實測；詳見 [本版說明](docs/RELEASE-1.26.0919-build-0535.md)。
 
+開發分支狀態（2026-09-21，尚未發布）：已加入桌面傳輸／記憶體修正，以及 Android Viewer 的佇列、解碼恢復、Shell／中文輸入與相機生命週期修正。這次更新為原始碼與文件同步，不代表下載套件已更新；Android 舊 Go AAR 仍須重建，APK／16 KB 裝置尚未驗收。詳見[桌面修正紀錄](docs/DEEP-REVIEW-FIXES-2026-09-20.md)、[Android 修正紀錄](docs/ANDROID-REVIEW-FIXES-2026-09-20.md)與[Android 建置](docs/ANDROID-BUILD.md)。
+
 - **GUI 與 CMD 雙模式**：支援遠端桌面與互動命令列，可依工作選擇模式；命令列使用獨立視窗，亦可連入 Linux CLI Host。
 - **MCP AI Agent 遠端操控**：AI Agent 可透過 MCP 連線遠端、操作桌面或命令列、查詢站台能力，完成工作後斷線。
 - **硬體編解碼加速**：支援 macOS H.264／HEVC 與 Windows H.264／AV1 正式硬體編碼路徑，Windows 另提供 H.264／HEVC／AV1 軟解；依兩端裝置能力自動選擇，無法使用時切換備援路徑，工具列可查看實際編解碼狀態。
@@ -77,6 +79,7 @@ macOS 首次使用需允許「螢幕錄製」與「輔助使用」權限。接�
 
 - [連線測速與分析](docs/CONNECTION-DIAGNOSTICS.md) · [串流設定與相容性](docs/STREAMING-CONTROLS.md)
 - [建置與打包](docs/BUILD.md) · [架構說明](docs/ARCHITECTURE.md)
+- [Android Viewer 建置與測試（開發中）](docs/ANDROID-BUILD.md) · [記憶體最佳化紀錄](docs/MEMORY-OPTIMIZATION-2026-09-19.md)
 - [畫面增強模型](docs/QUICKSRNET.md) · [實驗性補幀](docs/FRAME-INTERPOLATION.md)
 
 畫面處理使用 FSR、QuickSRNet／SESR 與 RIFE。感謝原作者提供相關技術；[FSR](docs/FSR-LICENSE.txt)、[超解析度模型](internal/superres/MODEL_LICENSE.txt)及 [RIFE](internal/frameinterp/MODEL_LICENSE.txt) 的完整授權亦隨套件附上。

@@ -1,5 +1,17 @@
 plugins { id("com.android.application") }
 
+// Source changes must not silently ship the old prebuilt Go core.
+val verifyAndroidCore by tasks.registering(Exec::class) {
+    workingDir(rootProject.projectDir.parentFile)
+    commandLine(providers.gradleProperty("python").getOrElse("python3"), "scripts/android_core.py", "verify")
+}
+tasks.register<Exec>("buildAndroidCore") {
+    workingDir(rootProject.projectDir.parentFile)
+    commandLine(providers.gradleProperty("python").getOrElse("python3"), "scripts/android_core.py", "build")
+}
+verifyAndroidCore.configure { mustRunAfter("buildAndroidCore") }
+tasks.named("preBuild") { dependsOn(verifyAndroidCore) }
+
 android { namespace = "com.yourdesk.android"; compileSdk = 35
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     defaultConfig {
@@ -17,7 +29,7 @@ android { namespace = "com.yourdesk.android"; compileSdk = 35
 }
 
 tasks.register("releasePreviewApk") {
-    dependsOn("assembleRelease")
+    dependsOn("verifyReleaseNativeLibraries")
     doLast {
         copy {
             from(layout.buildDirectory.file("outputs/apk/release/app-release-unsigned.apk"))
@@ -25,6 +37,18 @@ tasks.register("releasePreviewApk") {
             rename { "YourDesk-0.26.0915-build-1801-preview.apk" }
         }
     }
+}
+
+// Inspect the final APK too: third-party FFmpeg/MLKit libraries are not in the Go AAR.
+val verifyReleaseNativeLibraries by tasks.registering(Exec::class) {
+    dependsOn("assembleRelease")
+    workingDir(rootProject.projectDir.parentFile)
+    commandLine(providers.gradleProperty("python").getOrElse("python3"), "scripts/android_core.py", "verify-apk",
+        "--apk", layout.buildDirectory.file("outputs/apk/release/app-release-unsigned.apk").get().asFile.path)
+}
+// AGP creates variant assemble tasks after project evaluation.
+tasks.configureEach {
+    if (name == "assembleRelease") finalizedBy(verifyReleaseNativeLibraries)
 }
 dependencies {
     androidTestImplementation("androidx.test:runner:1.6.2")

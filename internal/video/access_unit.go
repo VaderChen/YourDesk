@@ -8,6 +8,9 @@ import (
 
 var ErrNeedKeyframe = errors.New("等待 IDR 以恢復參考影格")
 
+// 同時限制封包位元組與 NAL 數，避免大量極小 NAL 放大解析用記憶體。
+const maxVideoNALs = 4096
+
 // IsKeyframe 讀取實際 NAL，不能把全畫面更新等同於 IDR。
 func IsKeyframe(codec WireCodec, data []byte) (bool, error) {
 	if codec == WireAV1 {
@@ -26,6 +29,9 @@ func IsKeyframe(codec WireCodec, data []byte) (bool, error) {
 	index := 0
 	key, picture := false, false
 	for len(data) > 0 {
+		if index >= maxVideoNALs {
+			return false, fmt.Errorf("影片 NAL 過多")
+		}
 		if len(data) < 4 {
 			return false, fmt.Errorf("影片 NAL 截斷")
 		}

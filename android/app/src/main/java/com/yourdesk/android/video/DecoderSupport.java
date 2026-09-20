@@ -2,11 +2,13 @@ package com.yourdesk.android.video;
 
 import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
+import android.media.MediaFormat;
 import android.os.Build;
 
+import java.util.ArrayList;
 import java.util.Locale;
 
-/** Android 端硬體解碼器探測；結果只作協商依據，不把存在的 codec 當成可用。 */
+/** 協商與實際播放共用硬體候選；目前的可靠軟體備援是 JPEG，而非 FFmpeg 版本探測。 */
 public final class DecoderSupport {
   private DecoderSupport() { }
 
@@ -18,16 +20,14 @@ public final class DecoderSupport {
     return result.toString();
   }
 
-  /** 回傳可供 Host 選擇的 wire codec；JPEG 永遠保留作可靠的軟體備援。 */
+  /** 只公告 queue() 真正會使用的解碼路徑；JPEG 永遠保留。 */
   public static byte[] supportedWireCodecs() {
     java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
     out.write(0);
-    if (findDecoder("video/avc", false) != null) out.write(1);
-    if (findDecoder("video/hevc", false) != null) out.write(2);
+    for (byte codec : hardwareWireCodecs()) out.write(codec);
     return out.toByteArray();
   }
 
-  /** 只公告已找到硬體 decoder 的 codec，供 Host 的編碼器優先排序。 */
   public static byte[] hardwareWireCodecs() {
     java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
     if (findHardwareDecoder("video/avc") != null) out.write(1);
@@ -41,65 +41,56 @@ public final class DecoderSupport {
     result.append(label).append('=').append(name == null ? "無" : name);
   }
 
-  /** 回傳第一個非 software decoder 的名稱；null 表示沒有候選。 */
   public static String findHardwareDecoder(String mime) {
     String[] candidates = hardwareDecoders(mime);
     return candidates.length == 0 ? null : candidates[0];
   }
 
-  /**
-   * 回傳所有硬體候選，讓 runtime configure 失敗時能嘗試下一個實際 codec。
-   * MediaCodecList 的順序不是所有裝置都可靠，因此保留完整清單而不只取第一個。
-   */
-  public static String[] hardwareDecoders(String mime) {
-    java.util.ArrayList<String> result = new java.util.ArrayList<>();
+  public static String[] hardwareDecoders(String mime) { return hardwareDecoders(mime, null); }
+
+  /** 此影格的尺寸與 profile 必須受支援，configure 才是最後的廠商實作驗證。 */
+  public static String[] hardwareDecoders(String mime, MediaFormat format) {
+    ArrayList<String> result = new ArrayList<>();
     try {
-      MediaCodecList list = new MediaCodecList(MediaCodecList.REGULAR_CODECS);
-      for (MediaCodecInfo info : list.getCodecInfos()) {
-        if (info.isEncoder()) continue;
-        boolean supports = false;
-        for (String type : info.getSupportedTypes()) {
-          if (mime.equalsIgnoreCase(type)) {
-            supports = true;
+      for (MediaCodecInfo info : new MediaCodecList(MediaCodecList.REGULAR_CODECS).getCodecInfos()) {
+        try {
+          if (info.isEncoder() || !isHardware(info)) continue;
+          for (String type : info.getSupportedTypes()) {
+            if (!mime.equalsIgnoreCase(type)) continue;
+            if (format != null && !info.getCapabilitiesForType(type).isFormatSupported(format)) break;
+            if (!result.contains(info.getName())) result.add(info.getName());
             break;
           }
+        } catch (RuntimeException ignored) {
+          // 單一損壞的 codec descriptor 不可遮蔽清單中的其他候選。
         }
-        if (!supports || !isHardware(info)) continue;
-        if (!result.contains(info.getName())) result.add(info.getName());
       }
-    } catch (RuntimeException ignored) {
-      // codec 清單不是所有裝置都能在背景啟動階段讀取。
-    }
+    } catch (RuntimeException ignored) { }
     return result.toArray(new String[0]);
   }
 
-  private static boolean isHardware(MediaCodecInfo info) {
-    if (Build.VERSION.SDK_INT >= 29) {
-      return !info.isSoftwareOnly() && info.isHardwareAccelerated();
+  static int androidProfile(EncodedVideoFrame frame) {
+    if (frame.codec == 1) {
+      switch (frame.profileIdc) {
+        case 66: return MediaCodecInfo.CodecProfileLevel.AVCProfileBaseline;
+        case 77: return MediaCodecInfo.CodecProfileLevel.AVCProfileMain;
+        case 88: return MediaCodecInfo.CodecProfileLevel.AVCProfileExtended;
+        case 100: return MediaCodecInfo.CodecProfileLevel.AVCProfileHigh;
+        case 110: return MediaCodecInfo.CodecProfileLevel.AVCProfileHigh10;
+        case 122: return MediaCodecInfo.CodecProfileLevel.AVCProfileHigh422;
+        case 244: return MediaCodecInfo.CodecProfileLevel.AVCProfileHigh444;
+        default: return -1;
+      }
     }
-    String name = info.getName().toLowerCase(Locale.ROOT);
-    return !name.contains("google") && !name.contains("software") && !name.contains("sw.");
+    if (frame.profileIdc == 1) return MediaCodecInfo.CodecProfileLevel.HEVCProfileMain;
+    if (frame.profileIdc == 2) return MediaCodecInfo.CodecProfileLevel.HEVCProfileMain10;
+    return -1;
   }
 
-  private static String findDecoder(String mime, boolean hardwareOnly) {
-    try {
-      MediaCodecList list = new MediaCodecList(MediaCodecList.REGULAR_CODECS);
-      for (MediaCodecInfo info : list.getCodecInfos()) {
-        if (info.isEncoder()) continue;
-        boolean supports = false;
-        for (String type : info.getSupportedTypes()) {
-          if (mime.equalsIgnoreCase(type)) {
-            supports = true;
-            break;
-          }
-        }
-        if (!supports) continue;
-        if (hardwareOnly && !isHardware(info)) continue;
-        return info.getName();
-      }
-    } catch (RuntimeException ignored) {
-      // codec 清單不是所有裝置都能在背景啟動階段讀取。
-    }
-    return null;
+  private static boolean isHardware(MediaCodecInfo info) {
+    if (Build.VERSION.SDK_INT >= 29) return !info.isSoftwareOnly() && info.isHardwareAccelerated();
+    String name = info.getName().toLowerCase(Locale.ROOT);
+    return !name.startsWith("omx.google.") && !name.startsWith("c2.android.")
+        && !name.contains("ffmpeg") && !name.contains("software") && !name.contains("sw.");
   }
 }

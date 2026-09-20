@@ -1,8 +1,12 @@
 'use strict';
 const term=new Terminal({disableStdin:true,cursorBlink:true,scrollback:5000,fontSize:14,theme:{background:'#142019',foreground:'#dcebe1'}});
-const fit=new FitAddon.FitAddon();term.loadAddon(fit);term.open(document.getElementById('terminal')); term.textarea?.setAttribute('inputmode','text'); term.textarea?.setAttribute('autocomplete','off'); document.getElementById('terminal').addEventListener('pointerdown',()=>{term.focus();if(inputProxy){inputProxy.focus();inputProxy.click();}window.YourDesk?.showKeyboard?.();});
+const fit=new FitAddon.FitAddon();term.loadAddon(fit);term.open(document.getElementById('terminal'));
+// Native 與觸控皆聚焦 xterm 自己的 textarea；控制鍵與 IME 只走同一條輸入路徑。
+const inputProxy=term.textarea;
+inputProxy.id='input-proxy';
+for(const [name,value] of Object.entries({inputmode:'text',autocomplete:'off',autocorrect:'off',autocapitalize:'off',spellcheck:'false'}))inputProxy.setAttribute(name,value);
+document.getElementById('terminal').addEventListener('pointerdown',()=>{term.focus();window.YourDesk?.showKeyboard?.();});
 const status=document.getElementById('status');
-const inputProxy=document.getElementById('input-proxy'); inputProxy?.addEventListener('input',()=>{const v=inputProxy.value;if(v&&active)send(new TextEncoder().encode(v));inputProxy.value='';});
 const adjustFont=delta=>{term.options.fontSize=Math.max(8,Math.min(32,(term.options.fontSize||14)+delta));fit.fit();if(active)call('resize',size()).catch(fail);};
 document.getElementById('font-down').onclick=()=>adjustFont(-1);
 document.getElementById('font-up').onclick=()=>adjustFont(1);document.getElementById('keyboard').onclick=()=>window.YourDesk?.toggleKeyboard?.();

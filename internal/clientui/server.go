@@ -893,6 +893,9 @@ func (s *server) start(kind, siteID, binary string, args []string) error {
 		}
 		return err
 	}
+	if p.stdin != nil {
+		p.stdin = newProcessInput(p.stdin)
+	}
 	s.children[key] = p
 	if kind == "viewer" || kind == "quick" {
 		go s.sendViewerOptimization(key, p)

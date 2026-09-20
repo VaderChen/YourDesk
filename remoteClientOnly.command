@@ -29,7 +29,7 @@ finish() {
   local result=$?
   trap - EXIT
   if [[ "$result" -ne 0 ]]; then
-    echo "Client 啟動或執行失敗（結束碼：$result）。請保留上方訊息與日誌。" >&2
+    echo "Client 啟動或執行失敗（結束碼：${result}）。請保留上方訊息與日誌。" >&2
     if [[ -t 0 && "$result" -ne 130 && "$result" -ne 143 ]]; then
       read -r -p "按 Enter 關閉視窗……" _ || true
     fi

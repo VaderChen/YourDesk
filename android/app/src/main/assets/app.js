@@ -32,7 +32,7 @@ function render(){
   for(const action of ['delete','edit','terminal','desktop']){
    const button=document.createElement('button');button.type='button';button.className=action;button.innerHTML=icon(action);button.title=t(action);button.setAttribute('aria-label',`${t(action)} · ${site.name}`);
    button.disabled=(action==='terminal'||action==='desktop')&&!site[action];
-   button.onclick=()=>{if(action==='terminal'&&site[action]){openConnection(site.id,'shell');return} if(action==='desktop'&&site[action]){openConnection(site.id,'desktop');return} notice(action==='delete'||action==='edit'?'manage':'pending')};card.querySelector('.actions').append(button);
+   button.onclick=()=>{if(action==='terminal'&&site[action]){openConnection(site.id,'shell',site.signal);return} if(action==='desktop'&&site[action]){openConnection(site.id,'desktop',site.signal);return} notice(action==='delete'||action==='edit'?'manage':'pending')};card.querySelector('.actions').append(button);
   }
   list.append(card);
  }
