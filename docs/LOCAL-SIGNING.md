@@ -2,7 +2,7 @@
 
 `clientUI.app`、`bin/yourdesk-client` 與 `bin/yourdesk-remote` 均使用 Developer ID Application 簽章，拒絕退回 ad-hoc。三者沿用既有簽章識別碼 `clientUI`、`yourdesk-client`、`yourdesk-remote`；啟動器另明確寫入相同的 CFBundleIdentifier，避免因產生方式不同而改變身分。
 
-- `scripts/create-client-ui-launcher.sh`：在暫存目錄產生啟動器、簽署、送 Apple 公證並附加票根，全部成功後才替換專案下的 clientUI.app。沿用正式建置的 `YOURDESK_NOTARY_PROFILE`（預設 `YourDeskNotary`），不在腳本保存帳密。
+- `scripts/create-client-ui-launcher.sh`：在暫存目錄產生啟動器、簽署、送 Apple 公證並附加票根，全部成功後才替換專案下的 clientUI.app。沿用正式建置的 `YOURDESK_NOTARY_PROFILE`（預設 `YourDeskNotary`），不在腳本保存帳密。已儲存其他名稱的 Keychain profile 時，可透過該環境變數指定。
 - `runUITest.command`：在暫存目錄建置並簽署兩個 Go 執行檔，再移到固定的 bin 路徑，最後啟動介面。原路徑不會在重建期間暴露臨時 ad-hoc 執行檔。
 - `runUITest.command --build-only`：完成上述建置與簽署後結束，不開啟介面。
 

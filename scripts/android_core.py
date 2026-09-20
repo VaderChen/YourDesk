@@ -2,9 +2,11 @@
 """Build/verify the pinned Android core without replacing a known artifact on failure."""
 import argparse
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import struct
 import subprocess
@@ -16,6 +18,70 @@ CORE = ROOT / "android/core"
 AAR = ROOT / "android/libs/androidcore.aar"
 MANIFEST = AAR.with_suffix(".manifest.json")
 PAGE_SIZE = 16384
+PERSONAL_PATH = re.compile(
+    rb"(?:/(?:Users|home|Volumes)/|[A-Za-z]:[\\/](?:Users|Documents and Settings)[\\/])"
+    rb"[^\x00-\x20/\\\"'<>]+", re.IGNORECASE)
+
+
+def private_build_environment(environment, root=ROOT, home=None, temporary=None):
+    """Trim Go paths and C/C++ header/macro paths without recording local roots.
+
+    The pinned gomobile forwards -trimpath and inherits Android CGO_CPPFLAGS.
+    Go also maps package/work directories itself when -trimpath is enabled.
+    These extra maps cover absolute header paths outside the package, including
+    the SDK. CPPFLAGS is shared by both C and C++ without changing their defaults.
+    """
+    env = environment.copy()
+    env["GOWORK"] = "off"
+    env["GOFLAGS"] = "-mod=readonly -trimpath"
+    roots = [(home or Path.home(), "/_/home"),
+             (temporary or tempfile.gettempdir(), "/_/tmp"), (root, "/_/yourdesk")]
+    roots.extend((env[key], "/_/" + name) for key, name in (
+        ("ANDROID_HOME", "android-sdk"), ("ANDROID_NDK_HOME", "android-ndk"),
+        ("GOTMPDIR", "go-tmp")) if env.get(key))
+    mappings = {}
+    for path, replacement in roots:
+        for source in (Path(path).absolute(), Path(path).resolve()):
+            # Never use an entire filesystem as a prefix-map source.
+            if source != Path(source.anchor):
+                mappings[str(source)] = replacement
+    flags = []
+    # Clang uses the last matching map: place specific roots after their parents.
+    for source, replacement in sorted(mappings.items(), key=lambda item: len(item[0])):
+        for kind in ("file", "debug"):
+            flag = "-f" + kind + "-prefix-map=" + source + "=" + replacement
+            # cmd/go uses quoted.Split, not a shell: quote each complete token.
+            quote = "'" if "'" not in flag else '"'
+            if quote in flag:
+                raise ValueError("建置目錄同時含單引號與雙引號，無法安全編碼 CGO 路徑設定。")
+            flags.append(quote + flag + quote)
+    env["CGO_CPPFLAGS"] = " ".join(filter(None, [env.get("CGO_CPPFLAGS", ""), *flags]))
+    return env
+
+
+def verify_private_paths(archive):
+    """Reject personal build roots in native code, metadata and Java archives.
+
+    Paths such as /proc, /system and neutral /_/ build mappings are legitimate
+    runtime/toolchain paths; this is not a blanket ban on absolute paths.
+    Report only the member name, never the private path found inside it.
+    """
+    def inspect(z):
+        for member in z.infolist():
+            if member.is_dir():
+                continue
+            data = z.read(member)
+            if PERSONAL_PATH.search(member.filename.encode()) or PERSONAL_PATH.search(data):
+                raise ValueError("Android core 含個人建置路徑，拒絕發布。")
+            if member.filename.endswith(".jar"):
+                with zipfile.ZipFile(io.BytesIO(data)) as nested:
+                    # AAR classes.jar may be compressed, hiding paths from an
+                    # outer-byte scan. Java class members are not nested jars.
+                    for entry in nested.infolist():
+                        if PERSONAL_PATH.search(entry.filename.encode()) or PERSONAL_PATH.search(nested.read(entry)):
+                            raise ValueError("Android core 的 Java archive 含個人建置路徑，拒絕發布。")
+    with zipfile.ZipFile(archive) as archive_file:
+        inspect(archive_file)
 
 
 def digest(path):
@@ -96,6 +162,7 @@ def verify(aar=AAR, manifest=MANIFEST, core=CORE):
     if not isinstance(record, dict) or record.get("format") != 1 or record.get("sourceSha256") != source_digest(core) or record.get("aarSha256") != digest(aar):
         raise ValueError("Android core AAR 已過期或內容不符；請執行 python3 scripts/android_core.py build")
     verify_native(aar)
+    verify_private_paths(aar)
 
 
 def publish(candidate, staged_manifest, aar, manifest, validator):
@@ -173,12 +240,11 @@ def build(force=False):
     sdk = str(Path(sdk).resolve())
     env = os.environ.copy()
     # Do not accidentally use a parent go.work or caller's module overrides.
-    env["GOWORK"] = "off"
-    env["GOFLAGS"] = "-mod=readonly"
     env["ANDROID_HOME"] = sdk
     for variable in ("JAVA_HOME", "ANDROID_NDK_HOME"):
         if env.get(variable):
             env[variable] = str(Path(env[variable]).resolve())
+    env = private_build_environment(env)
     env["PATH"] = str(Path(go).resolve().parent) + os.pathsep + env.get("PATH", "")
     if env.get("JAVA_HOME"):
         env["PATH"] = str(Path(env["JAVA_HOME"]) / "bin") + os.pathsep + env["PATH"]
@@ -201,6 +267,7 @@ def build(force=False):
                         "-ldflags=-extldflags=-Wl,-z,max-page-size=16384,-z,common-page-size=16384",
                         "-o", str(candidate), "."], cwd=CORE, env=env, check=True)
         verify_native(candidate)
+        verify_private_paths(candidate)
         if source_digest() != original_digest:
             raise ValueError("建置期間原始碼已改變，保留舊 AAR，請重試。")
         record = {"format": 1, "sourceSha256": original_digest, "aarSha256": digest(candidate),
@@ -208,7 +275,7 @@ def build(force=False):
         staged_manifest = stage / "androidcore.manifest.json"
         staged_manifest.write_text(json.dumps(record, indent=2) + "\n")
         publish(candidate, staged_manifest, AAR, MANIFEST, lambda: verify(AAR, MANIFEST, CORE))
-    print("Android core AAR 建置、來源指紋與 16 KB ELF 驗證完成；未動 FFmpeg。")
+    print("Android core AAR 建置、來源指紋、個人路徑與 16 KB ELF 驗證完成；未動 FFmpeg。")
 
 
 def main():
@@ -222,12 +289,13 @@ def main():
             build(args.force)
         elif args.action == "verify":
             verify()
-            print("Android core source/AAR/16 KB ELF 驗證通過。")
+            print("Android core source/AAR/個人路徑/16 KB ELF 驗證通過。")
         else:
             if args.apk is None:
                 parser.error("verify-apk 需要 --apk")
             verify_native(args.apk, apk=True)
-            print("APK 所有 64-bit native ELF／ZIP 對齊驗證通過；仍需 16 KB 裝置實測。")
+            verify_private_paths(args.apk)
+            print("APK 所有 64-bit native ELF／ZIP 對齊與建置路徑驗證通過；仍需 16 KB 裝置實測。")
     except (ValueError, OSError, subprocess.CalledProcessError, zipfile.BadZipFile) as error:
         parser.exit(1, str(error) + "\n")
 

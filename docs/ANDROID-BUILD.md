@@ -5,7 +5,8 @@
 ## 目前可交付狀態
 
 - [深度檢查](ANDROID-DEEP-REVIEW-2026-09-20.md) 的 17 項問題中，16 項已完成原始碼修正與適用的主機端驗證；詳見[修正紀錄](ANDROID-REVIEW-FIXES-2026-09-20.md)。
-- **A02 尚未完成：既有 `android/libs/androidcore.aar` 仍是舊核心，ELF 為 4 KB 對齊；沒有產出包含此次修正的新 AAR／APK。** 不可把來源碼同步或主機測試通過當成 Android 發布完成。
+- **A02 尚未完成：先前本機保留的 `android/libs/androidcore.aar` 是舊核心，ELF 為 4 KB 對齊；沒有產出包含此次修正的新 AAR／APK。** 不可把來源碼同步或主機測試通過當成 Android 發布完成。
+- AAR 與產生的 `androidcore-sources.jar` 由本機建置產生，不隨 Git 分發。新 checkout 必須依下列流程建置；既有本機產物保留，僅在新產物驗證成功後替換。
 - 上次完整建置受限於缺少可用 Android NDK、Gradle 9.6.0 下載未完成；APK 建置、lint、instrumentation 與真機驗收仍待執行。
 - 新增的建置檢查會拒絕缺少來源指紋、內容不符或不符合 16 KB ELF 要求的 AAR。請完成下列正常重建流程，不要停用 gate 或手動偽造 manifest。
 
@@ -37,8 +38,8 @@ python3 scripts/android_core.py verify
 `build` 的行為：
 
 1. 先驗證既有 AAR；來源指紋、二進位指紋及原生庫檢查都通過時，直接保留，不重新建置。
-2. 有變更或驗證不符時，使用 module 鎖定的 gomobile／gobind 建置 arm64、API 26 的候選 AAR，加入 16 KB linker 設定。
-3. 核對來源在建置期間沒有變動，檢查 ELF 的架構、PT_LOAD 與 GNU_RELRO，再建立 `android/libs/androidcore.manifest.json`。
+2. 有變更或驗證不符時，使用 module 鎖定的 gomobile／gobind 建置 arm64、API 26 的候選 AAR，加入 16 KB linker 設定。所有 Go 建置套用 `-trimpath`；C／C++ 使用 prefix-map 去除專案、使用者、SDK／NDK 及暫存目錄的本機前綴。
+3. 核對來源在建置期間沒有變動，檢查 ELF 的架構、PT_LOAD 與 GNU_RELRO，並拒絕含個人目錄的 native library、Java class 或 AAR metadata，再建立 `android/libs/androidcore.manifest.json`。作業系統必要路徑與中性的 `/_/` 建置映射不屬於個人路徑。
 4. 正式替換前建立 `.bak`，替換後再次驗證；失敗則回復原產物並保留恢復用備份，成功才移除備份。
 
 來源指紋包含 core 的 production source、native／embed 資源及建置腳本；測試、隱藏檔與暫存備份不計入。AAR 與 manifest 必須成對保留；不要在來源修改後沿用舊 manifest。

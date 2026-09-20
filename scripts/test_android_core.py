@@ -1,6 +1,9 @@
 import hashlib
+import io
 import json
+import os
 from pathlib import Path
+import shlex
 import struct
 import tempfile
 import unittest
@@ -23,6 +26,132 @@ def elf(alignment=16384, offset=0, address=0, relro_end=None):
 
 
 class AndroidArtifactTests(unittest.TestCase):
+    def test_build_environment_trims_go_c_cpp_paths_and_keeps_caller_flags(self):
+        with tempfile.TemporaryDirectory(prefix="private build ") as folder:
+            root = Path(folder)
+            environment = {"GOFLAGS": "-mod=mod", "GOWORK": "private.work",
+                           "CGO_CPPFLAGS": "-DKEEP_EXISTING=1", "CGO_CFLAGS": "-O3",
+                           "CGO_CXXFLAGS": "-O2", "ANDROID_HOME": str(root / "sdk"),
+                           "ANDROID_NDK_HOME": str(root / "sdk/ndk")}
+            result = core.private_build_environment(environment, root=root / "source's tree",
+                                                    home=root, temporary=root / "temporary")
+            self.assertEqual(result["GOFLAGS"], "-mod=readonly -trimpath")
+            self.assertEqual(result["GOWORK"], "off")
+            self.assertEqual(result["CGO_CFLAGS"], "-O3")
+            self.assertEqual(result["CGO_CXXFLAGS"], "-O2")
+            flags = shlex.split(result["CGO_CPPFLAGS"])
+            self.assertEqual(flags[0], "-DKEEP_EXISTING=1")
+            for kind in ("file", "debug"):
+                self.assertIn("-f" + kind + "-prefix-map=" + str(root / "source's tree") + "=/_/yourdesk", flags)
+                self.assertIn("-f" + kind + "-prefix-map=" + str(root / "sdk/ndk") + "=/_/android-ndk", flags)
+            self.assertLess(flags.index("-ffile-prefix-map=" + str(root) + "=/_/home"),
+                            flags.index("-ffile-prefix-map=" + str(root / "sdk/ndk") + "=/_/android-ndk"))
+            self.assertEqual(environment["GOFLAGS"], "-mod=mod")
+            self.assertEqual(environment["CGO_CPPFLAGS"], "-DKEEP_EXISTING=1")
+
+    def test_unencodable_build_path_is_rejected_before_build(self):
+        with self.assertRaisesRegex(ValueError, "單引號與雙引號"):
+            core.private_build_environment({}, root=Path("both'and\"quotes"))
+
+    def test_personal_paths_rejected_without_echoing_private_value(self):
+        private_paths = (b"/Users/example-builder/project/main.go", b"/home/example-builder/cache",
+                         b"/Volumes/example-disk/project", b"C:\\Users\\example-builder\\project",
+                         b"c:/Users/example-builder/project")
+        with tempfile.TemporaryDirectory() as folder:
+            aar = Path(folder) / "androidcore.aar"
+            for private in private_paths:
+                with self.subTest(private=private):
+                    with zipfile.ZipFile(aar, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+                        archive.writestr("jni/arm64-v8a/libgojni.so", elf() + b"\x00" + private)
+                    with self.assertRaisesRegex(ValueError, "個人建置路徑") as raised:
+                        core.verify_private_paths(aar)
+                    self.assertNotIn("example-builder", str(raised.exception))
+            with zipfile.ZipFile(aar, "w") as archive:
+                archive.writestr("jni/arm64-v8a/libgojni.so", elf() + b"\x00/proc/self/maps\x00/_/yourdesk/core.go")
+            core.verify_private_paths(aar)
+
+    def test_nested_compressed_java_classes_and_member_names_are_checked(self):
+        with tempfile.TemporaryDirectory() as folder:
+            aar = Path(folder) / "androidcore.aar"
+            classes = io.BytesIO()
+            with zipfile.ZipFile(classes, "w", compression=zipfile.ZIP_DEFLATED) as jar:
+                jar.writestr("go/Example.class", b"class\x00/Users/example-builder/work/Example.java")
+            with zipfile.ZipFile(aar, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+                archive.writestr("classes.jar", classes.getvalue())
+            with self.assertRaisesRegex(ValueError, "個人建置路徑"):
+                core.verify_private_paths(aar)
+            with zipfile.ZipFile(aar, "w") as archive:
+                archive.writestr("/home/example-builder/metadata", b"content")
+            with self.assertRaisesRegex(ValueError, "個人建置路徑") as raised:
+                core.verify_private_paths(aar)
+            self.assertNotIn("example-builder", str(raised.exception))
+
+    def test_verify_apk_cli_checks_dependency_paths_after_native_validation(self):
+        for private in (False, True):
+            with self.subTest(private=private), tempfile.TemporaryDirectory() as folder:
+                apk = Path(folder) / "app.apk"
+                path = b"/Users/example-builder/dependency.c" if private else b"/_/dependency.c"
+                with zipfile.ZipFile(apk, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+                    archive.writestr("lib/arm64-v8a/libdependency.so", elf() + b"\x00" + path)
+                # Both fixtures satisfy the existing ELF/ZIP gate; only the
+                # build-path check must reject the personally rooted variant.
+                core.verify_native(apk, apk=True)
+                output, errors = io.StringIO(), io.StringIO()
+                with mock.patch("sys.argv", ["android_core.py", "verify-apk", "--apk", str(apk)]), \
+                     mock.patch("sys.stdout", output), mock.patch("sys.stderr", errors):
+                    if private:
+                        with self.assertRaises(SystemExit) as raised:
+                            core.main()
+                        self.assertEqual(raised.exception.code, 1)
+                    else:
+                        core.main()
+                if private:
+                    self.assertIn("個人建置路徑", errors.getvalue())
+                    self.assertNotIn("example-builder", errors.getvalue())
+                    self.assertNotIn("驗證通過", output.getvalue())
+                else:
+                    self.assertIn("建置路徑驗證通過", output.getvalue())
+                    self.assertEqual(errors.getvalue(), "")
+
+    def test_build_checks_privacy_before_replacing_existing_artifact(self):
+        for private in (False, True):
+            with self.subTest(private=private), tempfile.TemporaryDirectory() as folder:
+                root = Path(folder)
+                (root / "sdk/platforms").mkdir(parents=True)
+                (root / "core").mkdir()
+                aar, manifest = root / "androidcore.aar", root / "androidcore.manifest.json"
+                aar.write_bytes(b"old-aar")
+                manifest.write_bytes(b"old-manifest")
+                invocations = []
+                def run(command, **options):
+                    invocations.append((command, options))
+                    if len(command) > 1 and command[1] == "bind":
+                        candidate = Path(command[command.index("-o") + 1])
+                        content = elf() + (b"\x00/Users/example-builder/core.go" if private else b"")
+                        with zipfile.ZipFile(candidate, "w") as archive:
+                            archive.writestr("jni/arm64-v8a/libgojni.so", content)
+                with mock.patch.dict(os.environ, {"YOURDESK_GO": str(root / "go"), "ANDROID_HOME": str(root / "sdk")}, clear=True), \
+                     mock.patch.object(core, "AAR", aar), mock.patch.object(core, "MANIFEST", manifest), \
+                     mock.patch.object(core, "CORE", root / "core"), \
+                     mock.patch.object(core, "source_digest", return_value="source-fingerprint"), \
+                     mock.patch.object(core.shutil, "which", side_effect=lambda value, **_: value), \
+                     mock.patch.object(core.subprocess, "run", side_effect=run), \
+                     mock.patch.object(core.subprocess, "check_output", return_value="go version go1.27 test"):
+                    if private:
+                        with self.assertRaisesRegex(ValueError, "個人建置路徑"):
+                            core.build(force=True)
+                        self.assertEqual(aar.read_bytes(), b"old-aar")
+                        self.assertEqual(manifest.read_bytes(), b"old-manifest")
+                    else:
+                        core.build(force=True)
+                        core.verify(aar, manifest, root / "core")
+                bind, options = next(entry for entry in invocations if entry[0][1] == "bind")
+                self.assertIn("-trimpath", bind)
+                self.assertEqual(options["env"]["GOFLAGS"], "-mod=readonly -trimpath")
+                self.assertIn("-ffile-prefix-map=", options["env"]["CGO_CPPFLAGS"])
+                self.assertFalse(aar.with_name(aar.name + ".bak").exists())
+                self.assertFalse(aar.with_name("." + aar.name + ".lock").exists())
+
     def test_native_elf_alignment_and_relro(self):
         self.assertIsNone(core.elf_error(elf()))
         self.assertIsNone(core.elf_error(elf(relro_end=16384)))
