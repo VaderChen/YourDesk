@@ -77,6 +77,8 @@ type process struct {
 	terminalInstance             string
 	terminalOwner                *process
 	terminalConnection           bool
+	fileConnection               bool
+	fileOwner                    *process
 	transfers                    []clipboard.Progress
 	credentialKey, pendingSecret string
 	remember                     bool
@@ -376,6 +378,14 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 		closeWindow := s.preferences.CloseWindowOnDisconnect
 		s.mu.Unlock()
 		respond(w, 200, map[string]bool{"closeWindowOnDisconnect": closeWindow})
+		return
+	}
+	if r.URL.Path == "/api/files/window" && r.Method == "POST" {
+		s.openFilesWindow(w, r)
+		return
+	}
+	if r.URL.Path == "/api/files" && r.Method == "POST" {
+		s.filesAction(w, r)
 		return
 	}
 	if r.URL.Path == "/api/terminal/window" && r.Method == "POST" {
@@ -709,12 +719,17 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 			VideoMode   string `json:"videoMode"`
 			Diagnostics bool   `json:"diagnostics"`
 			Terminal    bool   `json:"terminal"`
+			Files       bool   `json:"files"`
 			ID          string `json:"id"`
 			Secret      string `json:"secret"`
 			Remember    bool   `json:"remember"`
 		}
 		if err := decode(w, r, &request); err != nil {
 			fail(w, err)
+			return
+		}
+		if request.Files && (request.Terminal || request.Diagnostics) {
+			fail(w, errors.New("檔案傳輸不能與其他連線模式同時啟用"))
 			return
 		}
 		if request.Terminal && request.Diagnostics {
@@ -757,6 +772,9 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 		if request.Terminal {
 			args = append(args, "-terminal")
 		}
+		if request.Files {
+			args = append(args, "-file-transfer")
+		}
 		if request.Diagnostics {
 			args = append(args, "-diagnostic")
 		}
@@ -772,6 +790,7 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 		}
 		p.diagnosticConnection = request.Diagnostics
 		p.terminalConnection = request.Terminal
+		p.fileConnection = request.Files
 		p.room = selected.Room
 		p.credentialKey = credentialID(selected.Signal, selected.Room)
 		p.pendingSecret = request.Secret
@@ -876,7 +895,7 @@ func (s *server) start(kind, siteID, binary string, args []string) error {
 			return err
 		}
 	}
-	if kind == "quick" || kind == "viewer" || kind == "host" || kind == "terminal-window" {
+	if kind == "quick" || kind == "viewer" || kind == "host" || kind == "terminal-window" || kind == "files-window" {
 		var err error
 		p.stdin, err = cmd.StdinPipe()
 		if err != nil {
@@ -1007,7 +1026,7 @@ func (s *server) start(kind, siteID, binary string, args []string) error {
 							}
 						case "frame":
 							// 首張畫面準備好才隱藏主介面，密碼驗證成功不代表視窗已開啟。
-							if p.stage != "connected" && !p.mcpOwned && !p.diagnosticConnection && !p.terminalConnection {
+							if p.stage != "connected" && !p.mcpOwned && !p.diagnosticConnection && !p.terminalConnection && !p.fileConnection {
 								select {
 								case s.connected <- struct{}{}:
 								default:
@@ -1034,6 +1053,14 @@ func (s *server) start(kind, siteID, binary string, args []string) error {
 			delete(s.children, key)
 		}
 		close(p.done)
+		if p.kind == "files-window" && p.fileOwner != nil {
+			if err != nil {
+				s.notice = "檔案傳輸視窗意外結束，請查看啟動終端的錯誤訊息。"
+			}
+			if remote := s.children["viewer:"+p.fileOwner.siteID]; remote == p.fileOwner && remote.fileConnection {
+				_ = remote.cmd.Process.Kill()
+			}
+		}
 		if p.terminalConnection && s.preferences.CloseWindowOnDisconnect {
 			for _, window := range s.children {
 				if window.kind == "terminal-window" && window.terminalOwner == p {
@@ -1047,13 +1074,13 @@ func (s *server) start(kind, siteID, binary string, args []string) error {
 			}
 		}
 		// 遠端結束時保留視窗供閱讀最後輸出，視窗的輪詢會顯示斷線狀態。
-		if !p.mcpOwned && !p.diagnosticConnection && !p.terminalConnection && (p.kind == "viewer" || p.kind == "quick") {
+		if !p.mcpOwned && !p.diagnosticConnection && !p.terminalConnection && !p.fileConnection && (p.kind == "viewer" || p.kind == "quick") {
 			select {
 			case s.viewerClosed <- struct{}{}:
 			default:
 			}
 		}
-		if err != nil && p.failureMessage == "" && !p.diagnosticConnection && !p.terminalConnection && p.kind != "terminal-window" {
+		if err != nil && p.failureMessage == "" && !p.diagnosticConnection && !p.terminalConnection && !p.fileConnection && p.kind != "terminal-window" && p.kind != "files-window" {
 			s.notice = "程序已結束；若非手動停止，請查看啟動終端的錯誤訊息。"
 		}
 	}()
@@ -1071,7 +1098,7 @@ func (s *server) sendViewerOptimization(key string, p *process) {
 		}
 		if policy := hardwareprobe.Policy(); policy != nil {
 			s.mu.Lock()
-			if s.children[key] == p && p.stdin != nil && !p.terminalConnection {
+			if s.children[key] == p && p.stdin != nil && !p.terminalConnection && !p.fileConnection {
 				_ = json.NewEncoder(p.stdin).Encode(map[string]any{"optimization": policy})
 			}
 			s.mu.Unlock()

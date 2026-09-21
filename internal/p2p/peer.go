@@ -102,6 +102,7 @@ type Peer struct {
 	receivedBytes       atomic.Uint64
 	receivedMessages    atomic.Uint64
 	transportMode       peertransport.Mode
+	filesOnly           atomic.Bool
 	commandsOnce        sync.Once
 	commands            commandState
 	pc                  *webrtc.PeerConnection
@@ -129,7 +130,8 @@ func config() webrtc.Configuration {
 func NewHost(ctx context.Context, signal *signaling.Client, onControl func(Control)) (*Peer, error) {
 	return NewHostWithTransport(ctx, signal, peertransport.Native, onControl)
 }
-func NewHostWithTransport(ctx context.Context, signal *signaling.Client, mode peertransport.Mode, onControl func(Control)) (*Peer, error) {
+func NewHostWithTransport(ctx context.Context, signal *signaling.Client, mode peertransport.Mode, onControl func(Control), options ...HostOptions) (*Peer, error) {
+	filesSupported := len(options) > 0 && options[0].FilesOnly
 	pc, link, err := newTransportPC(ctx, signal, mode, true, "")
 	if err != nil {
 		return nil, err
@@ -216,6 +218,9 @@ func NewHostWithTransport(ctx context.Context, signal *signaling.Client, mode pe
 		return nil, err
 	}
 	description := transportDescription{SessionDescription: *pc.LocalDescription(), NegotiationVersion: 1, Capabilities: peertransport.Modes()}
+	if filesSupported {
+		description.FilesVersion = 1
+	}
 	if link != nil {
 		sealed, sealErr := signal.SealTransport(description.SDP, link.Offer())
 		if sealErr != nil {
@@ -234,7 +239,7 @@ func NewHostWithTransport(ctx context.Context, signal *signaling.Client, mode pe
 		_ = p.Close()
 		negotiation, cancel := context.WithTimeout(ctx, 75*time.Second)
 		defer cancel()
-		return NewHostWithTransport(negotiation, signal, selected, onControl)
+		return NewHostWithTransport(negotiation, signal, selected, onControl, options...)
 	}
 	if e.Kind != signaling.KindAnswer {
 		_ = pc.Close()
@@ -249,6 +254,13 @@ func NewHostWithTransport(ctx context.Context, signal *signaling.Client, mode pe
 		_ = pc.Close()
 		return nil, err
 	}
+	if err := validateSessionMode(answer, filesSupported); err != nil {
+		_ = pc.Close()
+		return nil, err
+	}
+	// The authenticated answer is validated before ICE can connect or deliver
+	// control callbacks. This mode never changes during the peer's lifetime.
+	p.filesOnly.Store(answer.SessionMode == "files")
 	if err := rejectRelay(answer.SDP); err != nil {
 		_ = pc.Close()
 		return nil, err
@@ -264,9 +276,22 @@ func NewViewer(ctx context.Context, signal *signaling.Client, onFrame func(Frame
 	return NewViewerWithTransport(ctx, signal, peertransport.Native, onFrame, onControl...)
 }
 func NewViewerWithTransport(ctx context.Context, signal *signaling.Client, mode peertransport.Mode, onFrame func(Frame), onControl ...func(Control)) (*Peer, error) {
+	return newViewerWithTransport(ctx, signal, mode, false, onFrame, onControl...)
+}
+
+// NewFilesViewerWithTransport fails closed against older Hosts: silently
+// falling back to a desktop peer would capture and transmit their screen.
+func NewFilesViewerWithTransport(ctx context.Context, signal *signaling.Client, mode peertransport.Mode) (*Peer, error) {
+	return newViewerWithTransport(ctx, signal, mode, true, nil)
+}
+
+func newViewerWithTransport(ctx context.Context, signal *signaling.Client, mode peertransport.Mode, filesOnly bool, onFrame func(Frame), onControl ...func(Control)) (*Peer, error) {
 	description, selected, err := receiveTransportDescription(ctx, signal, mode)
 	if err != nil {
 		return nil, err
+	}
+	if filesOnly && description.FilesVersion != 1 {
+		return nil, errors.New("對端不支援獨立檔案傳輸工作階段，請更新遠端程式")
 	}
 	mode = selected
 	transportAddress := ""
@@ -281,6 +306,7 @@ func NewViewerWithTransport(ctx context.Context, signal *signaling.Client, mode 
 		return nil, err
 	}
 	p := &Peer{pc: pc, done: make(chan struct{}), clipboardInbox: make(chan []byte, 128), clipboardDone: make(chan struct{})}
+	p.filesOnly.Store(filesOnly)
 	p.bindTransport(link, mode)
 	pc.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
 		if state == webrtc.PeerConnectionStateClosed || state == webrtc.PeerConnectionStateFailed {
@@ -302,6 +328,9 @@ func NewViewerWithTransport(ctx context.Context, signal *signaling.Client, mode 
 			p.screen = dc
 			p.mu.Unlock()
 			p.onMessage(dc, func(m webrtc.DataChannelMessage) {
+				if filesOnly {
+					return
+				}
 				if f, ok := assembler.add(m.Data); ok && onFrame != nil {
 					onFrame(f)
 				}
@@ -352,6 +381,10 @@ func NewViewerWithTransport(ctx context.Context, signal *signaling.Client, mode 
 		return nil, err
 	}
 	answerDescription := transportDescription{SessionDescription: *pc.LocalDescription()}
+	if filesOnly {
+		answerDescription.FilesVersion = 1
+		answerDescription.SessionMode = "files"
+	}
 	if mode != peertransport.Native {
 		answerDescription.Transport = &transportOffer{Version: 1, Mode: mode}
 	}
@@ -406,6 +439,9 @@ func (p *Peer) SendFrameLimited(ctx context.Context, f Frame, bitsPerSecond int)
 }
 
 func (p *Peer) sendFrame(f Frame, beforeSend func(int) error) error {
+	if p.FilesOnly() {
+		return errors.New("檔案工作階段不傳送桌面影像")
+	}
 	p.mu.RLock()
 	dc := p.screen
 	closed := p.closed

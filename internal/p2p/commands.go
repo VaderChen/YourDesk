@@ -129,13 +129,13 @@ func (p *Peer) CallCommandParams(ctx context.Context, method string, params json
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	if err := ctx.Err(); err != nil {
-		return CommandResponse{}, err
+		return CommandResponse{}, interruptedCommand(err)
 	}
 	p.commandsInit()
 	p.commands.mu.Lock()
 	if len(p.commands.pending) >= 32 {
 		p.commands.mu.Unlock()
-		return CommandResponse{}, errors.New("P2P 指令等待佇列已滿")
+		return CommandResponse{}, interruptedCommand(errors.New("P2P 指令等待佇列已滿"))
 	}
 	p.commands.sequence++
 	id := p.commands.sequence
@@ -145,18 +145,15 @@ func (p *Peer) CallCommandParams(ctx context.Context, method string, params json
 	defer func() { p.commands.mu.Lock(); delete(p.commands.pending, id); p.commands.mu.Unlock() }()
 	deadline, _ := ctx.Deadline()
 	if err := p.SendControl(Control{Type: "command-request", CommandRequest: &CommandRequest{Version: CommandVersion, ID: id, Method: method, Expires: deadline.UnixMilli(), Params: params}}); err != nil {
-		return CommandResponse{}, err
+		return CommandResponse{}, interruptedCommand(err)
 	}
 	select {
 	case out := <-ch:
-		if out.Code != "" {
-			return out, fmt.Errorf("%s：%s", out.Code, out.Error)
-		}
-		return out, nil
+		return out, commandResponseError(out)
 	case <-ctx.Done():
-		return CommandResponse{}, fmt.Errorf("P2P 指令結果未確認：%w", ctx.Err())
+		return CommandResponse{}, interruptedCommand(fmt.Errorf("P2P 指令結果未確認：%w", ctx.Err()))
 	case <-p.Done():
-		return CommandResponse{}, errors.New("P2P 已斷線，指令結果未確認")
+		return CommandResponse{}, interruptedCommand(errors.New("P2P 已斷線，指令結果未確認"))
 	}
 }
 func (p *Peer) handleCommand(c Control) bool {
@@ -209,8 +206,12 @@ func (p *Peer) handleCommand(c Control) bool {
 			reject("unsupported_version", "不支援的指令版本")
 			return true
 		}
-		if len(r.Params) > 8192 || len(r.Method) > 64 || r.Expires <= time.Now().UnixMilli() || r.Expires > time.Now().Add(30*time.Second).UnixMilli() {
-			reject("expired_or_invalid", "指令已逾時或格式無效")
+		if len(r.Params) > 8192 || len(r.Method) > 64 || r.Expires <= 0 || r.Expires > time.Now().Add(30*time.Second).UnixMilli() {
+			reject("invalid_request", "指令格式無效")
+			return true
+		}
+		if r.Expires <= time.Now().UnixMilli() {
+			reject("expired", "指令已逾時")
 			return true
 		}
 		p.commands.mu.Lock()
@@ -285,7 +286,11 @@ func (p *Peer) handleCommand(c Control) bool {
 			}
 			if err != nil {
 				if response.Code == "" {
-					response.Code = "failed"
+					if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+						response.Code = "expired"
+					} else {
+						response.Code = "failed"
+					}
 				}
 				response.Error = err.Error()
 			} else {

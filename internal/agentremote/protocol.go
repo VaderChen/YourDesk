@@ -21,6 +21,7 @@ type Response struct {
 	Visible      *bool           `json:"visible,omitempty"`
 	Result       json.RawMessage `json:"result,omitempty"`
 	ID           string          `json:"id"`
+	Code         string          `json:"code,omitempty"`
 	Error        string          `json:"error,omitempty"`
 	Image        []byte          `json:"image,omitempty"`
 	Width        int             `json:"width,omitempty"`
@@ -30,3 +31,7 @@ type Response struct {
 }
 
 const Prefix = "YOURDESK_AGENT_EVENT "
+
+// CodeRequestInterrupted means execution/result delivery was interrupted or
+// temporarily busy. It is not evidence of a permanent source-file failure.
+const CodeRequestInterrupted = "request_interrupted"

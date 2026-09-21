@@ -1,4 +1,8 @@
 {
+  "檔案傳輸視窗意外結束，請查看啟動終端的錯誤訊息。": ["The file transfer window exited unexpectedly. Check the launch terminal for details.", "ファイル転送ウィンドウが予期せず終了しました。起動端末のエラーを確認してください。", "파일 전송 창이 예기치 않게 종료되었습니다. 실행 터미널의 오류를 확인하세요."],
+  "開啟檔案傳輸": ["Open file transfer", "ファイル転送を開く", "파일 전송 열기"],
+  "正在準備檔案傳輸…": ["Preparing file transfer…", "ファイル転送を準備中…", "파일 전송 준비 중…"],
+  "對方尚未支援檔案傳輸，請更新對方的 YourDesk 後再試。": ["The remote device does not support file transfer yet. Update YourDesk on that device and try again.", "接続先はファイル転送に未対応です。接続先の YourDesk を更新してください。", "원격 장치가 파일 전송을 지원하지 않습니다. 원격 YourDesk를 업데이트한 후 다시 시도하세요."],
   "安裝測試版本": [
     "Install test version",
     "テスト版をインストール",

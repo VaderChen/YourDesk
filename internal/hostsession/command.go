@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync/atomic"
 	"time"
+	"yourdesk/internal/filetransfer"
 	"yourdesk/internal/p2p"
 	"yourdesk/internal/remotedata"
 	"yourdesk/internal/signaling"
@@ -13,7 +14,7 @@ import (
 
 // 同一個 Host 的無桌面分支，在建立任何圖像資源之前選用。
 func commandSession(ctx context.Context, sig *signaling.Client, options Options) error {
-	peer, err := p2p.NewHostWithTransport(ctx, sig, options.Transport, func(p2p.Control) {})
+	peer, err := p2p.NewHostWithTransport(ctx, sig, options.Transport, func(p2p.Control) {}, p2p.HostOptions{FilesOnly: !options.DisableRemoteData})
 	if err != nil {
 		return err
 	}
@@ -28,11 +29,14 @@ func commandSession(ctx context.Context, sig *signaling.Client, options Options)
 	authorized.Store(true)
 	defer authorized.Store(false)
 	if !options.DisableRemoteData {
-		terminal.Register(peer, authorized.Load, func(bool) {})
-		remotedata.Register(peer, authorized.Load)
+		filetransfer.Register(peer, authorized.Load)
+		if !peer.FilesOnly() {
+			terminal.Register(peer, authorized.Load, func(bool) {})
+			remotedata.Register(peer, authorized.Load)
+		}
 	}
 	_ = peer.RegisterCommand("session.capabilities", func(context.Context) (any, error) {
-		return map[string]any{"schema": 1, "desktop": false, "terminal": terminal.Available(), "clipboard": false}, nil
+		return map[string]any{"schema": 1, "desktop": false, "terminal": !peer.FilesOnly() && terminal.Available(), "clipboard": false, "files": !options.DisableRemoteData}, nil
 	})
 	generation := incomingGeneration.Add(1)
 	connected := false
@@ -62,7 +66,9 @@ func commandSession(ctx context.Context, sig *signaling.Client, options Options)
 					fmt.Printf("YOURDESK_UI_EVENT {\"event\":\"host-connected\",\"session\":%d}\n", generation)
 				}
 				// 桌面 Viewer 即使跳過 Server 查詢，仍會從已驗證的 P2P 通道收到能力限制。
-				_ = peer.SendControl(p2p.Control{Type: "desktop-unavailable"})
+				if !peer.FilesOnly() {
+					_ = peer.SendControl(p2p.Control{Type: "desktop-unavailable"})
+				}
 			}
 		}
 	}

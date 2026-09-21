@@ -525,6 +525,7 @@ func main() {
 	backgroundDiagnostic := flag.Bool("diagnostic", false, "背景串流診斷，不開啟 遠端顯示")
 	transport := flag.String("transport", "", "虛擬傳輸模式：空白為原生 UDP，tailcat 為實驗性 Tailcat")
 	terminalMode := flag.Bool("terminal", false, "互動式遠端終端機")
+	filesMode := flag.Bool("file-transfer", false, "獨立檔案傳輸，不啟動桌面或命令列")
 	flag.Parse()
 	flag.Visit(func(f *flag.Flag) {
 		if f.Name == "source-fps" {
@@ -540,6 +541,15 @@ func main() {
 	}
 	if !*secretStdin {
 		fatal(fmt.Errorf("必須透過標準輸入提供連線密碼"))
+	}
+	if *filesMode && (*terminalMode || *backgroundDiagnostic) {
+		fatal(fmt.Errorf("檔案傳輸不能與其他連線模式同時啟用"))
+	}
+	if *filesMode {
+		if err := runCommandSession(*signalURL, *room, peertransport.Mode(*transport), true); err != nil {
+			fatal(err)
+		}
+		return
 	}
 	if *terminalMode {
 		if err := runTerminal(*signalURL, *room, peertransport.Mode(*transport)); err != nil {

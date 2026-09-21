@@ -18,6 +18,17 @@ Android 中文 IME 採獨立 `text` 控制訊息，每筆最多 16 KiB UTF-8；�
 
 此 Android 原始碼已做主機端測試與真實 Android API 型別編譯，但舊 AAR 尚未重建，完整 APK／16 KB／相機與 codec 實機驗收仍待完成；不能將桌面版支援範圍直接套用到 Android。建置與限制見 [Android 建置](ANDROID-BUILD.md)及[修正紀錄](ANDROID-REVIEW-FIXES-2026-09-20.md)。
 
+## 獨立桌面檔案傳輸
+
+macOS／Windows 站台卡片在 CMD 與 GUI 之間提供檔案傳輸入口，使用獨立原生視窗及 `xfer.*` 指令，不屬於剪貼簿檔案同步；Android／iOS 不在此功能範圍。這裡描述原始碼實作，安裝包是否包含請核對對應發行說明。
+
+- **工作階段分流**：`internal/p2p` 在已簽章的 offer／answer 協商獨立檔案模式；`internal/hostsession` 在要求桌面輸入權限或建立擷取、編碼、剪貼簿資源之前分流。此模式不開 Shell、不註冊桌面或輸入指令，遇不支援的舊 Host 不退回桌面連線。
+- **檔案與佇列**：`internal/filetransfer` 使用家目錄相對路徑、受限區塊、程序共用額度與續傳憑證。上傳完成才原子提交，不覆寫；建立目錄與確認後永久刪除使用獨立指令。取消驗證不依賴檔案仍可續傳，目的地衝突或暫存變動不會使保留額度無法釋放。
+- **視窗與重連**：`internal/clientui/files.go` 驗證 HTTP token、Origin、工作階段 instance；`files_window.go` 在獨立子程序管理背景下載及原生拖出。重連僅重綁相同站台與配對目標，檔案須手動續傳；不持久保存跨程式重啟的佇列。系統關窗與頁面按鈕共用有時間上限的取消確認流程。
+- **錯誤與進度**：畫面顯示百分比、位元組、速率及預估剩餘時間。逾時、斷線、忙碌經指令與子程序橋接保留可辨識分類；下載遇明確永久錯誤則結束並清理暫存。舊工作階段的延遲回覆不改變新連線狀態。
+
+原生拖入保留資料夾結構；拖出須先完整下載一般檔案，再由視窗底部原生區域複製至 Finder／Explorer。詳見[桌面檔案傳輸](FILE-TRANSFER.md)的操作、資源上限及實機驗收範圍；瀏覽器 mock 或交叉編譯不代表實際系統拖放已驗收。
+
 ## 下載與啟動
 
 從 [GitHub Releases](https://github.com/VaderChen/YourDesk/releases/latest) 下載對應平台套件。Release 名稱與 App 顯示版本一致：`1.YY.MMDD build HHmm`；標籤以 `1.YY.MMDD-build-HHmm` 表示同一版號。

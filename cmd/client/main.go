@@ -17,6 +17,7 @@ import (
 	"yourdesk/internal/autostart"
 	"yourdesk/internal/clientui"
 	"yourdesk/internal/deviceid"
+	"yourdesk/internal/filetransfer"
 	"yourdesk/internal/hardwareprobe"
 	"yourdesk/internal/hostguard"
 	"yourdesk/internal/hostsession"
@@ -30,6 +31,14 @@ import (
 )
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "--files-window" {
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer stop()
+		if err := clientui.RunFilesWindow(ctx); err != nil {
+			fatal(err)
+		}
+		return
+	}
 	if hardwareprobe.HandleHelper(os.Args[1:]) {
 		return
 	}
@@ -252,7 +261,8 @@ func main() {
 	}
 	defer releaseHost()
 	fmt.Println(`YOURDESK_UI_EVENT {"event":"host-ready"}`)
-	ctx = signaling.WithHostCapabilities(ctx, signaling.HostCapabilities{Schema: 1, OS: runtime.GOOS, Arch: runtime.GOARCH, Version: clientui.ApplicationVersion(), Desktop: !headless, Terminal: terminal.Available(), Clipboard: !headless})
+	filesAvailable := filetransfer.Available()
+	ctx = signaling.WithHostCapabilities(ctx, signaling.HostCapabilities{Schema: 1, OS: runtime.GOOS, Arch: runtime.GOARCH, Version: clientui.ApplicationVersion(), Desktop: !headless, Terminal: terminal.Available(), Files: &filesAvailable, Clipboard: !headless})
 	options := hostsession.Options{Headless: headless, Version: clientui.ApplicationVersion(), Transport: peertransport.Mode(*transport), Display: *display, FPS: *fps, Quality: *quality, Codec: *codec, CodecGoal: optimization.Goal(*codecGoal)}
 	if *directListen != "" {
 		go func() {

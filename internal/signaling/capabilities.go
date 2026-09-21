@@ -12,6 +12,8 @@ type HostCapabilities struct {
 	Desktop   bool   `json:"desktop"`
 	Terminal  bool   `json:"terminal"`
 	Clipboard bool   `json:"clipboard"`
+	// nil preserves unknown support when an older signaling server omits it.
+	Files *bool `json:"files,omitempty"`
 }
 type hostCapabilitiesKey struct{}
 

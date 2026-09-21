@@ -196,7 +196,7 @@ func (s *server) callRemoteAgent(ctx context.Context, in mcpAction) (agentremote
 		return agentremote.Response{}, fmt.Errorf("終端機尚未連線")
 	}
 	visibilityOnly := in.Action == "show" || in.Action == "hide"
-	if p == nil || (p.kind != "viewer" && p.kind != "quick") || p.diagnosticConnection || p.stdin == nil || (!visibilityOnly && p.stage != "connected") || (visibilityOnly && p.terminalConnection) {
+	if p == nil || (p.kind != "viewer" && p.kind != "quick") || p.diagnosticConnection || p.stdin == nil || (!visibilityOnly && p.stage != "connected") || (visibilityOnly && (p.terminalConnection || p.fileConnection)) {
 		s.mu.Unlock()
 		return agentremote.Response{}, fmt.Errorf("遠端顯示尚未連線或不支援操作")
 	}
@@ -205,9 +205,9 @@ func (s *server) callRemoteAgent(ctx context.Context, in mcpAction) (agentremote
 	}
 	if len(p.agentPending) >= 8 {
 		s.mu.Unlock()
-		return agentremote.Response{}, fmt.Errorf("操作佇列已滿")
+		return agentremote.Response{Code: agentremote.CodeRequestInterrupted}, fmt.Errorf("操作佇列已滿")
 	}
-	if !p.mcpOwned && !p.terminalConnection && in.Action != "network.test" {
+	if !p.mcpOwned && !p.terminalConnection && !p.fileConnection && in.Action != "network.test" {
 		p.mcpOwned = true
 		// 接管使用者已開啟的視窗，不因背景 MCP 偏好而自動隱藏。
 		p.mcpVisible = true
@@ -222,7 +222,7 @@ func (s *server) callRemoteAgent(ctx context.Context, in mcpAction) (agentremote
 	defer func() { s.mu.Lock(); delete(p.agentPending, id); s.mu.Unlock() }()
 	err = input.Send(ctx, append(data, '\n'))
 	if err != nil {
-		return agentremote.Response{}, fmt.Errorf("無法傳送操作：%w；請確認遠端狀態，勿直接重送", err)
+		return agentremote.Response{Code: agentremote.CodeRequestInterrupted}, fmt.Errorf("無法傳送操作：%w；請確認遠端狀態，勿直接重送", err)
 	}
 	select {
 	case out := <-ch:
@@ -231,11 +231,11 @@ func (s *server) callRemoteAgent(ctx context.Context, in mcpAction) (agentremote
 		}
 		return out, nil
 	case <-p.done:
-		return agentremote.Response{}, fmt.Errorf("遠端連線已結束")
+		return agentremote.Response{Code: agentremote.CodeRequestInterrupted}, fmt.Errorf("遠端連線已結束")
 	case <-input.done:
-		return agentremote.Response{}, fmt.Errorf("子程序控制管線已關閉；請確認遠端狀態，勿直接重送")
+		return agentremote.Response{Code: agentremote.CodeRequestInterrupted}, fmt.Errorf("子程序控制管線已關閉；請確認遠端狀態，勿直接重送")
 	case <-ctx.Done():
-		return agentremote.Response{}, fmt.Errorf("操作逾時或取消；請重新取得畫面確認結果，勿直接重送")
+		return agentremote.Response{Code: agentremote.CodeRequestInterrupted}, fmt.Errorf("操作逾時或取消；請重新取得畫面確認結果，勿直接重送")
 	}
 }
 func (s *server) startMCP(ctx context.Context) (func(), error) {

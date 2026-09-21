@@ -10,7 +10,8 @@ YourDesk is a remote desktop app for macOS and Windows. Connect to another compu
 
 ## Features
 
-- **GUI and command-line modes:** choose remote desktop or an interactive terminal for your task. Terminals use independent windows and can connect to Linux CLI Hosts.
+- **Remote desktop and terminal:** choose remote desktop or an interactive terminal for your task. Terminals use independent windows and can connect to Linux CLI Hosts.
+- **Dedicated desktop file transfer:** browse remote files, create folders, permanently delete items, pause and resume transfers, and view progress in a separate window. Available for macOS and Windows; this desktop feature does not include Android or iOS and does not start screen capture or a shell.
 - **Remote control through MCP AI agents:** AI agents can connect through MCP, operate the desktop or terminal, query site capabilities and disconnect when finished.
 - **Hardware-accelerated encoding and decoding:** supports H.264/HEVC on macOS and H.264 on Windows, selected automatically according to both devices' capabilities. Falls back when unavailable; the toolbar shows the actual encoding and decoding status.
 - **Cross-platform control:** use your keyboard, mouse and common shortcuts between Mac and Windows.
@@ -52,7 +53,9 @@ Download the latest package from [GitHub Releases](https://github.com/VaderChen/
 2. Enter the remote ID or select a saved connection.
 3. Enter the connection password to start.
 
-On macOS, allow Screen Recording and Accessibility permissions. When receiving remote files, allow Network Volumes access if prompted. If previously denied, enable it for YourDesk under System Settings → Privacy & Security → Files and Folders, then copy the files again. Windows requires WebView2 Runtime. Intel Macs and Linux desktop packages are currently unsupported. Direct IP connections are also available after enabling them in the remote computer's security settings. Connections are encrypted and require networks that permit direct connectivity.
+For remote desktop control on macOS, allow Screen Recording and Accessibility permissions. Dedicated file transfer does not start screen capture or keyboard/mouse control; normal filesystem permissions still apply. When receiving remote files via the clipboard, allow Network Volumes access if prompted. If previously denied, enable it for YourDesk under System Settings → Privacy & Security → Files and Folders, then copy the files again. Windows requires WebView2 Runtime. Intel Macs and Linux desktop packages are currently unsupported. Direct IP connections are also available after enabling them in the remote computer's security settings. Connections are encrypted and require networks that permit direct connectivity.
+
+This README describes the capabilities of the project source. For the features included in a published package, refer to that Release's notes.
 
 ## Enhancement and interpolation
 
@@ -66,9 +69,18 @@ Copy on one computer and paste on the other. The operating system handles file a
 
 Check for updates in About. After downloading, a red 10-second countdown lets you cancel or update immediately. When it ends, the app quits, installs the update and restarts automatically. If automatic installation fails, follow the instructions to install manually. Keep both computers updated for full functionality.
 
+## Dedicated file transfer
+
+1. Close the site's active CMD or GUI connection, then choose the file-transfer icon between CMD and GUI and enter the connection password. Both computers must support independent file-transfer sessions; older Hosts are rejected rather than opened as desktop sessions.
+2. Browse the remote user's home folder. Drag local files or folders from Finder / File Explorer into the upload area, or choose local files. Existing files are not overwritten and existing folders are not merged.
+3. Create folders or select an item to delete it. Deletion is permanent, not a move to Trash / Recycle Bin; deleting a folder also requires typing its name and confirming removal of its contents. For downloads, select one remote file, wait until it finishes downloading, then drag it from the native area at the bottom into Finder / File Explorer. Completed downloads remain in the system Downloads folder under `YourDesk`.
+4. Pause or resume uploads and downloads while monitoring the percentage, transferred / total bytes, speed and estimated time remaining. After a disconnection, keep the transfer window open, reconnect to the same site from the main window, then choose Resume manually. Resume requires both apps and this window to remain open; it does not survive an app or system restart. If cancellation cannot be confirmed when closing, the window stays open so you can retry or reconnect.
+
+This workflow is for the macOS / Windows desktop clients, not Android / iOS. See the [file-transfer guide](FILE-TRANSFER.md) for size and queue limits, cancellation behavior, and platform validation status. Windows native operation and actual Finder / File Explorer drag-and-drop still require platform-specific verification; browser smoke tests do not replace it.
+
 ## More information
 
-[Streaming settings](STREAMING-CONTROLS.md) · [Build guide](BUILD.md) · [Architecture](ARCHITECTURE.md) · [Enhancement models](QUICKSRNET.md) · [Interpolation](FRAME-INTERPOLATION.md)
+[File transfer](FILE-TRANSFER.md) · [Streaming settings](STREAMING-CONTROLS.md) · [Build guide](BUILD.md) · [Architecture](ARCHITECTURE.md) · [Enhancement models](QUICKSRNET.md) · [Interpolation](FRAME-INTERPOLATION.md)
 
 Thanks to the authors of FSR, QuickSRNet/SESR and RIFE. Full [FSR](FSR-LICENSE.txt), [super-resolution](../internal/superres/MODEL_LICENSE.txt) and [RIFE](../internal/frameinterp/MODEL_LICENSE.txt) licenses are included with the packages.
 
@@ -76,7 +88,7 @@ Thanks to the authors of FSR, QuickSRNet/SESR and RIFE. Full [FSR](FSR-LICENSE.t
 
 ## Remote terminal
 
-Choose Desktop or Terminal, or double-click a site to select a mode. Independent terminal windows support multiple sites; unsupported older peers show an update prompt. Run Linux as a regular user. CLI supports `-secret "password"`; `LC_ALL → LC_MESSAGES → LANG` selects Traditional Chinese, English, Japanese or Korean, with English fallback. See the ZIP README for usage.
+Choose GUI (Desktop) or CMD (Terminal), or double-click a site to choose between those two modes. Dedicated file transfer uses its own icon between CMD and GUI, not this double-click menu. Independent terminal windows support multiple sites; unsupported older peers show an update prompt. Run Linux as a regular user. CLI supports `-secret "password"`; `LC_ALL → LC_MESSAGES → LANG` selects Traditional Chinese, English, Japanese or Korean, with English fallback. See the ZIP README for usage.
 
 ## Support development
 

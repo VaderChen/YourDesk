@@ -16,10 +16,33 @@ import (
 
 type transportDescription struct {
 	webrtc.SessionDescription
+	FilesVersion       int                  `json:"filesSessionVersion,omitempty"`
+	SessionMode        string               `json:"sessionMode,omitempty"`
 	NegotiationVersion int                  `json:"transportNegotiation,omitempty"`
 	Capabilities       []peertransport.Mode `json:"transportCapabilities,omitempty"`
 	Transport          *transportOffer      `json:"transport,omitempty"`
 }
+
+// HostOptions enables explicit session negotiation. A host that advertises
+// FilesOnly must check Peer.FilesOnly before allocating desktop resources.
+type HostOptions struct {
+	FilesOnly bool
+}
+
+func (p *Peer) FilesOnly() bool { return p.filesOnly.Load() }
+
+func validateSessionMode(description transportDescription, filesSupported bool) error {
+	switch description.SessionMode {
+	case "": // Legacy desktop/terminal peers do not send a session mode.
+		return nil
+	case "files":
+		if filesSupported && description.FilesVersion == 1 {
+			return nil
+		}
+	}
+	return errors.New("對端不支援獨立檔案傳輸工作階段，請更新兩端程式")
+}
+
 type transportOffer struct {
 	Version int                `json:"version"`
 	Mode    peertransport.Mode `json:"mode"`

@@ -21,6 +21,9 @@ func (p *Peer) bindClipboard(dc *webrtc.DataChannel) {
 	p.mu.Unlock()
 	dc.OnClose(func() { p.clipboardOnce.Do(func() { close(p.clipboardDone) }) })
 	p.onMessage(dc, func(m webrtc.DataChannelMessage) {
+		if p.FilesOnly() {
+			return
+		}
 		if len(m.Data) > MaxClipboardMessage {
 			_ = dc.Close()
 			return
@@ -37,6 +40,9 @@ func (p *Peer) bindClipboard(dc *webrtc.DataChannel) {
 func (p *Peer) ClipboardMessages() <-chan []byte { return p.clipboardInbox }
 func (p *Peer) ClipboardDone() <-chan struct{}   { return p.clipboardDone }
 func (p *Peer) ClipboardReady() bool {
+	if p.FilesOnly() {
+		return false
+	}
 	p.mu.RLock()
 	dc, closed := p.clipboard, p.closed
 	p.mu.RUnlock()
@@ -45,6 +51,9 @@ func (p *Peer) ClipboardReady() bool {
 
 // 多個檔案讀取工作者共用送出門檻，檢查與送出須序列化。
 func (p *Peer) SendClipboard(ctx context.Context, data []byte) error {
+	if p.FilesOnly() {
+		return errors.New("檔案工作階段不傳送剪貼簿")
+	}
 	if len(data) > MaxClipboardMessage {
 		return errors.New("剪貼簿訊息過大")
 	}

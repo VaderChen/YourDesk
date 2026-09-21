@@ -73,7 +73,7 @@ func (p *passwordInput) read(ctx context.Context, prompt bool) ([]byte, error) {
 					select {
 					case p.agent <- *envelope.Agent:
 					default:
-						data, _ := json.Marshal(agentremote.Response{ID: envelope.Agent.ID, Error: "操作佇列已滿"})
+						data, _ := json.Marshal(agentremote.Response{ID: envelope.Agent.ID, Code: agentremote.CodeRequestInterrupted, Error: "操作佇列已滿"})
 						fmt.Fprintln(os.Stdout, agentremote.Prefix+string(data))
 					}
 					continue

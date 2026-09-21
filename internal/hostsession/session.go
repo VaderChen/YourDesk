@@ -17,6 +17,7 @@ import (
 	"yourdesk/internal/agentvideo"
 	"yourdesk/internal/clipboard"
 	"yourdesk/internal/desktop"
+	"yourdesk/internal/filetransfer"
 	"yourdesk/internal/input"
 	"yourdesk/internal/optimization"
 	"yourdesk/internal/p2p"
@@ -52,15 +53,6 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 	if options.Headless {
 		return commandSession(ctx, sig, options)
 	}
-	switch video.Codec(options.Codec) {
-	case video.CodecSoftwareAV1, video.CodecHardwareAV1, video.CodecAuto, video.CodecHardwareH264, video.CodecHardwareHEVC, video.CodecSoftwareH264, video.CodecHardwareJPEG, video.CodecSoftwareJPEG:
-	default:
-		return fmt.Errorf("不支援的影像編碼：%s", options.Codec)
-	}
-	// JPEG 保留作為舊 遠端顯示 與硬體失敗時的相容路徑。
-	jpegEncoder, jpegSelection := video.NewJPEGEncoderForCodec(video.Codec(options.Codec))
-	defer jpegEncoder.Close()
-	slog.Info("JPEG 相容編碼器", "selected", jpegSelection.Selected)
 	var remoteCodecs atomic.Uint32
 	var remoteHardwareCodecs atomic.Uint32
 	var hardwareEncoder video.IntraEncoder
@@ -72,8 +64,6 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 			hardwareEncoder.Close()
 		}
 	}()
-	capturer := desktop.NewLiveCapturer()
-	defer capturer.Close()
 	selected := options.Display
 	var displayMu sync.Mutex
 	agentView := newAgentVideo()
@@ -128,18 +118,13 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 		}
 	}
 
-	if err := input.EnsurePermissions(); err != nil {
-		return err
-	}
 	var clipboardSync *clipboard.Sync
-	if !options.DisableClipboard {
-		clipboardSync = clipboard.New()
-	}
 	var recovery atomic.Uint64
 	var lastKeyframeRequest atomic.Int64
 	var fullFrameRequested atomic.Bool
 	var terminalActive atomic.Bool
 	var authorized atomic.Bool
+	var closeDesktop func()
 	peer, err := p2p.NewHostWithTransport(ctx, sig, options.Transport, func(c p2p.Control) {
 		if c.Type == "video-capabilities" {
 			if c.KeyframeInterval == 10 {
@@ -282,16 +267,21 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 		if c.Type == "key" {
 			keys[originalKey] = c.Down
 		}
-	})
+	}, p2p.HostOptions{FilesOnly: !options.DisableRemoteData})
 	if err != nil {
 		return err
 	}
 	defer func() {
 		authorized.Store(false)
 		peer.Close()
+		agentView.gate.Lock()
+		defer agentView.gate.Unlock()
 		displayMu.Lock()
 		defer displayMu.Unlock()
 		releaseInput()
+		if closeDesktop != nil {
+			closeDesktop()
+		}
 	}()
 	if !activeSession.CompareAndSwap(false, true) {
 		return fmt.Errorf("Client 已有遠端工作階段")
@@ -330,6 +320,31 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 			}
 		}
 	}()
+	// The signed signaling answer selects file-only mode before any permission
+	// prompt, OS capture, encoder or clipboard service is started. Desktop
+	// callbacks stay unauthorized for this branch for the entire connection.
+	if peer.FilesOnly() {
+		return filesSession(ctx, peer)
+	}
+	switch video.Codec(options.Codec) {
+	case video.CodecSoftwareAV1, video.CodecHardwareAV1, video.CodecAuto, video.CodecHardwareH264, video.CodecHardwareHEVC, video.CodecSoftwareH264, video.CodecHardwareJPEG, video.CodecSoftwareJPEG:
+	default:
+		return fmt.Errorf("不支援的影像編碼：%s", options.Codec)
+	}
+	if err := input.EnsurePermissions(); err != nil {
+		return err
+	}
+	// JPEG remains the legacy/failure fallback for desktop sessions only.
+	jpegEncoder, jpegSelection := video.NewJPEGEncoderForCodec(video.Codec(options.Codec))
+	slog.Info("JPEG 相容編碼器", "selected", jpegSelection.Selected)
+	capturer := desktop.NewLiveCapturer()
+	closeDesktop = func() {
+		capturer.Close()
+		jpegEncoder.Close()
+	}
+	if !options.DisableClipboard {
+		clipboardSync = clipboard.New()
+	}
 	configPeer.Store(peer)
 	authorized.Store(true)
 	if runtime.GOOS == "windows" {
@@ -357,6 +372,7 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 		})
 	}
 	if !options.DisableRemoteData {
+		filetransfer.Register(peer, authorized.Load)
 		remotedata.Register(peer, authorized.Load)
 		terminal.Register(peer, authorized.Load, terminalActive.Store)
 	}

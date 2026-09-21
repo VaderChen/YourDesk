@@ -64,6 +64,7 @@ if (location.hash) {
   history.replaceState(null, '', location.pathname);
 }
 let state = null;
+let pendingFilesSite = null;
 let startupMainReady = false;
 let startupOptimizationDismissed = false;
 let startupOptimizationFinished = false;
@@ -211,7 +212,7 @@ function applySiteCapabilities(card,site) {
   device.setAttribute('aria-busy',String(recovering));
  }
 
- for(const [name,label] of [['desktop','此裝置沒有桌面環境，請改用命令列連線。'],['terminal','對方尚未支援命令列，請更新對方的 YourDesk 後再試。']]){
+ for(const [name,label] of [['desktop','此裝置沒有桌面環境，請改用命令列連線。'],['terminal','對方尚未支援命令列，請更新對方的 YourDesk 後再試。'],['files','對方尚未支援檔案傳輸，請更新對方的 YourDesk 後再試。']]){
   const btn=card.querySelector(`[data-connect-mode="${name}"]`);if(!btn)continue;
   const capability=siteCapability(site,name);
   btn.disabled=capability===false||recovering;
@@ -219,7 +220,7 @@ function applySiteCapabilities(card,site) {
   btn.setAttribute('aria-busy',String(recovering&&capability!==false));
   const available=!recovering && capability===true && siteOnline(site)===true && !Object.hasOwn(state.running,`viewer:${site.id}`);
   btn.classList.toggle('mode-available',available);
-  btn.dataset.tooltip=i18n.t(recovering?'等待遠端恢復連線…':btn.disabled?label:name==='desktop'?'開啟桌面':'開啟命令列');
+  btn.dataset.tooltip=i18n.t(recovering?'等待遠端恢復連線…':btn.disabled?label:name==='desktop'?'開啟桌面':name==='files'?'開啟檔案傳輸':'開啟命令列');
  }
  const diagnostic=card.querySelector('[data-connect-mode="diagnostics"]');if(diagnostic)diagnostic.disabled=recovering||siteCapability(site,'desktop')===false;
 }
@@ -276,10 +277,11 @@ function siteIconButton(icon, label, onClick, active = false) {
     edit: 'M14 5l5 5M4 20l5-1L21 7l-5-5L4 14z',
     connect: 'M3 3h18v14H3zM12 17v4M8 21h8',
     terminal: 'M3 4h18v16H3zM6 8l4 4-4 4M13 16h5',
+    files: 'M3 7V4h6l2 3h10v13H3V7zM7 11h9l-2-2M17 16H8l2 2',
     stop: 'M6 6h12v12H6z'
   }[icon]);
   svg.append(path); control.append(svg);
-  if (["connect","terminal","speed"].includes(icon)) control.dataset.connectMode=icon==="connect"?"desktop":icon==="speed"?"diagnostics":"terminal";
+  if (["connect","terminal","speed","files"].includes(icon)) control.dataset.connectMode=icon==="connect"?"desktop":icon==="speed"?"diagnostics":icon==="files"?"files":"terminal";
   return control;
 }
 function renderSites() {
@@ -324,6 +326,7 @@ function renderSites() {
       siteIconButton('delete', i18n.t(`刪除 ${site.name}`), () => deleteSite(site)),
       siteIconButton('edit', i18n.t(`編輯 ${site.name}`), () => editSite(site)),
       siteIconButton('terminal', i18n.t('開啟命令列'), () => active ? toast(i18n.t('請先關閉目前連線。'),true) : connect(site,true)),
+      siteIconButton('files', i18n.t('開啟檔案傳輸'), () => active ? toast(i18n.t('請先關閉目前連線。'),true) : connect(site,false,true)),
       siteIconButton(active ? 'stop' : 'connect', active ? i18n.t('關閉連線') : i18n.t('開啟桌面'), () => active ? stop(`viewer:${site.id}`) : connect(site), active)
     );
     const note = text('p', site.note || '', 'card-note'); note.dataset.tooltip = site.note;
@@ -397,6 +400,7 @@ async function startConnection(key, name, request) {
  catch(error) { failConnection(error.message); }
 }
 function failConnection(message) {
+ pendingFilesSite=null;
  pendingTerminalSite=null;
  pendingDiagnosticSite=null;
  if(!connectionWait)return;
@@ -411,13 +415,14 @@ function renderConnectionWait() {
  const {key}=connectionWait, session=state.sessions?.[key];
  const dialog=$('#connection-progress-dialog');
  if(state.passwordPrompt?.key===key){if(dialog.open)dialog.close();return;}
- if(session?.stage==='connected'){dialog.close();connectionWait=null;if(pendingTerminalSite && key===`viewer:${pendingTerminalSite.id}`){const site=pendingTerminalSite;pendingTerminalSite=null;openTerminal(site);return;}if(pendingDiagnosticSite && key===`viewer:${pendingDiagnosticSite.id}`){const site=pendingDiagnosticSite;pendingDiagnosticSite=null;openDiagnostics(site);}return;}
+ if(session?.stage==='connected'){dialog.close();connectionWait=null;if(pendingFilesSite && key===`viewer:${pendingFilesSite.id}`){const site=pendingFilesSite;pendingFilesSite=null;openFiles(site);return;}if(pendingTerminalSite && key===`viewer:${pendingTerminalSite.id}`){const site=pendingTerminalSite;pendingTerminalSite=null;openTerminal(site);return;}if(pendingDiagnosticSite && key===`viewer:${pendingDiagnosticSite.id}`){const site=pendingDiagnosticSite;pendingDiagnosticSite=null;openDiagnostics(site);}return;}
  if(session?.error){failConnection(session.error);return;}
  if(!Object.hasOwn(state.running,key)){failConnection(state.notice||'遠端連線已結束，請確認網路與遠端裝置後重試。');return;}
- const labels={waiting:'等待遠端回應…',authenticating:'正在驗證密碼…',connecting:pendingTerminalSite?'正在準備命令列…':'正在啟動 遠端顯示，等待遠端畫面…'};
+ const labels={waiting:'等待遠端回應…',authenticating:'正在驗證密碼…',connecting:pendingFilesSite?'正在準備檔案傳輸…':pendingTerminalSite?'正在準備命令列…':'正在啟動 遠端顯示，等待遠端畫面…'};
  $('#connection-progress-status').textContent=i18n.t(labels[session?.stage]||'正在建立安全連線…');
 }
 function cancelConnectionWait(){
+ pendingFilesSite=null;
  pendingTerminalSite=null;
  pendingDiagnosticSite=null;
  if(!connectionWait)return;
@@ -428,14 +433,20 @@ $('#connection-progress-dialog form').addEventListener('submit',event=>event.pre
 $('#connection-progress-cancel').addEventListener('click',cancelConnectionWait);
 $('#connection-progress-dialog').addEventListener('cancel',event=>{event.preventDefault();if(!busy)cancelConnectionWait();});
 
-function connect(site,terminal=false) {
+async function openFiles(site) {
+ try { await api('files/window','POST',{session:`viewer:${site.id}`}); }
+ catch(error){toast(i18n.t(error.message),true);await api('stop','POST',{key:`viewer:${site.id}`}).catch(()=>{});}
+}
+function connect(site,terminal=false,files=false) {
  if(siteRecovery.has(site.id)){toast(i18n.t('等待遠端恢復連線…'));return;}
- if(siteCapability(site,terminal?'terminal':'desktop')===false){toast(i18n.t(terminal?'對方尚未支援命令列，請更新對方的 YourDesk 後再試。':'此裝置沒有桌面環境，請改用命令列連線。'),true);return;}
+ if(files && siteCapability(site,'files')===false){toast(i18n.t('對方尚未支援檔案傳輸，請更新對方的 YourDesk 後再試。'),true);return;}
+ if(!files && siteCapability(site,terminal?'terminal':'desktop')===false){toast(i18n.t(terminal?'對方尚未支援命令列，請更新對方的 YourDesk 後再試。':'此裝置沒有桌面環境，請改用命令列連線。'),true);return;}
   action(async () => {
     pendingTerminalSite=terminal?site:null;
-    if(terminal)pendingDiagnosticSite=null;
+    pendingFilesSite=files?site:null;
+    if(terminal||files)pendingDiagnosticSite=null;
     const saved = await api('remembered', 'POST', { id: site.id });
-    if (saved.remembered) { await startConnection(`viewer:${site.id}`,site.name,()=>api('viewer/start','POST',{id:site.id,terminal,diagnostics:pendingDiagnosticSite?.id===site.id})); return; }
+    if (saved.remembered) { await startConnection(`viewer:${site.id}`,site.name,()=>api('viewer/start','POST',{id:site.id,terminal,files,diagnostics:pendingDiagnosticSite?.id===site.id})); return; }
     $('#connect-form').reset();
     $('#connect-form').elements.id.value = site.id;
     $('#connect-name').textContent = site.name;
@@ -705,6 +716,7 @@ $('#connect-form').addEventListener('submit', event => {
     const form = event.target;
     const payload={id:form.elements.id.value,secret:form.elements.secret.value,remember:form.elements.remember.checked};
     payload.terminal=pendingTerminalSite?.id===payload.id;
+    payload.files=pendingFilesSite?.id===payload.id;
     payload.diagnostics=pendingDiagnosticSite?.id===payload.id;
     await startConnection(`viewer:${payload.id}`,$('#connect-name').textContent,()=>api('viewer/start','POST',payload));
   });
