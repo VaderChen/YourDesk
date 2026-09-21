@@ -6,7 +6,9 @@
 
 YourDesk is a remote desktop app for macOS and Windows. Connect to another computer, organize your saved connections, and copy and paste across platforms with familiar controls.
 
-![YourDesk interface](../images/cap001.png)
+![YourDesk walkthrough: groups, search, saved sites, appearance and quick connect](../images/yourdesk-demo.gif)
+
+Chinese-language UI walkthrough using fictional devices; no live remote connection is established. [How the animation is made](README-DEMO.md)
 
 ## Features
 

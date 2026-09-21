@@ -6,7 +6,9 @@
 
 YourDesk는 macOS와 Windows를 지원하는 원격 데스크톱 앱입니다. 연결 관리부터 복사와 붙여넣기까지, 익숙한 방식으로 다른 컴퓨터를 사용할 수 있습니다.
 
-![YourDesk](../images/cap001.png)
+![YourDesk 사용 예시: 그룹, 검색, 연결 대상 추가, 테마 및 빠른 연결](../images/yourdesk-demo.gif)
+
+가상 장치 데이터를 사용한 번체 중국어 UI 시연이며 실제 원격 연결은 하지 않습니다. [애니메이션 제작 방법](README-DEMO.md)
 
 ## 주요 기능
 

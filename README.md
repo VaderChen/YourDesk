@@ -6,7 +6,9 @@
 
 YourDesk 是支援 macOS 與 Windows 的遠端桌面工具。從連線、站台管理到跨平台複製貼上，讓你在熟悉的操作方式中使用另一台電腦。
 
-![YourDesk 介面預覽](images/cap001.png)
+![YourDesk 操作示範：群組、搜尋、新增站台、外觀與快速連線](images/yourdesk-demo.gif)
+
+介面操作示範使用虛構站台資料，未建立真實遠端連線。[動畫製作方式](docs/README-DEMO.md)
 
 ## 特色與功能
 

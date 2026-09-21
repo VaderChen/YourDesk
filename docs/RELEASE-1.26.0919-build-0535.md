@@ -1,5 +1,3 @@
-# 1.26.0919 build 0535
-
 ## 繁體中文
 
 - 更新完成後只顯示「確定」，不再顯示下載按鈕與舊提示；確認只標記已讀，不重新下載。
@@ -43,4 +41,3 @@ Validation: Go and WebView smoke checks passed, including early data delivery an
 수신 측 Mac을 업데이트하면 적용됩니다. 읽기는 최대 32 KiB이며 데이터 전달 시 100 ms 간격으로 HTTP 버퍼를 비웁니다. 기존 역압을 유지하므로 지연이 큰 네트워크에서는 최대 속도가 낮아질 수 있습니다. 진행 표시 갱신은 Finder가 제어합니다.
 
 검증: 첫 데이터 전달과 Range／HEAD 처리를 포함한 Go 및 WebView smoke 검사를 통과했습니다. Finder 진행 표시, Windows 단축키와 설치 후 업데이트 흐름은 실제 기기 테스트가 필요합니다. 원격 Ctrl+Alt+Del 합성은 지원하지 않습니다. 데스크톱／CLI／WinPE 패키지 7개이며 Android는 포함하지 않습니다.
-
