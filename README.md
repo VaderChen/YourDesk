@@ -8,13 +8,7 @@ YourDesk 是支援 macOS 與 Windows 的遠端桌面工具。從連線、站台�
 
 ![YourDesk 操作示範：群組、搜尋、新增站台、外觀與快速連線](images/yourdesk-demo.gif)
 
-介面操作示範使用虛構站台資料，未建立真實遠端連線。[動畫製作方式](docs/README-DEMO.md)
-
 ## 特色與功能
-
-**1.26.0921 build 1641** — 修正 Windows 遠端 Ctrl+Alt+Del，切換安全桌面時維持連線；既有登入前服務需停用再啟用更新。 [繁體中文](docs/RELEASE-1.26.0921-build-1641.md)
-
-開發分支狀態（2026-09-21，尚未發布）：已加入桌面傳輸／記憶體修正，以及 Android Viewer 的佇列、解碼恢復、Shell／中文輸入與相機生命週期修正。這次更新為原始碼與文件同步，不代表下載套件已更新；Android Go AAR 須自行建置，APK／16 KB 裝置尚未驗收。詳見[桌面修正紀錄](docs/DEEP-REVIEW-FIXES-2026-09-20.md)、[Android 修正紀錄](docs/ANDROID-REVIEW-FIXES-2026-09-20.md)與[Android 建置](docs/ANDROID-BUILD.md)。
 
 - **GUI 與 CMD 雙模式**：支援遠端桌面與互動命令列，可依工作選擇模式；命令列使用獨立視窗，亦可連入 Linux CLI Host。
 - **MCP AI Agent 遠端操控**：AI Agent 可透過 MCP 連線遠端、操作桌面或命令列、查詢站台能力，完成工作後斷線。
@@ -28,7 +22,7 @@ YourDesk 是支援 macOS 與 Windows 的遠端桌面工具。從連線、站台�
 - **常駐與更新提醒**：關閉主視窗後仍可常駐系統匣，並定期提醒新版本。
 - **多語言與外觀**：支援繁體中文、英文、日文、韓文，以及明亮／暗色主題。
 
-## 新增 MCP：讓 AI Agent 操作遠端
+## MCP：讓 AI Agent 操作遠端
 
 AI Agent 可透過 MCP 建立遠端連線、取得畫面、操作鍵盤滑鼠、斷線、查詢連線診斷及調整設定。
 

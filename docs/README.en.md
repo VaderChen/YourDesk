@@ -8,11 +8,7 @@ YourDesk is a remote desktop app for macOS and Windows. Connect to another compu
 
 ![YourDesk walkthrough: groups, search, saved sites, appearance and quick connect](../images/yourdesk-demo.gif)
 
-Chinese-language UI walkthrough using fictional devices; no live remote connection is established. [How the animation is made](README-DEMO.md)
-
 ## Features
-
-**1.26.0921 build 1641** — Fix remote Windows Ctrl+Alt+Del and keep connections across secure-desktop changes; re-enable existing pre-login services to update them. [English](RELEASE-1.26.0921-build-1641.md)
 
 - **GUI and command-line modes:** choose remote desktop or an interactive terminal for your task. Terminals use independent windows and can connect to Linux CLI Hosts.
 - **Remote control through MCP AI agents:** AI agents can connect through MCP, operate the desktop or terminal, query site capabilities and disconnect when finished.
@@ -25,7 +21,7 @@ Chinese-language UI walkthrough using fictional devices; no live remote connecti
 - **Live status:** see FPS, transfer rates and enhancement status, with instant hover tips.
 - **Personal preferences:** light and dark themes, four interface languages, saved viewing settings and update reminders.
 
-## New: MCP for AI agents
+## MCP for AI agents
 
 AI agents can use MCP to connect to remote computers, capture screenshots, control the keyboard and mouse, disconnect, run connection diagnostics and manage settings.
 
