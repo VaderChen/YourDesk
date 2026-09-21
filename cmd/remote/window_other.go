@@ -33,7 +33,8 @@ func nativeSetCodecStatus(string, string, string) {}
 
 func nativeShowCloseConfirmation() {}
 
-func nativeTitlebarPopupOpen() bool { return false }
+func nativeVirtualKeyboardPointerOver() bool { return false }
+func nativeTitlebarPopupOpen() bool          { return false }
 
 func nativePrepareViewerWindow() {}
 
@@ -41,6 +42,10 @@ func nativeSetEnhancementStatus(enhancementDisplayStatus) {}
 
 func nativeSetCrop(int, string) {}
 
-func nativeConfirmCrop()                               {}
+func nativeConfirmCrop()                    {}
+func nativeShowVirtualKeyboard(string) bool { return false }
+
 func nativeShowSystemShortcut(string, bool, bool) bool { return false }
 func nativeCancelSystemShortcut()                      {}
+
+func nativeShowInputNotice(string) {}

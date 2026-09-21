@@ -221,6 +221,7 @@ func openViewerConnection(parent, handshakeCtx context.Context, sig *signaling.C
 		}
 		if c.Type == "keyboard-capabilities" {
 			g.remoteVersion.Store(c.AppVersion)
+			g.remoteKeyboardPlatform.Store(c.Platform)
 			if cap := c.StreamCapabilities; cap != nil && cap.SchemaVersion == streamconfig.Version && cap.SessionID != "" {
 				g.streamCapabilities.Store(cap)
 			}

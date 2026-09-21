@@ -375,6 +375,28 @@ class NativeBuildTests(unittest.TestCase):
             self.assertIn('-fdebug-prefix-map=', configure.kwargs['env']['CXXFLAGS'])
             self.assertIn('-trimpath', shlex.split(env['GOFLAGS']))
 
+    def test_turbojpeg_nasm_reproducible_windows_build(self):
+        with tempfile.TemporaryDirectory() as temp:
+            cache = Path(temp)
+            data = b'cached archive fixture'
+            (cache / f'libjpeg-turbo-{turbojpeg.VERSION}.tar.gz').write_bytes(data)
+            (cache / f'libjpeg-turbo-{turbojpeg.VERSION}').mkdir()
+            def run(args, **kwargs):
+                if '--build' in args:
+                    (kwargs['cwd'] / 'libturbojpeg.a').write_bytes(b'valid library')
+                return subprocess.CompletedProcess(args, 0)
+            with mock.patch.object(turbojpeg, 'CACHE', cache), \
+                 mock.patch.object(turbojpeg, 'SHA256', hashlib.sha256(data).hexdigest()), \
+                 mock.patch.object(turbojpeg.shutil, 'which', return_value='/tools/nasm'), \
+                 mock.patch.object(turbojpeg.subprocess, 'run', side_effect=run) as commands:
+                turbojpeg.prepare('windows/amd64', {'CC': 'x86_64-w64-mingw32-gcc'})
+                self.assertIn('-DCMAKE_ASM_NASM_FLAGS=--reproducible', commands.call_args_list[0].args[0])
+                count = commands.call_count
+                turbojpeg.prepare('windows/amd64', {'CC': 'x86_64-w64-mingw32-gcc'})
+                self.assertEqual(commands.call_count, count)
+                turbojpeg.prepare('windows/arm64', {'CC': 'aarch64-w64-mingw32-clang'})
+                self.assertNotIn('-DCMAKE_ASM_NASM_FLAGS=--reproducible', commands.call_args_list[-2].args[0])
+
     def test_turbojpeg_native_flags_select_new_cache_and_unchanged_build_is_reused(self):
         with tempfile.TemporaryDirectory() as temp:
             cache = Path(temp)

@@ -47,7 +47,9 @@ def prepare(target, env):
     if len(shlex.split(compiler)) != 1:
         raise RuntimeError('TurboJPEG CC 必須是單一編譯器路徑')
     flag_names = ('CFLAGS', 'CXXFLAGS', 'CPPFLAGS', 'LDFLAGS', 'SDKROOT', 'MACOSX_DEPLOYMENT_TARGET')
-    recipe = (VERSION, SHA256, target, compiler, ffmpeg.NATIVE_PATH_RECIPE,
+    # NASM 的 COFF 檔名欄位不受 C/C++ prefix-map 影響，須另外清除。
+    nasm_flags = '--reproducible' if arch == 'amd64' else ''
+    recipe = (VERSION, SHA256, target, compiler, ffmpeg.NATIVE_PATH_RECIPE, nasm_flags,
               tuple((name, env.get(name, '')) for name in flag_names))
     signature = hashlib.sha256(repr(recipe).encode()).hexdigest()[:12]
     build = CACHE / f'{system}-{arch}-{signature}'
@@ -63,6 +65,8 @@ def prepare(target, env):
                 '-DWITH_SIMD=ON', '-DCMAKE_POSITION_INDEPENDENT_CODE=ON',
                 '-DCMAKE_INSTALL_PREFIX=install',
                 f'-DCMAKE_C_COMPILER={compiler}']
+        if nasm_flags:
+            args += [f'-DCMAKE_ASM_NASM_FLAGS={nasm_flags}']
         if system == 'windows':
             args += ['-DCMAKE_SYSTEM_NAME=Windows', f'-DCMAKE_SYSTEM_PROCESSOR={"ARM64" if arch == "arm64" else "AMD64"}']
         elif system == 'darwin':

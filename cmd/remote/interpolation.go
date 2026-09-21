@@ -44,6 +44,12 @@ func (p *frameInterpolator) reset() {
 		p.cancel = nil
 	}
 	p.generation++
+	// 舊推論可能還在原生程式內；切斷其結果通道，關閉後不保留生成影像。
+	// worker 必須捕獲啟動時的通道，不能把舊結果放入新工作階段。
+	p.results = nil
+	p.deadline = time.Time{}
+	p.period = 0
+	p.queuedAt = time.Time{}
 	p.sourceBounds = image.Rectangle{}
 	p.previous = nil
 	p.shown = nil
@@ -66,6 +72,9 @@ func interpolationSnapshot(src *image.RGBA, method string) *image.RGBA {
 		return snapshotRGBA(src)
 	}
 	w, h := frameinterp.AppleWorkingSize(src.Bounds().Dx(), src.Bounds().Dy())
+	if w < 2 || h < 2 {
+		return snapshotRGBA(src)
+	}
 	dst := image.NewRGBA(image.Rect(0, 0, w, h))
 	xdraw.ApproxBiLinear.Scale(dst, dst.Bounds(), src, src.Bounds(), draw.Src, nil)
 	return dst
@@ -97,9 +106,6 @@ func (p *frameInterpolator) frame(src *image.RGBA, display int, dirty, enabled b
 		p.status = reason
 		return src, dirty
 	}
-	if p.results == nil {
-		p.results = make(chan interpolationResult, 1)
-	}
 	now := time.Now()
 	old := p.shown
 	if dirty || p.previous == nil {
@@ -110,6 +116,9 @@ func (p *frameInterpolator) frame(src *image.RGBA, display int, dirty, enabled b
 		p.sourceBounds = src.Bounds()
 		p.queued = interpolationSnapshot(src, method)
 		p.queuedAt = now
+	}
+	if p.results == nil {
+		p.results = make(chan interpolationResult, 1)
 	}
 	// 先接收既有工作的結果，不能被同一次 Draw 到達的新來源幀取消。
 	select {
@@ -134,6 +143,7 @@ func (p *frameInterpolator) frame(src *image.RGBA, display int, dirty, enabled b
 	default:
 	}
 	if p.target != nil && !now.Before(p.deadline) {
+		p.generated = false
 		p.shown = p.target
 		p.target = nil
 		if p.synthesizing {
@@ -153,6 +163,7 @@ func (p *frameInterpolator) frame(src *image.RGBA, display int, dirty, enabled b
 		p.last = arrival
 		if p.previous == nil || interval < 20*time.Millisecond || interval > 150*time.Millisecond || p.busy.Load() {
 			p.shown = next
+			p.generated = false
 			p.status = "等待穩定影格"
 		} else {
 			p.generation++
@@ -164,7 +175,7 @@ func (p *frameInterpolator) frame(src *image.RGBA, display int, dirty, enabled b
 			p.deadline = now.Add(budget)
 			ctx, cancel := context.WithDeadline(context.Background(), p.deadline)
 			p.cancel = cancel
-			a, b, id := p.previous, next, p.generation
+			a, b, id, results := p.previous, next, p.generation, p.results
 			p.busy.Store(true)
 			if !p.generated {
 				p.status = "準備補幀"
@@ -180,7 +191,7 @@ func (p *frameInterpolator) frame(src *image.RGBA, display int, dirty, enabled b
 					err = ctx.Err()
 				}
 				select {
-				case p.results <- interpolationResult{frame: mid, generation: id, reason: interpolationError(err)}:
+				case results <- interpolationResult{frame: mid, generation: id, reason: interpolationError(err)}:
 				default:
 				}
 			}()

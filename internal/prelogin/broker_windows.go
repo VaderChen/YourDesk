@@ -164,6 +164,14 @@ func serveControl(ctx context.Context, listener net.Listener, operation func(str
 			if json.NewDecoder(io.LimitReader(conn, 1024)).Decode(&request) != nil || ctx.Err() != nil {
 				return
 			}
+			if request.Operation == "sas" {
+				message := ""
+				if err := sendClientSAS(conn); err != nil {
+					message = err.Error()
+				}
+				_ = json.NewEncoder(conn).Encode(map[string]string{"error": message})
+				return
+			}
 			if request.Operation != "status" && request.Operation != "disconnect" {
 				return
 			}

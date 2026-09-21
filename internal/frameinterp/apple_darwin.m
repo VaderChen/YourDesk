@@ -10,7 +10,9 @@ static CVPixelBufferRef inputs[2],output;
 static int width,height;
 int yd_apple_supported(void){
 #if defined(__arm64__)
- if(@available(macOS 26.0,*))return [VTLowLatencyFrameInterpolationConfiguration isSupported];
+ if(@available(macOS 27.0,*))return [VTLowLatencyFrameInterpolationConfiguration isSupported]
+  && [VTLowLatencyFrameInterpolationConfiguration maximumDimensionForSpatialScaleFactor:1]>=2
+  && [VTLowLatencyFrameInterpolationConfiguration maximumPixelCountForSpatialScaleFactor:1]>=4;
 #endif
  return 0;
 }
@@ -25,29 +27,33 @@ static CVPixelBufferRef makeBuffer(NSDictionary *attrs,int w,int h,OSType fmt){
 }
 // 真實幀與生成幀共用尺寸規則，避免清晰度交替。
 void yd_apple_working_size(int w,int h,int *pw,int *ph){
- // macOS 26 沒有尺寸能力查詢；使用本機已驗證的 720p 工作預算。
- // 較新系統可查詢能力，但仍限制即時處理預算，避免 Core ML 放大後超量。
- double edge=1280.0,pixels=1280.0*720.0;
+ *pw=0;*ph=0;
+ if(w<2||h<2||w>8192||h>8192||!yd_apple_supported())return;
+ // 系統能力與即時預算取交集；零能力不可當作無限制。
+ double edge=0,pixels=0;
  if(@available(macOS 27.0,*)){
-  NSInteger limit=[VTLowLatencyFrameInterpolationConfiguration maximumDimensionForSpatialScaleFactor:1];
-  NSInteger count=[VTLowLatencyFrameInterpolationConfiguration maximumPixelCountForSpatialScaleFactor:1];
-  if(limit>0)edge=fmin(edge,limit);if(count>0)pixels=fmin(pixels,count);
+  edge=fmin(1280.0,[VTLowLatencyFrameInterpolationConfiguration maximumDimensionForSpatialScaleFactor:1]);
+  pixels=fmin(1280.0*720.0,[VTLowLatencyFrameInterpolationConfiguration maximumPixelCountForSpatialScaleFactor:1]);
  }
+ if(edge<2||pixels<4)return;
  double scale=fmin(1.0,fmin(edge/fmax(w,h),sqrt(pixels/((double)w*h))));
  *pw=MAX(2,((int)floor(w*scale)/2)*2);
  *ph=MAX(2,((int)floor(h*scale)/2)*2);
+ if(*pw>edge||*ph>edge||(double)*pw * *ph>pixels){*pw=0;*ph=0;}
 }
 int yd_apple_predict(const unsigned char *a,const unsigned char *b,int w,int h,int as,int bs,unsigned char *out,char *error,int n){@autoreleasepool{
- if(!yd_apple_supported()){snprintf(error,n,"Apple 補幀需要支援的 Mac 與 macOS 26 以上");return 0;}
- if(@available(macOS 26.0,*)){
+ if(!yd_apple_supported()){snprintf(error,n,"Apple 補幀需要支援的 Mac 與 macOS 27 以上");return 0;}
+ if(@available(macOS 27.0,*)){
  NSError *err=nil;
+ if(!a||!b||!out||w<2||h<2||w>8192||h>8192||as<w*4||bs<w*4){snprintf(error,n,"Apple 補幀影格緩衝無效");return 0;}
  int pw,ph;yd_apple_working_size(w,h,&pw,&ph);
+ if(pw<2||ph<2){snprintf(error,n,"Apple 補幀不支援此尺寸");return 0;}
  if(!processor||width!=pw||height!=ph){
   clearSession();
   VTLowLatencyFrameInterpolationConfiguration *c=[[VTLowLatencyFrameInterpolationConfiguration alloc] initWithFrameWidth:pw frameHeight:ph numberOfInterpolatedFrames:1];
   if(!c){snprintf(error,n,"Apple 補幀不支援此尺寸");return 0;}
   processor=[[VTFrameProcessor alloc]init];
-  BOOL ok=[processor startSessionWithConfiguration:c error:&err];
+  BOOL ok=c.frameSupportedPixelFormats.count>0 && [processor startSessionWithConfiguration:c error:&err];
   OSType fmt=[c.frameSupportedPixelFormats.firstObject unsignedIntValue];
   if(ok){inputs[0]=makeBuffer(c.sourcePixelBufferAttributes,pw,ph,fmt);inputs[1]=makeBuffer(c.sourcePixelBufferAttributes,pw,ph,fmt);output=makeBuffer(c.destinationPixelBufferAttributes,pw,ph,fmt);}
   [c release];
@@ -57,7 +63,7 @@ int yd_apple_predict(const unsigned char *a,const unsigned char *b,int w,int h,i
  if(!ci)ci=[[CIContext contextWithOptions:@{kCIContextWorkingColorSpace:[NSNull null]}]retain];
  CGColorSpaceRef cs=CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
  for(int i=0;i<2;i++){
-  NSData *data=[NSData dataWithBytes:i?b:a length:(size_t)(i?bs:as)*h];
+  NSData *data=[NSData dataWithBytes:i?b:a length:(size_t)(i?bs:as)*(h-1)+(size_t)w*4];
   CIImage *im=[CIImage imageWithBitmapData:data bytesPerRow:i?bs:as size:CGSizeMake(w,h) format:kCIFormatRGBA8 colorSpace:cs];
   im=[im imageByApplyingTransform:CGAffineTransformMakeScale((double)pw/w,(double)ph/h)];
   [ci render:im toCVPixelBuffer:inputs[i] bounds:CGRectMake(0,0,pw,ph) colorSpace:cs];
@@ -65,8 +71,9 @@ int yd_apple_predict(const unsigned char *a,const unsigned char *b,int w,int h,i
  VTFrameProcessorFrame *af=[[VTFrameProcessorFrame alloc]initWithBuffer:inputs[0] presentationTimeStamp:CMTimeMake(0,24)];
  VTFrameProcessorFrame *bf=[[VTFrameProcessorFrame alloc]initWithBuffer:inputs[1] presentationTimeStamp:CMTimeMake(2,24)];
  VTFrameProcessorFrame *df=[[VTFrameProcessorFrame alloc]initWithBuffer:output presentationTimeStamp:CMTimeMake(1,24)];
+ if(!af||!bf||!df){[af release];[bf release];[df release];CGColorSpaceRelease(cs);clearSession();snprintf(error,n,"Apple 補幀影格建立失敗");return 0;}
  VTLowLatencyFrameInterpolationParameters *params=[[VTLowLatencyFrameInterpolationParameters alloc]initWithSourceFrame:bf previousFrame:af interpolationPhase:@[@0.5] destinationFrames:@[df]];
- BOOL ok=[processor processWithParameters:params error:&err];
+ BOOL ok=params && [processor processWithParameters:params error:&err];
  if(ok){CIImage *result=[[CIImage imageWithCVPixelBuffer:output] imageByApplyingTransform:CGAffineTransformMakeScale((double)w/pw,(double)h/ph)];[ci render:result toBitmap:out rowBytes:w*4 bounds:CGRectMake(0,0,w,h) format:kCIFormatRGBA8 colorSpace:cs];}
  else snprintf(error,n,"%s",err.localizedDescription.UTF8String?:"Apple 補幀失敗");
  [params release];[af release];[bf release];[df release];CGColorSpaceRelease(cs);

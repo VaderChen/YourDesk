@@ -13,3 +13,6 @@ void *yd_win_menu_create(void);
 void yd_win_menu_add(void *menu,const char *label,int action,int checked);
 int yd_win_menu_show(void *menu,double x,double y);
 void yd_win_menu_destroy(void *menu);
+
+void yd_win_keyboard(int open);
+int yd_win_keyboard_hit(void);

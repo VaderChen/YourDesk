@@ -55,15 +55,22 @@ func (g *game) updateToolbar() (bool, error) {
 	nativeSetDisplays(selected, count, pending)
 	if action := nativeTitlebarAction(); action != 0 {
 		if g.systemShortcut != nil {
+			if action >= 1000 && g.systemShortcut.request.Key == "virtual-keyboard" {
+				g.sendVirtualKey(action)
+				return true, nil
+			}
 			if action == shortcutLocal || action == shortcutRemote || action == shortcutCancel {
 				g.systemShortcut.decision = action
 			}
 			return true, nil
 		}
-		if action >= 100 {
+		if action >= 100 && action < 104 {
 			g.selectDisplay(action - 100)
 		}
 		switch action {
+		case 56:
+			g.showVirtualKeyboard()
+			return true, nil
 		case 50, 51, 52, 53, 55:
 			g.titlebarSystemShortcut(action)
 			return true, nil

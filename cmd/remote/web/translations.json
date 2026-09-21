@@ -1,6 +1,14 @@
 {
-  "啟動": ["Active", "有効", "활성"],
-  "關閉": ["Off", "オフ", "꺼짐"],
+  "啟動": [
+    "Active",
+    "有効",
+    "활성"
+  ],
+  "關閉": [
+    "Off",
+    "オフ",
+    "꺼짐"
+  ],
   "低流量": [
     "Low bandwidth",
     "低通信量",
@@ -601,10 +609,10 @@
     "2× 補間（Apple 低遅延）",
     "2× 보간 (Apple 저지연)"
   ],
-  "Apple 補幀需要支援的 Mac 與 macOS 26 以上": [
-    "Apple interpolation requires a supported Mac and macOS 26 or later",
-    "Apple 補間には対応 Mac と macOS 26 以降が必要です",
-    "Apple 보간은 지원되는 Mac과 macOS 26 이상이 필요합니다"
+  "Apple 補幀需要支援的 Mac 與 macOS 27 以上": [
+    "Apple interpolation requires a supported Mac and macOS 27 or later",
+    "Apple 補間には対応 Mac と macOS 27 以降が必要です",
+    "Apple 보간은 지원되는 Mac과 macOS 27 이상이 필요합니다"
   ],
   "畫面靜止時會減少更新，FPS 降到 0 屬正常，可節省流量。": [
     "When the screen is still, fewer updates save bandwidth. FPS may normally drop to 0.",
@@ -676,7 +684,11 @@
     "新しい領域のフレームが届きません。復元で再試行できます",
     "새 영역 프레임이 아직 없습니다. 복원으로 다시 시도하세요"
   ],
-  "遠端目前無法接受輸入。": ["The remote computer cannot accept input right now.", "リモートは現在入力を受け付けられません。", "현재 원격 컴퓨터가 입력을 받을 수 없습니다."],
+  "遠端目前無法接受輸入。": [
+    "The remote computer cannot accept input right now.",
+    "リモートは現在入力を受け付けられません。",
+    "현재 원격 컴퓨터가 입력을 받을 수 없습니다."
+  ],
   "系統快捷鍵": [
     "System shortcuts",
     "システムショートカット",
@@ -697,9 +709,29 @@
     "リモート",
     "원격"
   ],
-  "Windows 會直接處理實體 Ctrl+Alt+Del，APP 無法先攔截；目前也不支援遠端傳送這組安全快捷鍵。": [
-    "Windows handles physical Ctrl+Alt+Del directly, before this app can intercept it. Sending this secure shortcut remotely is not currently supported.",
-    "物理キーの Ctrl+Alt+Del は Windows が直接処理するため、このアプリで事前に捕捉できません。このセキュリティ用ショートカットのリモート送信にも現在対応していません。",
-    "실제 Ctrl+Alt+Del은 앱이 가로채기 전에 Windows가 직접 처리합니다. 이 보안 단축키의 원격 전송도 현재 지원하지 않습니다."
+  "選擇遠端將透過 Windows 登入前服務傳送 Ctrl+Alt+Del；遠端需啟用服務並允許軟體 SAS。本機實體按鍵仍由 Windows 直接處理。": [
+    "Send Ctrl+Alt+Del through the remote Windows pre-login service. Enable the service and allow software SAS. Windows handles physical local keys directly.",
+    "リモート Windows のログイン前サービスで Ctrl+Alt+Del を送信します。サービスとソフトウェア SAS を有効にしてください。",
+    "원격 Windows 로그인 전 서비스로 Ctrl+Alt+Del을 보냅니다. 서비스와 소프트웨어 SAS를 허용하세요."
+  ],
+  "虛擬鍵盤": [
+    "Virtual keyboard",
+    "仮想キーボード",
+    "가상 키보드"
+  ],
+  "點選修飾鍵，再點選按鍵；組合送出後自動釋放。": [
+    "Select modifiers, then a key; keys release after each combination.",
+    "修飾キーを選択してからキーを押します。送信後に自動解除します。",
+    "보조 키를 선택한 후 키를 누르세요. 전송 후 자동으로 해제됩니다."
+  ],
+  "數字鍵盤": [
+    "Numeric keypad",
+    "テンキー",
+    "숫자 키패드"
+  ],
+  "注音鍵盤": [
+    "Zhuyin keyboard",
+    "注音キーボード",
+    "주음 키보드"
   ]
 }

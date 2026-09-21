@@ -55,6 +55,12 @@ document.addEventListener('keydown',event=>{
  if(action){event.preventDefault();if(!window.systemShortcutOpen)bridge(action===13?51:(!mac&&event.altKey?52:50));}
 },true);
 document.addEventListener('click',event=>{const button=event.target.closest('button');hideTip();if(!button||button.getAttribute('aria-disabled')==='true')return;if(button.dataset.menu){const r=button.getBoundingClientRect();bridge({menu:button.dataset.menu,x:r.x,y:r.bottom});}else if(button.dataset.action){bridge(Number(button.dataset.action));}});
+window.showInputNotice=message=>{
+ if(window.virtualKeyboardStatus){window.virtualKeyboardStatus(message);return}
+ clearTimeout(tipTimer);
+ const rect=document.querySelector('[data-menu="shortcuts"]').getBoundingClientRect();
+ bridge({tooltip:message,x:rect.x,y:rect.y,width:rect.width,height:rect.height});
+};
 window.showCloseConfirmation=()=>{
  clearTimeout(tipTimer);
  const rect=document.querySelector('[data-action="5"]').getBoundingClientRect();
@@ -91,14 +97,15 @@ window.systemShortcutDocument=request=>{
  doc.querySelector('h2').textContent=t('快捷鍵要作用在哪裡？');
  const key=doc.querySelector('p');key.textContent=request.label;key.style.color='#c42b1c';
  const message=doc.createElement('p');
- message.textContent=request.secure?t('Windows 會直接處理實體 Ctrl+Alt+Del，APP 無法先攔截；目前也不支援遠端傳送這組安全快捷鍵。'):request.remoteAvailable===false?t('遠端目前無法接受輸入。'):'';
+ message.textContent=request.secure?t('選擇遠端將透過 Windows 登入前服務傳送 Ctrl+Alt+Del；遠端需啟用服務並允許軟體 SAS。本機實體按鍵仍由 Windows 直接處理。'):request.remoteAvailable===false?t('遠端目前無法接受輸入。'):'';
  key.after(message);const buttons=doc.querySelector('.buttons');buttons.replaceChildren();
  for(const [label,action] of [['取消',42],['本機',40],['遠端',41]]){
   const button=doc.createElement('button');button.textContent=t(label);button.dataset.confirm=action;
-  button.disabled=(request.secure&&action!==42)||(action===41&&request.remoteAvailable===false);buttons.append(button);
+  button.disabled=(request.secure&&action===40)||(action===41&&request.remoteAvailable===false);buttons.append(button);
  }
  doc.querySelector('script').remove();const script=doc.createElement('script');
- script.textContent=`const buttons=[...document.querySelectorAll('button:not(:disabled)')];
+ script.textContent=`new ResizeObserver(()=>window.webkit.messageHandlers.titlebar.postMessage({shortcutHeight:Math.ceil(document.body.getBoundingClientRect().height)})).observe(document.body);
+ const buttons=[...document.querySelectorAll('button:not(:disabled)')];
  let sent=false;const send=action=>{if(!sent){sent=true;window.webkit.messageHandlers.titlebar.postMessage(action)}};
  buttons.forEach(b=>b.onclick=()=>send(Number(b.dataset.confirm)));
  (buttons.find(b=>b.dataset.confirm==='41')||buttons[0]).focus();
@@ -166,4 +173,4 @@ window.setTitlebarState=state=>{
  });
  positionDisplayButtons();
 };
-</script></body></html>
+</script><!-- VIRTUAL_KEYBOARD_SCRIPT --></body></html>

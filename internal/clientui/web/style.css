@@ -412,3 +412,5 @@ dialog .remember-row input { display: inline-block; width: 16px; height: 16px; m
 .mini-device.connecting { color: #946000; background: #fff0c2; }
 [data-theme="dark"] .mini-device.connected { color: #69f3a0; background: #17432b; box-shadow: inset 0 0 0 1px #42bf77; }
 [data-theme="dark"] .mini-device.connecting { color: #ffda79; background: #4d3a14; }
+
+.settings-update-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }

@@ -72,6 +72,7 @@ type windowsTitlebarMessage struct {
 	Action     int     `json:"action"`
 	Popup      bool    `json:"popup"`
 	Menu       bool    `json:"menu"`
+	Keyboard   bool    `json:"keyboard"`
 	X          float64 `json:"x"`
 	Y          float64 `json:"y"`
 	Width      float64 `json:"width"`
@@ -148,6 +149,11 @@ func runWindowsTitlebar() {
 			return
 		}
 		if message.Popup {
+			keyboard := C.int(0)
+			if message.Keyboard {
+				keyboard = 1
+			}
+			C.yd_win_keyboard(keyboard)
 			C.yd_win_popup(C.double(message.X), C.double(message.Y), C.double(message.Width), C.double(message.Height))
 			wasOpen := winChrome.popup.Swap(message.Menu)
 			if wasOpen && !message.Menu {
@@ -158,7 +164,7 @@ func runWindowsTitlebar() {
 		switch message.Action {
 		case 7, 8, 9:
 			C.yd_win_command(C.int(message.Action))
-		case 1, 2, 3, 4, 5, 6, 10, 11, 12, 13, 14, 16, 17, 40, 41, 42, 50, 51, 52, 53, 55:
+		case 1, 2, 3, 4, 5, 6, 10, 11, 12, 13, 14, 16, 17, 40, 41, 42, 50, 51, 52, 53, 55, 56:
 			C.yd_win_command(0)
 			select {
 			case winChrome.actions <- message.Action:
@@ -166,7 +172,9 @@ func runWindowsTitlebar() {
 			}
 		default:
 			if message.Action >= 100 {
-				C.yd_win_command(0)
+				if message.Action < 1000 {
+					C.yd_win_command(0)
+				}
 				select {
 				case winChrome.actions <- message.Action:
 				default:
@@ -244,13 +252,14 @@ func windowsTitlebarTick(w webview.WebView) {
 		w.Eval("window.setTitlebarState(" + string(data) + ")")
 	}
 }
-func nativeCloseTitlebar()            { windowsDispatch(func(w webview.WebView) { w.Terminate() }) }
-func nativeTitlebarControls() bool    { return !winChrome.initialized.Load() || winChrome.ready.Load() }
-func nativeTitlebarOverlay() bool     { return winChrome.overlay.Load() }
-func nativeTitlebarVisible() bool     { return winChrome.visible.Load() }
-func nativeTitlebarPopupOpen() bool   { return winChrome.popup.Load() || winChrome.nativeMenu.Load() }
-func nativeFullscreenRequested() bool { return false }
-func nativeRestoresWindowFrame() bool { return winChrome.ready.Load() }
+func nativeCloseTitlebar()                   { windowsDispatch(func(w webview.WebView) { w.Terminate() }) }
+func nativeTitlebarControls() bool           { return !winChrome.initialized.Load() || winChrome.ready.Load() }
+func nativeTitlebarOverlay() bool            { return winChrome.overlay.Load() }
+func nativeTitlebarVisible() bool            { return winChrome.visible.Load() }
+func nativeVirtualKeyboardPointerOver() bool { return C.yd_win_keyboard_hit() != 0 }
+func nativeTitlebarPopupOpen() bool          { return winChrome.popup.Load() || winChrome.nativeMenu.Load() }
+func nativeFullscreenRequested() bool        { return false }
+func nativeRestoresWindowFrame() bool        { return winChrome.ready.Load() }
 func nativeFullscreenTransitioning() bool {
 	return !winChrome.initialized.Load() || winChrome.transitioning.Load()
 }
@@ -351,6 +360,14 @@ func nativeShowCloseConfirmation() {
 	windowsDispatch(func(w webview.WebView) { w.Eval("window.showCloseConfirmation()") })
 }
 
+func nativeShowVirtualKeyboard(payload string) bool {
+	if !winChrome.ready.Load() {
+		return false
+	}
+	windowsDispatch(func(w webview.WebView) { w.Eval("window.showVirtualKeyboard(" + payload + ")") })
+	return true
+}
+
 func nativeShowSystemShortcut(label string, secure, remote bool) bool {
 	if !winChrome.ready.Load() {
 		return false
@@ -390,6 +407,8 @@ func showWindowsNativeMenu(message windowsTitlebarMessage) {
 	}
 	switch message.NativeMenu {
 	case "shortcuts":
+		add("虛擬鍵盤", 56, false)
+		add("", 0, false)
 		add("Ctrl+W", 50, false)
 		add("Alt+F4", 52, false)
 		add("Ctrl+Shift+Esc", 53, false)
@@ -454,4 +473,9 @@ func nativeConfirmCrop() {
 		default:
 		}
 	}()
+}
+
+func nativeShowInputNotice(message string) {
+	data, _ := json.Marshal(message)
+	windowsDispatch(func(w webview.WebView) { w.Eval("window.showInputNotice(" + string(data) + ")") })
 }

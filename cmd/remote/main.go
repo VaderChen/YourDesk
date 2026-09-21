@@ -77,6 +77,7 @@ type game struct {
 	restoreDisplay                  bool
 	preferenceSample                time.Time
 	presentedFrames                 atomic.Uint64 // 有新遠端影像的繪製次數，不計算重畫同一影格。
+	remoteKeyboardPlatform          atomic.Value
 	rawSupported                    atomic.Bool
 	rawActive                       bool
 	rawHeld                         map[int]rawkey.Event
@@ -217,14 +218,20 @@ func (g *game) Update() (err error) {
 	if blocked, err := g.updateSystemShortcut(); blocked {
 		return err
 	}
+	virtualKeyboard := g.virtualKeyboardOpen()
 	rawInput := g.updateRawKeys()
+	if virtualKeyboard {
+		rawInput = true
+	} // 虛擬鍵盤只攔實體按鍵，滑鼠仍走既有流程。
 	if g.updateCrop(toolbarHandled) {
 		return nil
 	}
-	if action := g.windowShortcut(rawInput); action != 0 {
-		return g.executeWindowShortcut(action)
+	if !virtualKeyboard {
+		if action := g.windowShortcut(rawInput); action != 0 {
+			return g.executeWindowShortcut(action)
+		}
 	}
-	if g.systemShortcut != nil {
+	if g.systemShortcut != nil && !virtualKeyboard {
 		return nil
 	}
 	// 此組合鍵由本機處理，不把切換組合鍵傳到遠端。
@@ -262,9 +269,14 @@ func (g *game) Update() (err error) {
 	}
 	// Only the focused Remote window may control the Host. This prevents a
 	// same-machine smoke test from continuously fighting the local cursor.
-	if !ebiten.IsFocused() || nativeTitlebarPopupOpen() {
-		if time.Now().After(g.agentDeadline) {
+	if !ebiten.IsFocused() || nativeTitlebarPopupOpen() || (virtualKeyboard && nativeVirtualKeyboardPointerOver()) {
+		mouseHeld := false
+		for _, down := range g.lastButtons {
+			mouseHeld = mouseHeld || down
+		}
+		if time.Now().After(g.agentDeadline) && (!virtualKeyboard || mouseHeld) {
 			g.clipboard.CancelKeys("遠端顯示 失去焦點或開啟本機選單")
+			clear(g.lastButtons)
 		}
 		return nil
 	}

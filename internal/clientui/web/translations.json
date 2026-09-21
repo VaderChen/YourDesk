@@ -1,61 +1,304 @@
 {
- "確定": ["OK", "OK", "확인"],
- "遠端桌面已連線": ["Remote desktop connected", "リモートデスクトップ接続済み", "원격 데스크톱 연결됨"],
- "遠端桌面連線中": ["Connecting to remote desktop", "リモートデスクトップに接続中", "원격 데스크톱 연결 중"],
- "顯示站台 QR Code": ["Show site QR code", "サイトの QR コードを表示", "사이트 QR 코드 표시"],
- "站台 QR Code": ["Site QR code", "サイト QR コード", "사이트 QR 코드"],
- "正在產生 QR Code…": ["Generating QR code…", "QR コードを生成中…", "QR 코드 생성 중…"],
- "包含站台名稱、ID 與伺服器位址，不含連線密碼。": ["Includes the site name, ID and server address, without the connection password.", "サイト名、ID、サーバーアドレスを含みます。接続パスワードは含みません。", "사이트 이름, ID, 서버 주소를 포함하며 연결 비밀번호는 포함하지 않습니다."],
- "複製站台連結": ["Copy site link", "サイトリンクをコピー", "사이트 링크 복사"],
- "站台連結已複製": ["Site link copied", "サイトリンクをコピーしました", "사이트 링크 복사됨"],
- "目前站台資料無法產生 QR Code": ["Cannot generate a QR code for this site", "このサイトの QR コードを生成できません", "이 사이트의 QR 코드를 생성할 수 없습니다"],
- "站台資料過長，無法產生 QR Code": ["Site data is too long for a QR code", "サイト情報が長すぎます", "사이트 데이터가 너무 깁니다"],
- "QR Code 產生失敗": ["QR code generation failed", "QR コードの生成に失敗しました", "QR 코드 생성 실패"],
- "封包分析": ["Packet analysis", "パケット分析", "패킷 분석"],
- "請先開啟封包分析": ["Enable packet analysis first", "先にパケット分析を有効にしてください", "먼저 패킷 분석을 켜세요"],
- "請在遠端開啟封包分析": ["Enable packet analysis on the remote device", "リモート端末でパケット分析を有効にしてください", "원격 장치에서 패킷 분석을 켜세요"],
- "封包分析已關閉": ["Packet analysis is off", "パケット分析は無効です", "패킷 분석이 꺼져 있습니다"],
- "低延遲": ["Low latency","低遅延","낮은 지연 시간"],
- "傳輸策略": ["Transmission strategy","伝送方針","전송 전략"],
- "均衡": ["Balanced","バランス","균형"],
- "省頻寬": ["Save bandwidth","帯域節約","대역폭 절약"],
- "自動編碼的選擇偏好；變更會重新建立目前連線。": ["Automatic codec preference; changing this reconnects the current session.","自動コーデックの優先設定。変更すると現在の接続を再確立します。","자동 코덱 우선 설정입니다. 변경하면 현재 연결을 다시 설정합니다."],
-  "結果": ["Result", "結果", "결과"],
-  "後端": ["Backend", "バックエンド", "백엔드"],
-  "耗時": ["Elapsed", "所要時間", "소요 시간"],
-  "編碼實測": ["Encoding test", "エンコードテスト", "인코딩 테스트"],
-  "解碼實測": ["Decoding test", "デコードテスト", "디코딩 테스트"],
-  "格式 / 輸出": ["Format / Output", "形式 / 出力", "형식 / 출력"],
-  "格式 / 輸入": ["Format / Input", "形式 / 入力", "형식 / 입력"],
-  "格式 / 輸出 / 尺寸": ["Format / Output / Size", "形式 / 出力 / サイズ", "형식 / 출력 / 크기"],
-  "格式 / 輸入 / 尺寸": ["Format / Input / Size", "形式 / 入力 / サイズ", "형식 / 입력 / 크기"],
-  "Windows 原生格式": ["Windows native format", "Windows ネイティブ形式", "Windows 네이티브 형식"],
-
-  "軟體獨立測試": ["Independent software test", "ソフトウェア独立テスト", "독립 소프트웨어 테스트"],
-  "優先圖形 API": ["Preferred graphics API", "優先グラフィックス API", "우선 그래픽 API"],
-  "記憶體": ["Memory", "メモリ", "메모리"],
-  "編解碼分析": ["Codec analysis","コーデック分析","코덱 분석"],
-  "未確認": ["Unconfirmed","未確認","미확인"],
-  "尚未開始偵測": ["Detection not started","検出未開始","감지 시작 전"],
-  "偵測中": ["Detecting","検出中","감지 중"],
-  "偵測完成": ["Detection complete","検出完了","감지 완료"],
-  "部分偵測未完成": ["Detection partially complete","一部の検出が未完了","일부 감지 미완료"],
-  "偵測未完成": ["Detection incomplete","検出未完了","감지 미완료"],
-  "偵測已取消": ["Detection cancelled","検出をキャンセルしました","감지 취소됨"],
-  "等待偵測": ["Pending detection","検出待ち","감지 대기"],
-  "硬體概況": ["Hardware overview","ハードウェア概要","하드웨어 개요"],
-  "邏輯處理器": ["Logical processors","論理プロセッサ","논리 프로세서"],
-  "加速指令集": ["Acceleration instruction sets","高速化命令セット","가속 명령어 집합"],
-  "偵測結果": ["Detection results","検出結果","감지 결과"],
-  "編解碼實測": ["Codec probe results","コーデック実測結果","코덱 실측 결과"],
-  "結果僅代表列出的格式與尺寸；實測未通過或未確認的項目，保守顯示為不支援。": ["Results apply only to the listed formats and sizes. Failed or unconfirmed tests are conservatively shown as unsupported.", "結果は記載の形式とサイズに限ります。失敗または未確認の項目は保守的に非対応と表示します。", "결과는 표시된 형식과 크기에 한정됩니다. 실패하거나 확인되지 않은 항목은 보수적으로 미지원으로 표시합니다."],
-  "格式 / 尺寸": ["Format / dimensions","形式 / サイズ","형식 / 크기"],
-  "編碼結果": ["Encoding result","エンコード結果","인코딩 결과"],
-  "解碼結果": ["Decoding result","デコード結果","디코딩 결과"],
-  "實測未通過": ["Probe unsuccessful","実測不成功","실측 실패"],
-  "硬體加速可用": ["Hardware acceleration available","ハードウェア高速化が利用可能","하드웨어 가속 사용 가능"],
-  "軟體運算": ["Software processing","ソフトウェア処理","소프트웨어 연산"],
-  "可用 (加速未知)": ["Available; acceleration unknown","利用可能、高速化方式は不明","사용 가능, 가속 방식 알 수 없음"],
+  "安裝測試版本": [
+    "Install test version",
+    "テスト版をインストール",
+    "테스트 버전 설치"
+  ],
+  "目前沒有可取得的測試版本。": [
+    "No prerelease is currently available.",
+    "現在入手できるテスト版はありません。",
+    "현재 설치할 수 있는 테스트 버전이 없습니다."
+  ],
+  "測試版本可能尚未穩定，請確認後安裝。": [
+    "This is a prerelease. Confirm before installing.",
+    "テスト版です。内容を確認してからインストールしてください。",
+    "테스트 버전입니다. 확인 후 설치하세요."
+  ],
+  "請先開啟強制更新。": [
+    "Enable force update first.",
+    "先に強制更新を有効にしてください。",
+    "먼저 강제 업데이트를 켜세요."
+  ],
+  "確定": [
+    "OK",
+    "OK",
+    "확인"
+  ],
+  "遠端桌面已連線": [
+    "Remote desktop connected",
+    "リモートデスクトップ接続済み",
+    "원격 데스크톱 연결됨"
+  ],
+  "遠端桌面連線中": [
+    "Connecting to remote desktop",
+    "リモートデスクトップに接続中",
+    "원격 데스크톱 연결 중"
+  ],
+  "顯示站台 QR Code": [
+    "Show site QR code",
+    "サイトの QR コードを表示",
+    "사이트 QR 코드 표시"
+  ],
+  "站台 QR Code": [
+    "Site QR code",
+    "サイト QR コード",
+    "사이트 QR 코드"
+  ],
+  "正在產生 QR Code…": [
+    "Generating QR code…",
+    "QR コードを生成中…",
+    "QR 코드 생성 중…"
+  ],
+  "包含站台名稱、ID 與伺服器位址，不含連線密碼。": [
+    "Includes the site name, ID and server address, without the connection password.",
+    "サイト名、ID、サーバーアドレスを含みます。接続パスワードは含みません。",
+    "사이트 이름, ID, 서버 주소를 포함하며 연결 비밀번호는 포함하지 않습니다."
+  ],
+  "複製站台連結": [
+    "Copy site link",
+    "サイトリンクをコピー",
+    "사이트 링크 복사"
+  ],
+  "站台連結已複製": [
+    "Site link copied",
+    "サイトリンクをコピーしました",
+    "사이트 링크 복사됨"
+  ],
+  "目前站台資料無法產生 QR Code": [
+    "Cannot generate a QR code for this site",
+    "このサイトの QR コードを生成できません",
+    "이 사이트의 QR 코드를 생성할 수 없습니다"
+  ],
+  "站台資料過長，無法產生 QR Code": [
+    "Site data is too long for a QR code",
+    "サイト情報が長すぎます",
+    "사이트 데이터가 너무 깁니다"
+  ],
+  "QR Code 產生失敗": [
+    "QR code generation failed",
+    "QR コードの生成に失敗しました",
+    "QR 코드 생성 실패"
+  ],
+  "封包分析": [
+    "Packet analysis",
+    "パケット分析",
+    "패킷 분석"
+  ],
+  "請先開啟封包分析": [
+    "Enable packet analysis first",
+    "先にパケット分析を有効にしてください",
+    "먼저 패킷 분석을 켜세요"
+  ],
+  "請在遠端開啟封包分析": [
+    "Enable packet analysis on the remote device",
+    "リモート端末でパケット分析を有効にしてください",
+    "원격 장치에서 패킷 분석을 켜세요"
+  ],
+  "封包分析已關閉": [
+    "Packet analysis is off",
+    "パケット分析は無効です",
+    "패킷 분석이 꺼져 있습니다"
+  ],
+  "低延遲": [
+    "Low latency",
+    "低遅延",
+    "낮은 지연 시간"
+  ],
+  "傳輸策略": [
+    "Transmission strategy",
+    "伝送方針",
+    "전송 전략"
+  ],
+  "均衡": [
+    "Balanced",
+    "バランス",
+    "균형"
+  ],
+  "省頻寬": [
+    "Save bandwidth",
+    "帯域節約",
+    "대역폭 절약"
+  ],
+  "自動編碼的選擇偏好；變更會重新建立目前連線。": [
+    "Automatic codec preference; changing this reconnects the current session.",
+    "自動コーデックの優先設定。変更すると現在の接続を再確立します。",
+    "자동 코덱 우선 설정입니다. 변경하면 현재 연결을 다시 설정합니다."
+  ],
+  "結果": [
+    "Result",
+    "結果",
+    "결과"
+  ],
+  "後端": [
+    "Backend",
+    "バックエンド",
+    "백엔드"
+  ],
+  "耗時": [
+    "Elapsed",
+    "所要時間",
+    "소요 시간"
+  ],
+  "編碼實測": [
+    "Encoding test",
+    "エンコードテスト",
+    "인코딩 테스트"
+  ],
+  "解碼實測": [
+    "Decoding test",
+    "デコードテスト",
+    "디코딩 테스트"
+  ],
+  "格式 / 輸出": [
+    "Format / Output",
+    "形式 / 出力",
+    "형식 / 출력"
+  ],
+  "格式 / 輸入": [
+    "Format / Input",
+    "形式 / 入力",
+    "형식 / 입력"
+  ],
+  "格式 / 輸出 / 尺寸": [
+    "Format / Output / Size",
+    "形式 / 出力 / サイズ",
+    "형식 / 출력 / 크기"
+  ],
+  "格式 / 輸入 / 尺寸": [
+    "Format / Input / Size",
+    "形式 / 入力 / サイズ",
+    "형식 / 입력 / 크기"
+  ],
+  "Windows 原生格式": [
+    "Windows native format",
+    "Windows ネイティブ形式",
+    "Windows 네이티브 형식"
+  ],
+  "軟體獨立測試": [
+    "Independent software test",
+    "ソフトウェア独立テスト",
+    "독립 소프트웨어 테스트"
+  ],
+  "優先圖形 API": [
+    "Preferred graphics API",
+    "優先グラフィックス API",
+    "우선 그래픽 API"
+  ],
+  "記憶體": [
+    "Memory",
+    "メモリ",
+    "메모리"
+  ],
+  "編解碼分析": [
+    "Codec analysis",
+    "コーデック分析",
+    "코덱 분석"
+  ],
+  "未確認": [
+    "Unconfirmed",
+    "未確認",
+    "미확인"
+  ],
+  "尚未開始偵測": [
+    "Detection not started",
+    "検出未開始",
+    "감지 시작 전"
+  ],
+  "偵測中": [
+    "Detecting",
+    "検出中",
+    "감지 중"
+  ],
+  "偵測完成": [
+    "Detection complete",
+    "検出完了",
+    "감지 완료"
+  ],
+  "部分偵測未完成": [
+    "Detection partially complete",
+    "一部の検出が未完了",
+    "일부 감지 미완료"
+  ],
+  "偵測未完成": [
+    "Detection incomplete",
+    "検出未完了",
+    "감지 미완료"
+  ],
+  "偵測已取消": [
+    "Detection cancelled",
+    "検出をキャンセルしました",
+    "감지 취소됨"
+  ],
+  "等待偵測": [
+    "Pending detection",
+    "検出待ち",
+    "감지 대기"
+  ],
+  "硬體概況": [
+    "Hardware overview",
+    "ハードウェア概要",
+    "하드웨어 개요"
+  ],
+  "邏輯處理器": [
+    "Logical processors",
+    "論理プロセッサ",
+    "논리 프로세서"
+  ],
+  "加速指令集": [
+    "Acceleration instruction sets",
+    "高速化命令セット",
+    "가속 명령어 집합"
+  ],
+  "偵測結果": [
+    "Detection results",
+    "検出結果",
+    "감지 결과"
+  ],
+  "編解碼實測": [
+    "Codec probe results",
+    "コーデック実測結果",
+    "코덱 실측 결과"
+  ],
+  "結果僅代表列出的格式與尺寸；實測未通過或未確認的項目，保守顯示為不支援。": [
+    "Results apply only to the listed formats and sizes. Failed or unconfirmed tests are conservatively shown as unsupported.",
+    "結果は記載の形式とサイズに限ります。失敗または未確認の項目は保守的に非対応と表示します。",
+    "결과는 표시된 형식과 크기에 한정됩니다. 실패하거나 확인되지 않은 항목은 보수적으로 미지원으로 표시합니다."
+  ],
+  "格式 / 尺寸": [
+    "Format / dimensions",
+    "形式 / サイズ",
+    "형식 / 크기"
+  ],
+  "編碼結果": [
+    "Encoding result",
+    "エンコード結果",
+    "인코딩 결과"
+  ],
+  "解碼結果": [
+    "Decoding result",
+    "デコード結果",
+    "디코딩 결과"
+  ],
+  "實測未通過": [
+    "Probe unsuccessful",
+    "実測不成功",
+    "실측 실패"
+  ],
+  "硬體加速可用": [
+    "Hardware acceleration available",
+    "ハードウェア高速化が利用可能",
+    "하드웨어 가속 사용 가능"
+  ],
+  "軟體運算": [
+    "Software processing",
+    "ソフトウェア処理",
+    "소프트웨어 연산"
+  ],
+  "可用 (加速未知)": [
+    "Available; acceleration unknown",
+    "利用可能、高速化方式は不明",
+    "사용 가능, 가속 방식 알 수 없음"
+  ],
   "正在最佳化中": [
     "Optimizing…",
     "最適化しています…",
@@ -1061,7 +1304,12 @@
     "リモート接続が終了しました。ネットワークとリモート端末を確認して再試行してください。",
     "원격 연결이 종료되었습니다. 네트워크와 원격 장치를 확인한 후 다시 시도하세요."
   ],
-  "更新重點": ["更新重點", "Update highlights", "更新内容", "업데이트 주요 내용"],
+  "更新重點": [
+    "更新重點",
+    "Update highlights",
+    "更新内容",
+    "업데이트 주요 내용"
+  ],
   "發現新版本": [
     "New version available",
     "新しいバージョンがあります",
@@ -1592,10 +1840,10 @@
     "2× 補間（Apple 低遅延）",
     "2× 보간 (Apple 저지연)"
   ],
-  "Apple 補幀需要支援的 Mac 與 macOS 26 以上": [
-    "Apple interpolation requires a supported Mac and macOS 26 or later",
-    "Apple 補間には対応 Mac と macOS 26 以降が必要です",
-    "Apple 보간은 지원되는 Mac과 macOS 26 이상이 필요합니다"
+  "Apple 補幀需要支援的 Mac 與 macOS 27 以上": [
+    "Apple interpolation requires a supported Mac and macOS 27 or later",
+    "Apple 補間には対応 Mac と macOS 27 以降が必要です",
+    "Apple 보간은 지원되는 Mac과 macOS 27 이상이 필요합니다"
   ],
   "連線測速與分析": [
     "Connection speed and analysis",
@@ -2672,11 +2920,31 @@
     "ログイン前に自動起動",
     "로그인 전 자동 시작"
   ],
-  "預設顯示啟動時的偵測結果；長按「深度測試」一秒，重新執行全部測試項目。指令集可用不代表目前編解碼路徑已採用；實際傳輸也需配合對方的解碼能力。": ["Shows startup results by default. Hold Deep test for one second to rerun every test. Available instruction sets may not be used by the current codec; transmission also depends on the remote decoder.", "初期表示は起動時の検出結果です。「詳細テスト」を1秒間押すと全項目を再実行します。利用可能な命令セットが現在使用されているとは限りません。送信は相手側のデコード能力にも依存します。", "기본적으로 시작 시 감지 결과를 표시합니다. 상세 테스트를 1초간 누르면 모든 항목을 다시 실행합니다. 사용 가능한 명령어 집합이 현재 사용되는 것은 아니며 전송은 상대 디코더에도 의존합니다."],
-  "深度測試": ["Deep test", "詳細テスト", "상세 테스트"],
-  "深度測試進度": ["Deep test progress", "詳細テストの進捗", "상세 테스트 진행률"],
-  "正在啟動深度測試…": ["Starting deep test…", "詳細テストを開始中…", "상세 테스트 시작 중…"],
-  "按住一秒，重新測試完整清單。測試期間可能影響效能。": ["Hold for one second to rerun all tests. Testing may affect performance.", "1秒間押すと全項目を再テストします。テスト中は性能に影響する場合があります。", "1초간 누르면 모든 테스트를 다시 실행합니다. 테스트 중 성능에 영향을 줄 수 있습니다."],
+  "預設顯示啟動時的偵測結果；長按「深度測試」一秒，重新執行全部測試項目。指令集可用不代表目前編解碼路徑已採用；實際傳輸也需配合對方的解碼能力。": [
+    "Shows startup results by default. Hold Deep test for one second to rerun every test. Available instruction sets may not be used by the current codec; transmission also depends on the remote decoder.",
+    "初期表示は起動時の検出結果です。「詳細テスト」を1秒間押すと全項目を再実行します。利用可能な命令セットが現在使用されているとは限りません。送信は相手側のデコード能力にも依存します。",
+    "기본적으로 시작 시 감지 결과를 표시합니다. 상세 테스트를 1초간 누르면 모든 항목을 다시 실행합니다. 사용 가능한 명령어 집합이 현재 사용되는 것은 아니며 전송은 상대 디코더에도 의존합니다."
+  ],
+  "深度測試": [
+    "Deep test",
+    "詳細テスト",
+    "상세 테스트"
+  ],
+  "深度測試進度": [
+    "Deep test progress",
+    "詳細テストの進捗",
+    "상세 테스트 진행률"
+  ],
+  "正在啟動深度測試…": [
+    "Starting deep test…",
+    "詳細テストを開始中…",
+    "상세 테스트 시작 중…"
+  ],
+  "按住一秒，重新測試完整清單。測試期間可能影響效能。": [
+    "Hold for one second to rerun all tests. Testing may affect performance.",
+    "1秒間押すと全項目を再テストします。テスト中は性能に影響する場合があります。",
+    "1초간 누르면 모든 테스트를 다시 실행합니다. 테스트 중 성능에 영향을 줄 수 있습니다."
+  ],
   "長時間未操作自動關閉": [
     "Automatically close when idle",
     "長時間操作がない場合は自動終了",
@@ -2696,5 +2964,25 @@
     "Keep the window open and reconnect in the background. Close after three failed attempts. Cannot be enabled together with closing windows on disconnect.",
     "切断後もウィンドウを保持してバックグラウンドで再接続します。3回失敗すると閉じます。切断時の自動終了とは同時に有効にできません。",
     "연결 종료 후 창을 유지하고 백그라운드에서 재연결합니다. 세 번 실패하면 창을 닫습니다. 연결 종료 시 자동 닫기와 동시에 켤 수 없습니다."
+  ],
+  "授權 Ctrl+Alt+Del": [
+    "Authorize Ctrl+Alt+Del",
+    "Ctrl+Alt+Del を許可",
+    "Ctrl+Alt+Del 권한 허용"
+  ],
+  "授權": [
+    "Authorize",
+    "許可",
+    "허용"
+  ],
+  "允許 YourDesk 服務傳送 Ctrl+Alt+Del？接著會要求 Windows 管理員授權。": [
+    "Allow the YourDesk service to send Ctrl+Alt+Del? Windows will ask for administrator approval.",
+    "YourDesk サービスによる Ctrl+Alt+Del の送信を許可しますか？Windows の管理者承認が必要です。",
+    "YourDesk 서비스가 Ctrl+Alt+Del을 전송하도록 허용할까요? Windows 관리자 승인이 필요합니다."
+  ],
+  "允許 YourDesk 傳送 Ctrl+Alt+Del？將啟用登入前連線服務及開機自動啟動，接著會要求 Windows 管理員授權。": [
+    "Allow YourDesk to send Ctrl+Alt+Del? This enables the pre-login service and startup at boot. Windows will ask for administrator approval.",
+    "YourDesk に Ctrl+Alt+Del の送信を許可しますか？ログイン前接続サービスと起動時の自動実行を有効にします。Windows の管理者承認が必要です。",
+    "YourDesk의 Ctrl+Alt+Del 전송을 허용할까요? 로그인 전 연결 서비스와 부팅 시 자동 시작이 활성화되며 Windows 관리자 승인이 필요합니다."
   ]
 }

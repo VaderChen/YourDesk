@@ -99,7 +99,6 @@ func runAgent(parent context.Context) error {
 	var host *serviceChild
 	var hostDone <-chan struct{}
 	var events chan serviceEvent
-	var desktop string
 	var generation uint64
 	var eventCancel context.CancelFunc
 	stopHost := func() {
@@ -144,17 +143,12 @@ func runAgent(parent context.Context) error {
 			if windows.WTSGetActiveConsoleSessionId() != session {
 				return nil
 			}
-			name, err := inputDesktopName()
-			if err != nil {
-				if host != nil {
-					stopHost()
-				}
+			// 桌面切換由擷取及輸入的固定執行緒處理；保留 Host 與 P2P 工作階段。
+			if host != nil {
 				continue
 			}
-			if host != nil && !strings.EqualFold(name, desktop) {
-				stopHost()
-			}
-			if host != nil {
+			name, err := inputDesktopName()
+			if err != nil {
 				continue
 			}
 			host, err = startServiceChild(session, name, args)
@@ -162,7 +156,7 @@ func runAgent(parent context.Context) error {
 				slog.Warn("桌面代理等待重試", "error", err)
 				continue
 			}
-			desktop, hostDone = name, host.done
+			hostDone = host.done
 			var eventContext context.Context
 			eventContext, eventCancel = context.WithCancel(ctx)
 			events = make(chan serviceEvent, 16)

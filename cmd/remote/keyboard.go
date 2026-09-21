@@ -16,7 +16,7 @@ func (g *game) releaseRawKeys(reason string) {
 }
 func (g *game) updateRawKeys() bool {
 	supported := g.rawSupported.Load() && rawKeyboardAvailable()
-	enabled := !g.crop.blockInput() && supported && !nativeTitlebarPopupOpen() && ebiten.IsFocused() && g.controlEnabled && g.displayInputReady()
+	enabled := !g.virtualKeyboardOpen() && !g.crop.blockInput() && supported && !nativeTitlebarPopupOpen() && ebiten.IsFocused() && g.controlEnabled && g.displayInputReady()
 	events := captureRawKeys(enabled)
 	if enabled && !g.rawActive {
 		// 能力協商完成時，釋放舊協定留下的按鍵狀態。

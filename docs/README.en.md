@@ -10,7 +10,7 @@ YourDesk is a remote desktop app for macOS and Windows. Connect to another compu
 
 ## Features
 
-**1.26.0915 build 1524 fixes remote-file paste on a local Mac.** The app checks network-volume access before publishing files to Finder. The user confirmed that pasting works again. Only the receiving Mac needs this fix; allow Network Volumes access if prompted, then copy again. See the [release notes](RELEASE-1.26.0915-build-1524.md).
+**1.26.0921 build 1641** — Fix remote Windows Ctrl+Alt+Del and keep connections across secure-desktop changes; re-enable existing pre-login services to update them. [English](RELEASE-1.26.0921-build-1641.md)
 
 - **GUI and command-line modes:** choose remote desktop or an interactive terminal for your task. Terminals use independent windows and can connect to Linux CLI Hosts.
 - **Remote control through MCP AI agents:** AI agents can connect through MCP, operate the desktop or terminal, query site capabilities and disconnect when finished.
@@ -60,7 +60,7 @@ On macOS, allow Screen Recording and Accessibility permissions. When receiving r
 
 Screen enhancement reduces the transmitted image size and enlarges it locally. User feedback shows greater benefits on higher-resolution remote desktops, especially 1440p and 4K. Choose FSR or Core ML according to device support.
 
-Experimental **2× interpolation** can improve motion smoothness on Apple Silicon with macOS 13 or later. Choose Apple low-latency interpolation or RIFE; Auto prefers Apple on supported Macs running macOS 26 or later. Enhancement and interpolation both default to off. Results depend on your devices and network; fast motion and small text may show artifacts.
+Experimental **2× interpolation** can improve motion smoothness on Apple Silicon with macOS 13 or later. Choose Apple low-latency interpolation or RIFE; Auto prefers Apple on supported Macs running macOS 27 or later. Enhancement and interpolation both default to off. Results depend on your devices and network; fast motion and small text may show artifacts.
 
 ## Everyday use and updates
 

@@ -8,6 +8,8 @@ int yd_fullscreen_requested(void);
 void yd_toggle_fullscreen(void);
 int yd_fullscreen_transitioning(void);
 void yd_confirm_crop(void);
+void yd_virtual_keyboard(const char *json);
+void yd_input_notice(const char *json);
 void yd_system_shortcut(const char *label, int secure, int remote);
 void yd_cancel_system_shortcut(void);
 void yd_set_crop(int state, const char *message);
@@ -17,6 +19,7 @@ void yd_configure_titlebar(const char *html);
 void yd_set_displays(int index, int count, int pending);
 #include <stdlib.h>
 int yd_titlebar_action(void);
+int yd_virtual_keyboard_hit(void);
 void yd_set_titlebar_mode(int mode);
 void yd_set_codec_status(const char *codec,const char *source,const char *receiver);
 void yd_set_traffic(double tx, double rx, double fps, int render);
@@ -87,7 +90,8 @@ func nativeSetCodecStatus(codec, source, receiver string) {
 
 func nativeShowCloseConfirmation() { C.yd_show_close_confirmation() }
 
-func nativeTitlebarPopupOpen() bool { return false }
+func nativeVirtualKeyboardPointerOver() bool { return C.yd_virtual_keyboard_hit() != 0 }
+func nativeTitlebarPopupOpen() bool          { return false }
 
 func nativePrepareViewerWindow() {}
 
@@ -109,6 +113,13 @@ func nativeSetCrop(state int, message string) {
 
 func nativeConfirmCrop() { C.yd_confirm_crop() }
 
+func nativeShowVirtualKeyboard(payload string) bool {
+	value := C.CString(payload)
+	defer C.free(unsafe.Pointer(value))
+	C.yd_virtual_keyboard(value)
+	return true
+}
+
 func nativeShowSystemShortcut(label string, secure, remote bool) bool {
 	value := C.CString(label)
 	defer C.free(unsafe.Pointer(value))
@@ -124,3 +135,10 @@ func nativeShowSystemShortcut(label string, secure, remote bool) bool {
 	return true
 }
 func nativeCancelSystemShortcut() { C.yd_cancel_system_shortcut() }
+
+func nativeShowInputNotice(message string) {
+	data, _ := json.Marshal(message)
+	value := C.CString(string(data))
+	defer C.free(unsafe.Pointer(value))
+	C.yd_input_notice(value)
+}

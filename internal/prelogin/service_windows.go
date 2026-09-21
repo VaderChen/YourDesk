@@ -39,7 +39,7 @@ func servicePaths() (root, executable string, err error) {
 }
 
 func Status() State {
-	s := State{Supported: true, Message: serviceHint}
+	s := State{Supported: true, Message: serviceHint, SASSupported: true, SASAllowed: secureAttentionPolicyAllowed()}
 	// WinPE 不安裝持久服務。
 	if key, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\CurrentControlSet\Control\MiniNT`, registry.QUERY_VALUE); err == nil {
 		key.Close()
@@ -65,6 +65,28 @@ func Status() State {
 }
 
 func Configure(ctx context.Context, enabled bool, c Config) error {
+	return configureWindows(ctx, enabled, c, false)
+}
+func ConfigureSecureAttention(ctx context.Context, c Config) error {
+	state := Status()
+	if !state.SASSupported {
+		return errors.New("這台電腦不支援 Ctrl+Alt+Del 授權。")
+	}
+	var err error
+	if state.Enabled {
+		err = elevateWindows(ctx, "sas-enable", "")
+	} else {
+		err = configureWindows(ctx, true, c, true)
+	}
+	if err != nil {
+		return errors.New("Ctrl+Alt+Del 授權未完成；請確認管理員允許，並檢查系統管理原則。")
+	}
+	if !Status().SASAllowed {
+		return errors.New("Windows 原則仍未允許服務產生 Ctrl+Alt+Del，請洽系統管理員。")
+	}
+	return nil
+}
+func configureWindows(ctx context.Context, enabled bool, c Config, sas bool) error {
 	if !Status().Supported {
 		return errors.New(Status().Message)
 	}
@@ -93,6 +115,9 @@ func Configure(ctx context.Context, enabled bool, c Config) error {
 			return errors.New(serviceFailed)
 		}
 		mode = "install"
+		if sas {
+			mode = "install-sas"
+		}
 	}
 	if err := elevateWindows(ctx, mode, path); err != nil {
 		slog.Warn("登入前服務操作未完成", "operation", mode, "error", err)

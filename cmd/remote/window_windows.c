@@ -9,6 +9,7 @@
 static HWND viewer, chrome;
 static LONG_PTR originalStyle, normalStyle;
 static WINDOWPLACEMENT placement;
+static int keyboardOpen;
 static int active, fullscreen, shown=1, popupOpen, previousWidth, previousHeight, comReady;
 static double popupX,popupY,popupW,popupH;
 static ULONGLONG edgeSince,leaveSince;
@@ -122,7 +123,7 @@ void yd_win_destroy(void) {
  if(comReady) {CoUninitialize();comReady=0;}
 }
 void yd_win_popup(double x,double y,double width,double height) {
- popupX=x;popupY=y;popupW=width;popupH=height;popupOpen=width>0 && height>0;
+ popupX=x;popupY=y;popupW=width;popupH=height;popupOpen=width>0 && height>0;if(!popupOpen)keyboardOpen=0;
  // 下次 tick 重算裁切區，選單之外仍可操作遠端畫面。
  regionDirty=1;
 }
@@ -165,7 +166,7 @@ int yd_win_tick(void) {
   previousWidth=client.right;previousHeight=height;lastRegion=popup;regionDirty=0;
  }
  int down=(GetAsyncKeyState(VK_LBUTTON)&0x8000)!=0;
- int outside=popupOpen && ((!foreground) || (down&&!previousDown && point.y>=header && !PtInRect(&popup,point)));
+ int outside=popupOpen && !keyboardOpen && ((!foreground) || (down&&!previousDown && point.y>=header && !PtInRect(&popup,point)));
  previousDown=down;
  return (fullscreen?1:0)|(shown?2:0)|(IsZoomed(viewer)?4:0)|(outside?8:0);
 }
@@ -221,3 +222,12 @@ int yd_win_menu_show(void *menu,double x,double y) {
  return result;
 }
 void yd_win_menu_destroy(void *menu) {if(menu) DestroyMenu((HMENU)menu);}
+
+// 鍵盤浮層持續開啟；只在游標位於其範圍內時阻擋遠端滑鼠。
+
+void yd_win_keyboard(int open) { keyboardOpen=open; }
+int yd_win_keyboard_hit(void) {
+ if(!keyboardOpen || !popupOpen || !IsWindow(chrome))return 0;
+ POINT point;GetCursorPos(&point);ScreenToClient(viewer,&point);double dpi=scale();
+ return point.x>=popupX*dpi && point.x<(popupX+popupW)*dpi && point.y>=popupY*dpi && point.y<(popupY+popupH)*dpi;
+}

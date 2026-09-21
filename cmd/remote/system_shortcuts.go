@@ -60,16 +60,16 @@ func (g *game) updateSystemShortcut() (bool, error) {
 	}
 	captureRawKeys(false)
 	if d.decision == 0 {
-		return true, nil
+		return d.request.Key != "virtual-keyboard", nil
 	}
-	if !nativeSystemShortcutReleased(d.request.Key, d.request.Modifiers) ||
+	if (d.request.Key != "virtual-keyboard" && !nativeSystemShortcutReleased(d.request.Key, d.request.Modifiers)) ||
 		ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) ||
 		ebiten.IsKeyPressed(ebiten.KeyEnter) || ebiten.IsKeyPressed(ebiten.KeyEscape) {
 		return true, nil
 	}
 	g.systemShortcut = nil
 	nativeSystemShortcutGuard(false)
-	if d.decision == shortcutCancel || d.request.Secure {
+	if d.decision == shortcutCancel || (d.request.Secure && d.decision == shortcutLocal) {
 		return true, nil
 	}
 	if d.decision == shortcutLocal {
@@ -95,6 +95,10 @@ func (g *game) updateSystemShortcut() (bool, error) {
 	g.mu.RUnlock()
 	if d.decision != shortcutRemote || g.peer != d.peer || g.peer == nil || !g.peer.Connected() ||
 		!g.controlEnabled || !g.displayInputReady() || !sameView {
+		return true, nil
+	}
+	if d.request.Secure {
+		g.sendSecureAttention()
 		return true, nil
 	}
 	for _, e := range d.request.Chord() {

@@ -11,6 +11,7 @@ static atomic_bool fullscreenRequested = false;
 static atomic_bool fullscreenTransitioning = false;
 static NSInteger pendingMenuAction = 0;
 static atomic_int titlebarAction = 0;
+static NSMutableArray<NSNumber *> *virtualKeyActions;
 static atomic_int titlebarMode = 0;
 static int cropState = 0;
 static NSString *cropMessage = @"";
@@ -24,11 +25,26 @@ static WKWebView *titlebarWeb;
 static NSPanel *cropPanel;
 static NSPanel *systemShortcutPanel;
 static NSUInteger systemShortcutGeneration;
+static NSPoint keyboardDragOrigin;
+static BOOL keyboardDragging=NO;
+static CGRect keyboardHitRect;
+static NSMutableArray *keyboardFrameObservers;
+// AppKit 主執行緒發布位置快照；畫面執行緒只讀快照，不等待主事件迴圈。
+static void ydPublishKeyboardFrame(void) {
+ NSRect frame=systemShortcutPanel.frame;
+ CGFloat top=NSMaxY(NSScreen.screens.firstObject.frame);
+ @synchronized(NSApplication.class) { keyboardHitRect=CGRectMake(frame.origin.x,top-NSMaxY(frame),frame.size.width,frame.size.height); }
+}
 static void ydCloseShortcutPanel(void) {
+ for(id observer in keyboardFrameObservers)[NSNotificationCenter.defaultCenter removeObserver:observer];
+ [keyboardFrameObservers release];keyboardFrameObservers=nil;
+ @synchronized(NSApplication.class) { keyboardHitRect=CGRectZero; }
+ @synchronized(NSApplication.class) { [virtualKeyActions removeAllObjects]; }
  if (!systemShortcutPanel) return;
  NSPanel *panel=systemShortcutPanel;systemShortcutPanel=nil;
- NSWindow *parent=panel.sheetParent;
- [parent endSheet:panel];[panel orderOut:nil];[panel release];
+ NSWindow *parent=panel.sheetParent ?: panel.parentWindow;
+ keyboardDragging=NO;
+ if(panel.sheetParent)[parent endSheet:panel];else [parent removeChildWindow:panel];[panel orderOut:nil];[panel release];
  yd_keyboard_suspend(0);[parent makeFirstResponder:parent.contentView];
 }
 static NSView *titlebarControls;
@@ -123,6 +139,8 @@ static void ydUpdateTitlebar(void) {
         BOOL fullscreen = atomic_load(&fullscreenActive);
         addItem(fullscreen ? @"離開全螢幕" : @"進入全螢幕", 4, fullscreen, YES);
     } else if ([body[@"menu"] isEqual:@"shortcuts"]) {
+        addItem(@"虛擬鍵盤",56,NO,YES);
+        [menu addItem:[NSMenuItem separatorItem]];
         addItem(@"Cmd+Q",51,NO,YES);
         addItem(@"Cmd+W",50,NO,YES);
         addItem(@"Ctrl+Alt+Del",55,NO,YES);
@@ -150,6 +168,43 @@ static void ydUpdateTitlebar(void) {
     if (!message.frameInfo.mainFrame) return;
     if ([message.body isKindOfClass:[NSDictionary class]]) {
         NSDictionary *body = message.body;
+        if(systemShortcutPanel && !systemShortcutPanel.sheetParent && message.webView==systemShortcutPanel.contentView){
+          NSPanel *panel=systemShortcutPanel;
+          NSRect screen=(panel.screen ?: titlebarWeb.window.screen).visibleFrame;
+          if([body[@"keyboardHeight"] isKindOfClass:NSNumber.class]){
+            CGFloat height=[body[@"keyboardHeight"] doubleValue];
+            if(isfinite(height)&&height>=180&&height<=450&&fabs(panel.contentView.frame.size.height-height)>1){
+              CGFloat top=NSMaxY(panel.frame);[panel setContentSize:NSMakeSize(panel.contentView.frame.size.width,height)];
+              [panel setFrameOrigin:NSMakePoint(panel.frame.origin.x,top-panel.frame.size.height)];
+            }
+            return;
+          }
+          if([body[@"keyboardLayout"] isKindOfClass:NSString.class]){
+            CGFloat width=[body[@"keyboardLayout"] isEqual:@"numeric"]?300:MIN(1080,screen.size.width-40);
+            [panel setContentSize:NSMakeSize(width,panel.contentView.frame.size.height)];
+            NSPoint origin=panel.frame.origin;origin.x=MAX(NSMinX(screen),MIN(origin.x,NSMaxX(screen)-panel.frame.size.width));
+            [panel setFrameOrigin:origin];return;
+          }
+          if([body[@"keyboardDrag"] isKindOfClass:NSString.class]){
+            NSString *phase=body[@"keyboardDrag"];
+            if([phase isEqual:@"start"]){keyboardDragOrigin=panel.frame.origin;keyboardDragging=YES;}
+            else if([phase isEqual:@"end"])keyboardDragging=NO;
+            else if([phase isEqual:@"move"] && keyboardDragging && [body[@"dx"] isKindOfClass:NSNumber.class] && [body[@"dy"] isKindOfClass:NSNumber.class]){
+              CGFloat dx=[body[@"dx"] doubleValue],dy=[body[@"dy"] doubleValue];
+              if(isfinite(dx)&&isfinite(dy)) [panel setFrameOrigin:NSMakePoint(MAX(NSMinX(screen),MIN(keyboardDragOrigin.x+dx,NSMaxX(screen)-panel.frame.size.width)),MAX(NSMinY(screen),MIN(keyboardDragOrigin.y-dy,NSMaxY(screen)-panel.frame.size.height)))];
+            }
+            return;
+          }
+        }
+        if (systemShortcutPanel && systemShortcutPanel.sheetParent && message.webView == systemShortcutPanel.contentView && [body[@"shortcutHeight"] isKindOfClass:NSNumber.class]) {
+            CGFloat height=[body[@"shortcutHeight"] doubleValue];
+            if (isfinite(height)) {
+                height=MIN(500,MAX(140,height));
+                if (fabs(systemShortcutPanel.contentView.frame.size.height-height)>1)
+                    [systemShortcutPanel setContentSize:NSMakeSize(480,height)];
+            }
+            return;
+        }
         if (cropPanel && message.webView == cropPanel.contentView && [body[@"cropHeight"] isKindOfClass:[NSNumber class]]) {
             CGFloat height=MIN(400,MAX(140,[body[@"cropHeight"] doubleValue]));
             if (fabs(cropPanel.contentView.frame.size.height-height)>1) [cropPanel setContentSize:NSMakeSize(440,height)];
@@ -249,6 +304,13 @@ static void ydUpdateTitlebar(void) {
     if (![message.body isKindOfClass:[NSNumber class]]) return;
     [titlebarTooltip close];
     int action = [message.body intValue];
+    if(action>=1000 && action<66536 && systemShortcutPanel && message.webView==systemShortcutPanel.contentView) {
+      @synchronized(NSApplication.class) {
+        if(!virtualKeyActions) virtualKeyActions=[NSMutableArray new];
+        if(virtualKeyActions.count<128) [virtualKeyActions addObject:@(action)];
+      }
+      return;
+    }
     if ((action==40 || action==41 || action==42) && systemShortcutPanel && message.webView==systemShortcutPanel.contentView) {
       ydCloseShortcutPanel();atomic_store(&titlebarAction,action);return;
     }
@@ -258,7 +320,7 @@ static void ydUpdateTitlebar(void) {
     }
     if (action == 7) [titlebarWeb.window miniaturize:nil];
     else if (action >= 100 && action < 104 && action-100 < atomic_load(&displayCount) && !atomic_load(&displayPending)) atomic_store(&titlebarAction, action);
-    else if ((action >= 1 && action <= 6) || action==13 || action==14 || action==50 || action==51 || action==52 || action==53 || action==55) atomic_store(&titlebarAction, action);
+    else if ((action >= 1 && action <= 6) || action==13 || action==14 || action==50 || action==51 || action==52 || action==53 || action==55 || action==56) atomic_store(&titlebarAction, action);
     // 按下 HTML 按鈕後，鍵盤焦點交還遠端畫布。
     [titlebarWeb.window makeFirstResponder:titlebarWeb.window.contentView];
 }
@@ -351,7 +413,14 @@ void yd_configure_titlebar(const char *html) {
     [page release];
 }
 
-int yd_titlebar_action(void) { return atomic_exchange(&titlebarAction, 0); }
+int yd_titlebar_action(void) {
+ int action=atomic_exchange(&titlebarAction,0);
+ if(action)return action;
+ @synchronized(NSApplication.class) {
+  if(virtualKeyActions.count){action=virtualKeyActions[0].intValue;[virtualKeyActions removeObjectAtIndex:0];}
+ }
+ return action;
+}
 void yd_set_titlebar_mode(int mode) {
     if (atomic_exchange(&titlebarMode, mode) != mode) dispatch_async(dispatch_get_main_queue(), ^{ ydUpdateTitlebar(); });
 }
@@ -541,22 +610,22 @@ void yd_system_shortcut(const char *label, int secure, int remote) {
    [titlebarWeb evaluateJavaScript:[NSString stringWithFormat:@"window.systemShortcutDocument(%@)",json] completionHandler:^(id html,NSError *error){
     if(generation!=systemShortcutGeneration)return;
     if(error || ![html isKindOfClass:NSString.class] || !parent){atomic_store(&titlebarAction,42);return;}
-    systemShortcutPanel=[[NSPanel alloc] initWithContentRect:NSMakeRect(0,0,480,300) styleMask:NSWindowStyleMaskTitled backing:NSBackingStoreBuffered defer:NO];
+    systemShortcutPanel=[[NSPanel alloc] initWithContentRect:NSMakeRect(0,0,480,180) styleMask:NSWindowStyleMaskTitled backing:NSBackingStoreBuffered defer:NO];
     systemShortcutPanel.title=ydText(@"快捷鍵要作用在哪裡？");
-    WKWebView *web=[[WKWebView alloc] initWithFrame:NSMakeRect(0,0,480,300) configuration:titlebarWeb.configuration];
+    WKWebView *web=[[WKWebView alloc] initWithFrame:NSMakeRect(0,0,480,180) configuration:titlebarWeb.configuration];
     systemShortcutPanel.contentView=web;[web loadHTMLString:html baseURL:nil];[web release];
     yd_keyboard_suspend(1);[parent beginSheet:systemShortcutPanel completionHandler:nil];
    }];return;
   }
   NSAlert *alert=[[NSAlert alloc] init];systemShortcutAlert=alert;
   alert.messageText=ydText(@"快捷鍵要作用在哪裡？");
-  NSString *message=secure ? ydText(@"Windows 會直接處理實體 Ctrl+Alt+Del，APP 無法先攔截；目前也不支援遠端傳送這組安全快捷鍵。") : @"";
+  NSString *message=secure ? ydText(@"選擇遠端將透過 Windows 登入前服務傳送 Ctrl+Alt+Del；遠端需啟用服務並允許軟體 SAS。本機實體按鍵仍由 Windows 直接處理。") : @"";
   if(!secure && !remote)message=ydText(@"遠端目前無法接受輸入。");
   alert.informativeText=message.length ? [NSString stringWithFormat:@"%@\n\n%@",key,message] : key;
   [alert addButtonWithTitle:ydText(@"取消")];
   [alert addButtonWithTitle:ydText(@"本機")];
   [alert addButtonWithTitle:ydText(@"遠端")];
-  alert.buttons[1].enabled=!secure;alert.buttons[2].enabled=!secure && remote;
+  alert.buttons[1].enabled=!secure;alert.buttons[2].enabled=remote;
   NSButton *defaultButton=alert.buttons[2].enabled ? alert.buttons[2] : alert.buttons[0];
   for(NSButton *button in alert.buttons)button.keyEquivalent=button==defaultButton ? @"\r" : @"";
   alert.window.defaultButtonCell=defaultButton.cell;
@@ -639,4 +708,54 @@ void yd_confirm_crop(void) {
   }];
   [alert release];
  });
+}
+
+// 鍵盤使用可移動的 WebView 子視窗；保持原生輸入暫停，避免點擊穿透遠端。
+void yd_virtual_keyboard(const char *payload) {
+ NSString *json=[[NSString alloc] initWithUTF8String:payload];
+ dispatch_async(dispatch_get_main_queue(), ^{
+  NSWindow *parent=titlebarWeb.window;
+  if(!parent || !titlebarLoaded){atomic_store(&titlebarAction,42);return;}
+  NSUInteger generation=++systemShortcutGeneration;
+  [titlebarWeb evaluateJavaScript:[NSString stringWithFormat:@"window.virtualKeyboardDocument(%@)",json] completionHandler:^(id html,NSError *error){
+   if(generation!=systemShortcutGeneration)return;
+   if(error || ![html isKindOfClass:NSString.class]){atomic_store(&titlebarAction,42);return;}
+   CGFloat width=MIN(1080,parent.screen.visibleFrame.size.width-40);
+   systemShortcutPanel=[[NSPanel alloc] initWithContentRect:NSMakeRect(0,0,width,350) styleMask:NSWindowStyleMaskTitled backing:NSBackingStoreBuffered defer:NO];
+   systemShortcutPanel.title=ydText(@"虛擬鍵盤");
+   WKWebView *web=[[WKWebView alloc] initWithFrame:NSMakeRect(0,0,width,350) configuration:titlebarWeb.configuration];
+   systemShortcutPanel.contentView=web;[web loadHTMLString:html baseURL:nil];[web release];
+   yd_keyboard_suspend(1);
+   NSRect frame=systemShortcutPanel.frame;
+   [systemShortcutPanel setFrameOrigin:NSMakePoint(NSMidX(parent.frame)-frame.size.width/2,NSMidY(parent.frame)-frame.size.height/2)];
+   [parent addChildWindow:systemShortcutPanel ordered:NSWindowAbove];
+   [systemShortcutPanel makeKeyAndOrderFront:nil];
+   keyboardFrameObservers=[NSMutableArray new];
+   for(NSNotificationName name in @[NSWindowDidMoveNotification,NSWindowDidResizeNotification]) {
+    id observer=[NSNotificationCenter.defaultCenter addObserverForName:name object:systemShortcutPanel queue:nil usingBlock:^(NSNotification *note){ydPublishKeyboardFrame();}];
+    [keyboardFrameObservers addObject:observer];
+   }
+   ydPublishKeyboardFrame();
+  }];
+ });
+ [json release];
+}
+
+int yd_virtual_keyboard_hit(void) {
+ CGRect rect;
+ @synchronized(NSApplication.class) { rect=keyboardHitRect; }
+ if(CGRectIsEmpty(rect))return 0;
+ CGEventRef event=CGEventCreate(NULL);
+ if(!event)return 1;
+ CGPoint point=CGEventGetLocation(event);CFRelease(event);
+ return CGRectContainsPoint(rect,point)?1:0;
+}
+
+void yd_input_notice(const char *json) {
+ NSString *value=[[NSString alloc] initWithUTF8String:json];
+ dispatch_async(dispatch_get_main_queue(), ^{
+  WKWebView *web=(systemShortcutPanel && !systemShortcutPanel.sheetParent)?(WKWebView *)systemShortcutPanel.contentView:titlebarWeb;
+  [web evaluateJavaScript:[NSString stringWithFormat:@"window.virtualKeyboardStatus ? window.virtualKeyboardStatus(%@) : window.showInputNotice?.(%@)",value,value] completionHandler:nil];
+ });
+ [value release];
 }

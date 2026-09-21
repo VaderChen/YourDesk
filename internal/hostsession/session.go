@@ -21,6 +21,7 @@ import (
 	"yourdesk/internal/optimization"
 	"yourdesk/internal/p2p"
 	"yourdesk/internal/peertransport"
+	"yourdesk/internal/prelogin"
 	"yourdesk/internal/rawkey"
 	"yourdesk/internal/remotedata"
 	"yourdesk/internal/signaling"
@@ -331,6 +332,20 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 	}()
 	configPeer.Store(peer)
 	authorized.Store(true)
+	if runtime.GOOS == "windows" {
+		_ = peer.RegisterCommand("input.secure-attention", func(commandCtx context.Context) (any, error) {
+			if !authorized.Load() {
+				return nil, errors.New("遠端工作階段尚未授權")
+			}
+			if err := commandCtx.Err(); err != nil {
+				return nil, err
+			}
+			if err := prelogin.SendSecureAttention(commandCtx); err != nil {
+				return nil, err
+			}
+			return map[string]bool{"submitted": true}, nil
+		})
+	}
 	if runtime.GOOS == "darwin" || runtime.GOOS == "windows" {
 		// IME clients use the existing command advertisement to distinguish older
 		// Hosts that only understand physical key events. This command is read-only.
@@ -566,7 +581,7 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 		epoch := captureEpoch.Load()
 		displayMu.Unlock()
 		if changed || time.Since(lastDisplayReport) >= time.Second {
-			_ = peer.SendControl(p2p.Control{Type: "keyboard-capabilities", AppVersion: options.Version, EnhancementSupported: true, StreamCapabilities: streamconfig.Advertise(configSession)})
+			_ = peer.SendControl(p2p.Control{Type: "keyboard-capabilities", Platform: runtime.GOOS, AppVersion: options.Version, EnhancementSupported: true, StreamCapabilities: streamconfig.Advertise(configSession)})
 			_ = peer.SendControl(p2p.Control{Type: "displays", Display: &current, DisplayCount: count, DisplayRequest: displayRequest})
 			lastDisplayReport = time.Now()
 			lastCount = count

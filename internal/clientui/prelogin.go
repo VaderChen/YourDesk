@@ -36,7 +36,8 @@ func (s *server) handlePrelogin(w http.ResponseWriter, r *http.Request) bool {
 		return true
 	}
 	var request struct {
-		Enabled bool `json:"enabled"`
+		Enabled         bool `json:"enabled"`
+		SecureAttention bool `json:"secureAttention"`
 	}
 	if err := decode(w, r, &request); err != nil {
 		fail(w, err)
@@ -54,7 +55,12 @@ func (s *server) handlePrelogin(w http.ResponseWriter, r *http.Request) bool {
 		fail(w, errors.New(status.Message))
 		return true
 	}
-	if status.Enabled == request.Enabled {
+	if request.SecureAttention && (!request.Enabled || !status.SASSupported) {
+		s.mu.Unlock()
+		fail(w, errors.New("無效的 Ctrl+Alt+Del 授權要求"))
+		return true
+	}
+	if status.Enabled == request.Enabled && (!request.SecureAttention || status.SASAllowed) {
 		s.mu.Unlock()
 		respond(w, 200, map[string]bool{"ok": true})
 		return true
@@ -63,6 +69,9 @@ func (s *server) handlePrelogin(w http.ResponseWriter, r *http.Request) bool {
 	s.preloginMessage = "正在變更系統服務，請完成管理員授權。"
 	config := prelogin.Config{Tailcat: s.preferences.TailcatEnabled, Room: s.info["room"], Signal: s.options.Signal, Secret: s.options.Secret, Codec: s.preferences.Codec, CodecGoal: s.preferences.CodecGoal, Direct: s.preferences.DirectListen}
 	host := s.children["host"]
+	if request.SecureAttention && status.Enabled {
+		host = nil
+	} // 僅調整原則時不必停止既有 Host。
 	if host != nil {
 		host.stdin.Close()
 	}
@@ -80,7 +89,11 @@ func (s *server) handlePrelogin(w http.ResponseWriter, r *http.Request) bool {
 			}
 		}
 		if err == nil {
-			err = prelogin.Configure(ctx, request.Enabled, config)
+			if request.SecureAttention {
+				err = prelogin.ConfigureSecureAttention(ctx, config)
+			} else {
+				err = prelogin.Configure(ctx, request.Enabled, config)
+			}
 		}
 		s.mu.Lock()
 		defer s.mu.Unlock()

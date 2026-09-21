@@ -24,7 +24,9 @@ func TestWindowsRollbackCoversInstallerPayload(t *testing.T) {
 		managed[name] = true
 	}
 	patterns := []*regexp.Regexp{
-		regexp.MustCompile(`^File(?: /r)? "\$\{PAYLOAD_DIR\}/([^"/]+)"$`),
+		// /x 可重複指定引號或未加引號的排除樣式；只擷取最後的安裝項目。
+		// 其他未知選項仍交由下方未匹配檢查報錯，避免漏掉回復清單。
+		regexp.MustCompile(`^File(?: /r)?(?: /x (?:"[^"\r\n]+"|[^\s"]+))* "\$\{PAYLOAD_DIR\}/([^"/]+)"$`),
 		regexp.MustCompile(`^File /oname=([^ ]+) `),
 		regexp.MustCompile(`^(?:Delete|WriteUninstaller) "\$INSTDIR\\([^"\\]+)"$`),
 	}

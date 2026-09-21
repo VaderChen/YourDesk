@@ -41,15 +41,26 @@ func NewLiveCapturer() LiveCapturer {
 	c := &windowsCapturer{requests: make(chan captureRequest), done: make(chan struct{})}
 	go func() {
 		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
 		defer close(c.done)
+		desktop := newCaptureDesktop()
+		defer desktop.close()
 		var surface gdiSurface
 		defer surface.close()
 		gpu := newDesktopGPU()
 		if gpu != nil {
-			defer gpu.close()
+			defer func() { gpu.close() }()
 		}
 		for request := range c.requests {
+			if err := desktop.ensure(func() {
+				surface.close()
+				if gpu != nil {
+					gpu.close()
+					gpu = newDesktopGPU()
+				}
+			}); err != nil {
+				request.reply <- captureReply{nil, err}
+				continue
+			}
 			bounds := c.Bounds(request.display)
 			if gpu != nil && !bounds.Empty() {
 				img, err := gpu.capture(bounds)
@@ -92,11 +103,23 @@ func (c *windowsCapturer) Close() {
 
 // 單次截圖亦使用相同 DIB 實作，不再走套件的 GetDIBits 路徑。
 func captureDisplay(display int) (image.Image, error) {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
-	var surface gdiSurface
-	defer surface.close()
-	return surface.capture((ScreenshotCapturer{}).Bounds(display))
+	reply := make(chan captureReply, 1)
+	go func() {
+		// 專用執行緒結束即回收，不把已切換桌面的執行緒交回排程器。
+		runtime.LockOSThread()
+		desktop := newCaptureDesktop()
+		defer desktop.close()
+		var surface gdiSurface
+		defer surface.close()
+		if err := desktop.ensure(surface.close); err != nil {
+			reply <- captureReply{nil, err}
+			return
+		}
+		img, err := surface.capture((ScreenshotCapturer{}).Bounds(display))
+		reply <- captureReply{img, err}
+	}()
+	result := <-reply
+	return result.image, result.err
 }
 
 type gdiSurface struct {

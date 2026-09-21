@@ -43,12 +43,14 @@ func (c Config) validate() error {
 }
 
 type State struct {
-	Room      string `json:"room,omitempty"`
-	Supported bool   `json:"supported"`
-	Enabled   bool   `json:"enabled"`
-	Busy      bool   `json:"busy"`
-	Message   string `json:"message"`
-	Error     string `json:"error,omitempty"`
+	SASSupported bool   `json:"sasSupported"`
+	SASAllowed   bool   `json:"sasAllowed"`
+	Room         string `json:"room,omitempty"`
+	Supported    bool   `json:"supported"`
+	Enabled      bool   `json:"enabled"`
+	Busy         bool   `json:"busy"`
+	Message      string `json:"message"`
+	Error        string `json:"error,omitempty"`
 }
 
 // Handle 在一般 APP／Host 啟動前處理專用服務入口。
@@ -67,6 +69,22 @@ func Handle(ctx context.Context, args []string) (bool, error) {
 		return true, runDaemon(ctx)
 	case "agent":
 		return true, runAgent(ctx)
+	case "sas-enable":
+		if len(args) != 2 {
+			return true, errors.New("無效的 SAS 授權參數")
+		}
+		return true, enableSecureAttentionPolicy()
+	case "install-sas":
+		if !Status().SASSupported {
+			return true, errors.New("此平台不支援 Windows SAS 授權。")
+		}
+		if len(args) != 3 {
+			return true, errors.New("缺少安裝設定")
+		}
+		if err := install(args[2]); err != nil {
+			return true, err
+		}
+		return true, enableSecureAttentionPolicy()
 	case "install":
 		if len(args) != 3 {
 			return true, errors.New("缺少安裝設定")

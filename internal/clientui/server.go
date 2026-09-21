@@ -976,6 +976,8 @@ func (s *server) start(kind, siteID, binary string, args []string) error {
 							}
 						case "clipboard-progress":
 							// 傳輸進度由各自的 遠端顯示 顯示，不喚起管理主畫面。
+						case "input-error":
+							s.notice = event.Message
 						case "error":
 							p.failureMessage = event.Message
 							s.notice = event.Message

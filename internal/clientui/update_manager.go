@@ -29,6 +29,7 @@ type releaseAsset struct {
 	Digest string `json:"digest"`
 }
 type updateStatus struct {
+	Prerelease       bool                `json:"prerelease,omitempty"`
 	AutomaticInstall bool                `json:"automaticInstall"`
 	InstallAt        int64               `json:"installAt"`
 	Available        bool                `json:"available"`
@@ -158,7 +159,7 @@ func (u *updateManager) saveLocked() {
 }
 func (u *updateManager) notifyPending() {
 	state := u.snapshot()
-	if state.Available && state.Version != state.NotifiedVersion {
+	if !state.Prerelease && state.Available && state.Version != state.NotifiedVersion {
 		select {
 		case u.notify <- struct{}{}:
 		default:
@@ -188,13 +189,17 @@ func (u *updateManager) run() {
 	}
 }
 func (u *updateManager) check(ctx context.Context, manual bool, force ...bool) updateStatus {
+	return u.checkChannel(ctx, manual, len(force) > 0 && force[0], false)
+}
+
+func (u *updateManager) checkChannel(ctx context.Context, manual, force, prerelease bool) updateStatus {
 	u.checkMu.Lock()
 	defer u.checkMu.Unlock()
-	if state := u.snapshot(); state.Downloading || state.Opening || state.InstallAt > 0 {
+	if state := u.snapshot(); state.Downloading || state.Opening || state.InstallAt > 0 || (!manual && state.Prerelease && state.Available && time.Since(state.CheckedAt) < updateInterval) {
 		return state
 	}
-	result, err := fetchRelease(ctx)
-	if err == nil && manual && (u.forceUpdate || (len(force) > 0 && force[0])) && validReleaseAsset(result.Asset) {
+	result, err := fetchReleaseChannel(ctx, prerelease)
+	if err == nil && manual && !prerelease && (u.forceUpdate || force) && validReleaseAsset(result.Asset) {
 		result.Available = true
 		result.Message = "更新流程測試：可下載目前的正式版本。"
 	}
@@ -207,6 +212,14 @@ func (u *updateManager) check(ctx context.Context, manual bool, force ...bool) u
 	u.state.CheckedAt = time.Now()
 	if err != nil {
 		u.state.Message = err.Error()
+		if prerelease {
+			u.state.Prerelease = true
+			u.state.Version = ""
+			u.state.DownloadError, u.state.OpenError = "", ""
+			u.state.Available = false
+			u.state.Asset = releaseAsset{}
+			u.state.DownloadPath = ""
+		}
 	} else {
 		// 版本或資產變更時，不沿用上一版的下載狀態。
 		if u.state.Version != result.Version || u.state.Asset != result.Asset {
@@ -217,6 +230,7 @@ func (u *updateManager) check(ctx context.Context, manual bool, force ...bool) u
 		if !u.state.ShowNotes {
 			u.state.Notes = result.Notes
 		}
+		u.state.Prerelease = prerelease
 		u.state.Available, u.state.Version, u.state.Asset, u.state.Message = result.Available, result.Version, result.Asset, result.Message
 	}
 	u.saveLocked()
@@ -224,38 +238,75 @@ func (u *updateManager) check(ctx context.Context, manual bool, force ...bool) u
 	u.mu.Unlock()
 	return state
 }
-func fetchRelease(ctx context.Context) (updateStatus, error) {
+
+type githubRelease struct {
+	Tag         string         `json:"tag_name"`
+	Name        string         `json:"name"`
+	Draft       bool           `json:"draft"`
+	Prerelease  bool           `json:"prerelease"`
+	PublishedAt time.Time      `json:"published_at"`
+	Assets      []releaseAsset `json:"assets"`
+}
+
+func fetchRelease(ctx context.Context) (updateStatus, error) { return fetchReleaseChannel(ctx, false) }
+
+func fetchReleaseChannel(ctx context.Context, prerelease bool) (updateStatus, error) {
 	var result updateStatus
-	request, err := http.NewRequestWithContext(ctx, "GET", "https://api.github.com/repos/VaderChen/YourDesk/releases/latest", nil)
-	if err != nil {
-		return result, err
+	result.Prerelease = prerelease
+	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
+	defer cancel()
+	var release githubRelease
+	for page := 1; ; page++ {
+		endpoint := "https://api.github.com/repos/VaderChen/YourDesk/releases/latest"
+		if prerelease {
+			endpoint = fmt.Sprintf("https://api.github.com/repos/VaderChen/YourDesk/releases?per_page=100&page=%d", page)
+		}
+		request, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
+		if err != nil {
+			return result, err
+		}
+		request.Header.Set("Accept", "application/vnd.github+json")
+		request.Header.Set("User-Agent", "YourDesk")
+		response, err := (&http.Client{Timeout: 8 * time.Second}).Do(request)
+		if err != nil {
+			return result, fmt.Errorf("無法連線 GitHub，請稍後重試。")
+		}
+		if response.StatusCode == 404 {
+			response.Body.Close()
+			break
+		}
+		if response.StatusCode != 200 {
+			response.Body.Close()
+			return result, fmt.Errorf("GitHub 暫時無法提供更新資訊，請稍後重試。")
+		}
+		var releases []githubRelease
+		decoder := json.NewDecoder(io.LimitReader(response.Body, 8<<20))
+		if prerelease {
+			err = decoder.Decode(&releases)
+		} else {
+			err = decoder.Decode(&release)
+		}
+		response.Body.Close()
+		if err != nil {
+			return result, fmt.Errorf("無法讀取更新資訊。")
+		}
+		if !prerelease {
+			break
+		}
+		for _, candidate := range releases {
+			if !candidate.Draft && candidate.Prerelease && (release.Tag == "" || candidate.PublishedAt.After(release.PublishedAt)) {
+				release = candidate
+			}
+		}
+		if len(releases) < 100 {
+			break
+		}
 	}
-	request.Header.Set("Accept", "application/vnd.github+json")
-	request.Header.Set("User-Agent", "YourDesk")
-	response, err := (&http.Client{Timeout: 8 * time.Second}).Do(request)
-	if err != nil {
-		return result, fmt.Errorf("無法連線 GitHub，請稍後重試。")
-	}
-	defer response.Body.Close()
-	if response.StatusCode == 404 {
+	if release.Tag == "" || release.Draft || release.Prerelease != prerelease {
 		result.Message = "目前沒有可取得的正式發行版本。"
-		return result, nil
-	}
-	if response.StatusCode != 200 {
-		return result, fmt.Errorf("GitHub 暫時無法提供更新資訊，請稍後重試。")
-	}
-	var release struct {
-		Tag        string         `json:"tag_name"`
-		Name       string         `json:"name"`
-		Draft      bool           `json:"draft"`
-		Prerelease bool           `json:"prerelease"`
-		Assets     []releaseAsset `json:"assets"`
-	}
-	if err := json.NewDecoder(io.LimitReader(response.Body, 2<<20)).Decode(&release); err != nil {
-		return result, fmt.Errorf("無法讀取更新資訊。")
-	}
-	if release.Draft || release.Prerelease {
-		result.Message = "目前沒有可取得的正式發行版本。"
+		if prerelease {
+			result.Message = "目前沒有可取得的測試版本。"
+		}
 		return result, nil
 	}
 	result.Version = release.Tag
@@ -266,10 +317,13 @@ func fetchRelease(ctx context.Context) (updateStatus, error) {
 		result.Message = "發行版本格式無法比較，請前往下載頁確認。"
 		return result, nil
 	}
-	result.Available = versionKey(result.Version) > versionKey(currentVersion())
+	result.Available = prerelease || versionKey(result.Version) > versionKey(currentVersion())
 	result.Message = "目前已是最新版本。"
 	if result.Available {
 		result.Message = "發現新版本，可前往下載。"
+	}
+	if prerelease {
+		result.Message = "測試版本可能尚未穩定，請確認後安裝。"
 	}
 	if result.Available {
 		result.Notes = fetchReleaseNotes(ctx, release.Assets)
@@ -591,7 +645,13 @@ func (s *server) handleUpdates(w http.ResponseWriter, r *http.Request) bool {
 	}
 	switch {
 	case r.URL.Path == "/api/updates" && r.Method == "GET":
-		respond(w, 200, s.updater.check(r.Context(), true, r.URL.Query().Get("force") == "true"))
+		force := r.URL.Query().Get("force") == "true"
+		prerelease := r.URL.Query().Get("prerelease") == "true"
+		if prerelease && !force {
+			respond(w, 400, map[string]string{"error": "請先開啟強制更新。"})
+			return true
+		}
+		respond(w, 200, s.updater.checkChannel(r.Context(), true, force, prerelease))
 	case r.URL.Path == "/api/updates/state" && r.Method == "GET":
 		respond(w, 200, s.updater.snapshot())
 	case r.URL.Path == "/api/updates/ack" && r.Method == "POST":

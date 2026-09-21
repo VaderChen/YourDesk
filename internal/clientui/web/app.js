@@ -951,19 +951,23 @@ async function initialize() {
 }
 initialize();
 
-$('#check-update').addEventListener('click', async () => {
-  const control = $('#check-update');
+async function checkUpdate(prerelease=false) {
+  if(prerelease && !$('#force-update').checked)return;
+  const control = $(prerelease?'#install-prerelease':'#check-update');
   control.disabled = true;
   $('#download-update').hidden = true;
   $('#update-status').textContent = i18n.t('正在檢查更新…');
   try {
-    const result = await api($('#force-update').checked?'updates?force=true':'updates');
+    const result = await api(prerelease?'updates?force=true&prerelease=true':$('#force-update').checked?'updates?force=true':'updates');
     $('#update-status').textContent = i18n.t(result.message) + (result.version ? ` ${result.version}` : '');
     $('#download-update').hidden = !result.available;
     state.updates=result;renderRelease(result,true);
   } catch (error) { $('#update-status').textContent = i18n.t(error.message); }
   finally { control.disabled = false; }
-});
+}
+$('#check-update').addEventListener('click', () => checkUpdate());
+$('#install-prerelease').addEventListener('click', () => checkUpdate(true));
+$('#force-update').addEventListener('change', () => { $('#install-prerelease').hidden = !$('#force-update').checked; });
 $('#download-update').addEventListener('click', () => action(downloadUpdate));
 
 // 使用原生拖曳影像預覽；篩選時僅重排可見站台，隱藏項目保留原位置。
@@ -1202,7 +1206,7 @@ function renderRelease(value, manual=false) {
  const openingLabel=automatic?'正在準備自動安裝…':'正在開啟下載檔案…';
  const label=value.downloading?downloadLabel:value.opening?openingLabel:countdown?'立即更新':value.downloadPath?(automatic?'開始更新':'開啟下載檔案'):(automatic?'下載並自動更新':'下載並開啟');
  $('#release-title').textContent=i18n.t(value.showNotes?'更新重點':value.downloadPath?'下載完成':value.available?'發現新版本':'');
- const updateHint=automatic?'下載完成後將自動關閉程式、安裝新版並重新啟動。遠端連線會中斷。':'下載完成後將開啟解壓縮目錄，請手動更新。程式與遠端連線不會自動關閉。';
+ const updateHint=(value.prerelease?i18n.t('測試版本可能尚未穩定，請確認後安裝。')+' ':'')+i18n.t(automatic?'下載完成後將自動關閉程式、安裝新版並重新啟動。遠端連線會中斷。':'下載完成後將開啟解壓縮目錄，請手動更新。程式與遠端連線不會自動關閉。');
  const message=value.downloading?downloadLabel:value.opening?openingLabel:value.downloadError || value.openError || (value.available && value.asset?.browser_download_url?updateHint:value.message);
  $('#release-status').classList.toggle('update-countdown',countdown);
  $('#release-status').hidden=showingNotes;
@@ -1306,7 +1310,7 @@ function renderInterpolationSupport(){
  control.title=supported?'':i18n.t('RIFE 目前僅支援 Apple Silicon Mac');
  const method=$('#ui-interpolation-method');method.disabled=!supported;
  method.querySelector('[value=apple]').disabled=!state?.appleInterpolationSupported;
- method.title=state?.appleInterpolationSupported?'':i18n.t('Apple 補幀需要支援的 Mac 與 macOS 26 以上');
+ method.title=state?.appleInterpolationSupported?'':i18n.t('Apple 補幀需要支援的 Mac 與 macOS 27 以上');
 }
 
 let streamAutoRun = null;
@@ -1435,7 +1439,16 @@ function showHostConflict(owner) {
 
 $('#copy-mcp-address').addEventListener('click',()=>action(async()=>{await navigator.clipboard.writeText($('#mcp-address').textContent);toast(i18n.t('MCP 位址已複製'));}));
 
-let preloginWasBusy=false;
+let preloginWasBusy=false, sasPermissionPrompted=false;
+function requestSASPermission(){
+ const service=state?.prelogin;
+ if(!service?.sasSupported||service.busy)return;
+ sasPermissionPrompted=true;
+ const message=service.enabled?'允許 YourDesk 服務傳送 Ctrl+Alt+Del？接著會要求 Windows 管理員授權。':'允許 YourDesk 傳送 Ctrl+Alt+Del？將啟用登入前連線服務及開機自動啟動，接著會要求 Windows 管理員授權。';
+ confirmDelete(i18n.t('授權 Ctrl+Alt+Del'),i18n.t(message),async()=>{await api('prelogin','POST',{enabled:true,secureAttention:true});await updateRunning();});
+ $('#confirm-form button[type="submit"]').textContent=i18n.t('授權');
+}
+$('#authorize-sas').addEventListener('click',requestSASPermission);
 // 服務狀態由系統安裝結果決定，不存成一般偏好值。
 function renderPrelogin() {
  const service=state?.prelogin;
@@ -1449,6 +1462,10 @@ function renderPrelogin() {
  $('#prelogin-progress').textContent=service?.busy ? i18n.t(service.message) : '';
  if (!service?.busy && preloginWasBusy && service?.error) toast(i18n.t(service.error),false,{warning:true,duration:15000});
  preloginWasBusy=!!service?.busy;
+ const ready=!!service?.enabled&&!!service?.sasAllowed;
+ $('#authorize-sas').hidden=!service?.sasSupported;
+ $('#authorize-sas').disabled=ready||!!service?.busy;
+ if(service?.sasSupported&&!ready&&!service.busy&&!sasPermissionPrompted&&!document.querySelector('dialog[open]'))requestSASPermission();
 }
 $('#ui-prelogin').addEventListener('change',()=>action(async()=>{
  const toggle=$('#ui-prelogin');

@@ -35,15 +35,15 @@
  maximize.dataset.action='8';maximize.dataset.tip='最大化／還原';maximize.setAttribute('aria-label','最大化／還原');
  close.textContent='×';controls.replaceChildren(minimize,maximize,close);document.querySelector('header').append(controls);
  const popup=document.createElement('div');popup.className='win-popup';popup.hidden=true;document.body.append(popup);
- let state={},kind='';
+ let state={},kind='',keyboardDispose=null;
  const tr=source=>(state.strings||{})[source]||source;
  const send=message=>window.ydTitlebar(message).catch(()=>{});
  const publishRegion=()=>{
   if(popup.hidden){send({popup:true,menu:false,width:0,height:0});return}
   const r=popup.getBoundingClientRect();
-  send({popup:true,menu:kind==='menu'||kind==='confirm'||kind==='shortcut',x:r.x,y:r.y,width:r.width,height:r.height});
+  send({popup:true,menu:kind==='menu'||kind==='confirm'||kind==='shortcut',keyboard:kind==='keyboard',x:r.x,y:r.y,width:r.width,height:r.height});
  };
- window.closeWindowsPopup=()=>{const cancel=kind==='confirm'?17:kind==='shortcut'?42:0;popup.hidden=true;kind='';window.systemShortcutOpen=false;publishRegion();if(cancel)send({action:cancel})};
+ window.closeWindowsPopup=()=>{keyboardDispose?.();keyboardDispose=null;const cancel=kind==='confirm'?17:(kind==='shortcut'||kind==='keyboard')?42:0;popup.hidden=true;popup.style.width='';kind='';window.systemShortcutOpen=false;publishRegion();if(cancel)send({action:cancel})};
  const position=rect=>{
   popup.hidden=false;popup.style.left='10px';popup.style.top='62px';
   popup.style.left=Math.max(10,Math.min(rect.right-popup.offsetWidth,innerWidth-popup.offsetWidth-10))+'px';
@@ -58,24 +58,39 @@
   position({right:innerWidth/2+210});popup.style.top=Math.max(62,(innerHeight-popup.offsetHeight)/2)+'px';publishRegion();
   popup.querySelector('[data-confirm="17"]').focus();
  };
+ window.showVirtualKeyboard=request=>{
+  window.closeWindowsPopup();kind='keyboard';window.systemShortcutOpen=true;
+  popup.className='win-popup virtual-keyboard';popup.style.width='1080px';popup.setAttribute('role','dialog');popup.setAttribute('aria-label',tr('虛擬鍵盤'));
+  let dragOrigin=null;
+  const keyboardUI=message=>{
+   if(message.keyboardLayout){popup.style.width=message.keyboardLayout==='numeric'?'300px':'1080px';}
+   if(message.keyboardDrag==='start')dragOrigin={x:popup.offsetLeft,y:popup.offsetTop};
+   if(message.keyboardDrag==='move'&&dragOrigin){popup.style.left=Math.max(0,Math.min(innerWidth-popup.offsetWidth,dragOrigin.x+message.dx))+'px';popup.style.top=Math.max(52,Math.min(innerHeight-popup.offsetHeight,dragOrigin.y+message.dy))+'px';}
+   if(message.keyboardDrag==='end')dragOrigin=null;
+   if(message.keyboardLayout){popup.style.left=Math.max(0,Math.min(popup.offsetLeft,innerWidth-popup.offsetWidth))+'px';}
+   publishRegion();
+  };
+  popup.replaceChildren();keyboardDispose=window.mountVirtualKeyboard(popup,request,action=>{if(action===42){window.closeWindowsPopup()}else send({action})},keyboardUI);
+  position({right:innerWidth/2+540});popup.style.top='62px';publishRegion();
+ };
  window.showSystemShortcut=request=>{
   window.closeWindowsPopup();kind='shortcut';window.systemShortcutOpen=true;
   popup.className='win-popup crop-confirm';popup.setAttribute('role','dialog');popup.setAttribute('aria-modal','true');popup.setAttribute('aria-labelledby','system-shortcut-title');
   const title=document.createElement('h2');title.id='system-shortcut-title';title.textContent=tr('快捷鍵要作用在哪裡？');
   const key=document.createElement('p');key.className='system-shortcut-key';key.textContent=request.label;
   const message=document.createElement('p');
-  if(request.secure)message.textContent=tr('Windows 會直接處理實體 Ctrl+Alt+Del，APP 無法先攔截；目前也不支援遠端傳送這組安全快捷鍵。');
+  if(request.secure)message.textContent=tr('選擇遠端將透過 Windows 登入前服務傳送 Ctrl+Alt+Del；遠端需啟用服務並允許軟體 SAS。本機實體按鍵仍由 Windows 直接處理。');
   else if(request.remoteAvailable===false)message.textContent=tr('遠端目前無法接受輸入。');
   const buttons=document.createElement('div');buttons.className='buttons';
   for(const [label,action] of [['取消',42],['本機',40],['遠端',41]]){
-   const button=document.createElement('button');button.textContent=tr(label);button.disabled=(!!request.secure&&action!==42)||(action===41&&request.remoteAvailable===false);
+   const button=document.createElement('button');button.textContent=tr(label);button.disabled=(!!request.secure&&action===40)||(action===41&&request.remoteAvailable===false);
    button.onclick=()=>{kind='';window.closeWindowsPopup();send({action})};buttons.append(button);
   }
   popup.replaceChildren(title,key,...(message.textContent?[message]:[]),buttons);position({right:innerWidth/2+210});popup.style.top=Math.max(62,(innerHeight-popup.offsetHeight)/2)+'px';publishRegion();
   (buttons.lastElementChild.disabled?buttons.firstElementChild:buttons.lastElementChild).focus();
  };
  window.windowsTitlebarBridge=message=>{
-  if((kind==='confirm'||kind==='shortcut') && typeof message!=='number')return;
+  if((kind==='confirm'||kind==='shortcut'||kind==='keyboard') && typeof message!=='number')return;
   if(typeof message==='number'){send({action:message});return}
   if(message.menu){
    window.closeWindowsPopup();
@@ -107,7 +122,7 @@
   const index=buttons.indexOf(document.activeElement),next=(index+(event.shiftKey?-1:1)+buttons.length)%buttons.length;
   event.preventDefault();buttons[next].focus();
  });
- window.addEventListener('blur',window.closeWindowsPopup);
+ window.addEventListener('blur',()=>{if(kind!=='keyboard')window.closeWindowsPopup()});
  window.addEventListener('resize',window.closeWindowsPopup);
  document.addEventListener('contextmenu',event=>event.preventDefault());
  window.addEventListener('DOMContentLoaded',()=>send({ready:true}));
