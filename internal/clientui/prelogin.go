@@ -22,6 +22,35 @@ func (s *server) preloginState() prelogin.State {
 	return state
 }
 func (s *server) handlePrelogin(w http.ResponseWriter, r *http.Request) bool {
+	if r.URL.Path == "/api/prelogin/sas" {
+		if r.Method != "POST" {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return true
+		}
+		var request struct {
+			Enabled *bool `json:"enabled"`
+		}
+		if err := decode(w, r, &request); err != nil {
+			fail(w, err)
+			return true
+		}
+		if request.Enabled == nil {
+			fail(w, errors.New("無效的 Ctrl+Alt+Del 開關要求"))
+			return true
+		}
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if s.preloginBusy {
+			fail(w, errors.New("未登入服務正在變更，請稍候。"))
+			return true
+		}
+		if err := prelogin.SetSecureAttentionEnabled(r.Context(), *request.Enabled); err != nil {
+			fail(w, err)
+			return true
+		}
+		respond(w, 200, map[string]bool{"ok": true})
+		return true
+	}
 	if r.URL.Path != "/api/prelogin" {
 		return false
 	}
@@ -60,7 +89,7 @@ func (s *server) handlePrelogin(w http.ResponseWriter, r *http.Request) bool {
 		fail(w, errors.New("無效的 Ctrl+Alt+Del 授權要求"))
 		return true
 	}
-	if status.Enabled == request.Enabled && (!request.SecureAttention || status.SASAllowed) {
+	if status.Enabled == request.Enabled && (!request.SecureAttention || (status.SASAllowed && !status.SASDisabled)) {
 		s.mu.Unlock()
 		respond(w, 200, map[string]bool{"ok": true})
 		return true

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync/atomic"
+	"yourdesk/internal/remoteaudio"
 )
 
 //go:embed web/translations.json
@@ -32,6 +33,8 @@ func refreshViewerLanguage(previous string) string {
 	if dir, err := os.UserConfigDir(); err == nil {
 		if data, err := os.ReadFile(filepath.Join(dir, "YourDesk", "preferences.json")); err == nil {
 			var preferences struct {
+				RemoteAudio             bool   `json:"remoteAudio"`
+				AudioCodec              string `json:"audioCodec"`
 				AutoReconnect           bool   `json:"autoReconnect"`
 				CloseWhenIdle           bool   `json:"closeWhenIdle"`
 				CloseWindowOnDisconnect bool   `json:"closeWindowOnDisconnect"`
@@ -59,6 +62,7 @@ func refreshViewerLanguage(previous string) string {
 					mbps = 12
 				}
 				viewerStreamingLimits.Store(&streamingLimits{fps, mbps})
+				viewerAudio.Store(&remoteaudio.Settings{Enabled: preferences.RemoteAudio, Codec: preferences.AudioCodec})
 				viewerAutoReconnect.Store(preferences.AutoReconnect)
 				viewerCloseWindowOnDisconnect.Store(preferences.CloseWindowOnDisconnect && !preferences.AutoReconnect)
 				viewerCloseWhenIdle.Store(preferences.CloseWhenIdle)

@@ -63,6 +63,7 @@ static BOOL titlebarLoaded = NO;
 // 僅由主執行緒存取。
 static NSString *videoCodec=@"", *sourceEncoding=@"", *receiverDecoding=@"unknown";
 static NSDictionary *enhancementStatus;
+static NSDictionary *audioStatus;
 static BOOL renderFPS = NO;
 static double trafficTX = 0, trafficRX = 0, viewerFPS = 0;
 static NSPopover *titlebarTooltip;
@@ -96,6 +97,7 @@ static void ydUpdateTitlebar(void) {
         @"strings": titlebarStrings ?: @{}, @"language": titlebarLanguage,
         @"crop":@(cropState), @"cropMessage":cropMessage,
         @"enhancement":enhancementStatus ?: @{},
+        @"audio":audioStatus ?: @{},
         @"videoCodec":videoCodec,@"sourceEncoding":sourceEncoding,@"receiverDecoding":receiverDecoding,
         @"tx": @(trafficTX), @"rx": @(trafficRX), @"fps": @(viewerFPS), @"renderFPS": @(renderFPS),
         @"mode": @(atomic_load(&titlebarMode)), @"display": @(atomic_load(&displayIndex)),
@@ -269,9 +271,13 @@ static void ydUpdateTitlebar(void) {
         NSArray *rows = body[@"rows"];
         if ([rows isKindOfClass:[NSArray class]] && rows.count > 0 && rows.count <= 12) {
             NSMutableArray *labels = [NSMutableArray array], *values = [NSMutableArray array];
-            CGFloat labelWidth = 0, valueWidth = 0;
+            CGFloat labelWidth = 0, valueWidth = 0, rowsHeight = 0;
             for (id row in rows) {
-                if (![row isKindOfClass:[NSDictionary class]] || ![row[@"label"] isKindOfClass:[NSString class]] || ![row[@"value"] isKindOfClass:[NSString class]]) break;
+                if (![row isKindOfClass:[NSDictionary class]]) break;
+                if ([row[@"separator"] isEqual:@YES]) {
+                    [labels addObject:NSNull.null];[values addObject:NSNull.null];rowsHeight+=13;continue;
+                }
+                if (![row[@"label"] isKindOfClass:[NSString class]] || ![row[@"value"] isKindOfClass:[NSString class]]) break;
                 NSTextField *key = [NSTextField labelWithString:row[@"label"]];
                 key.font = [NSFont systemFontOfSize:12 weight:NSFontWeightMedium];
                 key.textColor = [NSColor secondaryLabelColor];
@@ -280,14 +286,22 @@ static void ydUpdateTitlebar(void) {
                 [key sizeToFit]; [value sizeToFit];
                 labelWidth = MAX(labelWidth,key.frame.size.width); valueWidth = MAX(valueWidth,value.frame.size.width);
                 [labels addObject:key]; [values addObject:value];
+                rowsHeight+=26;
             }
             if (labels.count == rows.count) {
-                content.view = [[[NSView alloc] initWithFrame:NSMakeRect(0,0,32+labelWidth+16+valueWidth,18+rows.count*26)] autorelease];
+                content.view = [[[NSView alloc] initWithFrame:NSMakeRect(0,0,32+labelWidth+16+valueWidth,18+rowsHeight)] autorelease];
+                CGFloat top=content.view.frame.size.height-12;
                 for (NSUInteger i=0;i<rows.count;i++) {
+                    if (labels[i]==NSNull.null) {
+                        // 一般列末尾已有 8 點空白；線上再留 2 點、線下留 10 點。
+                        NSBox *divider=[[[NSBox alloc] initWithFrame:NSMakeRect(16,top-3,content.view.frame.size.width-32,1)] autorelease];
+                        divider.boxType=NSBoxSeparator;[content.view addSubview:divider];top-=13;continue;
+                    }
                     NSTextField *key=labels[i], *value=values[i];
-                    key.frame=NSMakeRect(16,14+(rows.count-1-i)*26,labelWidth,18);
-                    value.frame=NSMakeRect(32+labelWidth,14+(rows.count-1-i)*26,valueWidth,18);
+                    key.frame=NSMakeRect(16,top-18,labelWidth,18);
+                    value.frame=NSMakeRect(32+labelWidth,top-18,valueWidth,18);
                     [content.view addSubview:key]; [content.view addSubview:value];
+                    top-=26;
                 }
             }
         }
@@ -304,7 +318,7 @@ static void ydUpdateTitlebar(void) {
     if (![message.body isKindOfClass:[NSNumber class]]) return;
     [titlebarTooltip close];
     int action = [message.body intValue];
-    if(action>=1000 && action<66536 && systemShortcutPanel && message.webView==systemShortcutPanel.contentView) {
+    if(action>=1000 && action<1049576 && systemShortcutPanel && message.webView==systemShortcutPanel.contentView) {
       @synchronized(NSApplication.class) {
         if(!virtualKeyActions) virtualKeyActions=[NSMutableArray new];
         if(virtualKeyActions.count<128) [virtualKeyActions addObject:@(action)];
@@ -588,6 +602,17 @@ void yd_set_codec_status(const char *codec,const char *source,const char *receiv
   }
  });
  [c release];[s release];[r release];
+}
+
+void yd_set_audio_status(const char *json) {
+ NSString *text=[[NSString alloc] initWithUTF8String:json];
+ dispatch_async(dispatch_get_main_queue(), ^{
+  id value=[NSJSONSerialization JSONObjectWithData:[text dataUsingEncoding:NSUTF8StringEncoding] options:0 error:nil];
+  if([value isKindOfClass:[NSDictionary class]] && ![audioStatus isEqual:value]) {
+   [audioStatus release];audioStatus=[value copy];ydUpdateTitlebar();
+  }
+ });
+ [text release];
 }
 
 void yd_show_close_confirmation(void) {

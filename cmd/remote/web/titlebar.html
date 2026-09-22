@@ -146,8 +146,22 @@ window.setTitlebarState=state=>{
  const status=document.getElementById('codec-status');
  const sourceValue=modeLabel(state.sourceEncoding)+' · '+(state.videoCodec||t('等待影格'));
  const receiverValue=modeLabel(state.receiverDecoding);
- status.tooltipRows=[{label:t('來源編碼')+'：',value:sourceValue},{label:t('接收解碼')+'：',value:receiverValue}];
- const statusTip=status.tooltipRows.map(row=>row.label+' '+row.value).join('\n');
+ const audio=state.audio||{};
+ const audioValue=(backend,decoding=false)=>{
+  if(!audio.enabled)return t('關閉');
+  if(!backend?.enabled)return t(backend?.error||audio.error?'無法使用':'等待聲音');
+  const codec={opus:'Opus',aac:'AAC','aac-software':'AAC',pcm:'PCM'}[backend.codec]||t('未知');
+  const mode=modeLabel(backend.hardware?'hardware':'software');
+  return decoding?mode:mode+' · '+codec;
+ };
+ status.tooltipRows=[
+  {label:t('影像編碼')+'：',value:sourceValue},
+  {label:t('聲音編碼')+'：',value:audioValue(audio.source)},
+  {separator:true},
+  {label:t('影像解碼')+'：',value:receiverValue},
+  {label:t('聲音解碼')+'：',value:audioValue(audio.receiver,true)}
+ ];
+ const statusTip=status.tooltipRows.map(row=>row.separator?'':row.label+' '+row.value).join('\n');
  status.dataset.tip=statusTip;status.setAttribute('aria-label',statusTip);
  const fpsBox=document.getElementById('viewer-fps').parentElement;
  fpsBox.classList.toggle('enhancement-active',info.active===true);

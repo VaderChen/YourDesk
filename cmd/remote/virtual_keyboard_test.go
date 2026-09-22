@@ -39,7 +39,7 @@ func TestVirtualKeyboardChords(t *testing.T) {
 	if !ok || r.Modifiers != 32 || r.Key != "backspace" {
 		t.Fatalf("Fn 組合錯誤：%+v", r)
 	}
-	for _, action := range []int{-1, 42, 999, 66536, 99999} {
+	for _, action := range []int{-1, 42, 999, 1049576, 9999999} {
 		if _, ok := virtualKeyRequest(action); ok {
 			t.Fatalf("接受無效 action %d", action)
 		}
@@ -57,5 +57,21 @@ func TestVirtualKeyboardDoesNotBlockPointer(t *testing.T) {
 	g.systemShortcut.request.Key = "delete"
 	if blocked, err := g.updateSystemShortcut(); !blocked || err != nil {
 		t.Fatal("確認對話框仍應阻塞輸入", blocked, err)
+	}
+}
+
+func TestVirtualKeyboardRightModifiers(t *testing.T) {
+	for _, platform := range []string{"darwin", "windows"} {
+		offset := 1000
+		if platform == "windows" {
+			offset += 8192
+		}
+		code, _ := rawkey.Code(platform, "e")
+		r, ok := virtualKeyRequest(offset + 4*65536 + code)
+		right, _ := rawkey.Code(platform, "rightalt")
+		events := r.Chord()
+		if !ok || r.Modifiers != 4 || len(events) != 4 || events[0].Code != right || events[3].Code != right || events[3].Modifiers != 0 {
+			t.Fatalf("右 Alt 遺失: %+v %+v", r, events)
+		}
 	}
 }

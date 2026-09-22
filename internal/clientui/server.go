@@ -27,6 +27,7 @@ import (
 	"yourdesk/internal/authlog"
 	"yourdesk/internal/childprocess"
 	"yourdesk/internal/clipboard"
+	"yourdesk/internal/remoteaudio"
 
 	"yourdesk/internal/agentremote"
 	"yourdesk/internal/deviceid"
@@ -94,11 +95,14 @@ type process struct {
 }
 type Preferences struct {
 	SelectedGroup           string   `json:"selectedGroup"`
+	SASPromptDismissed      bool     `json:"sasPromptDismissed"`
 	MCPWhitelistEnabled     bool     `json:"mcpWhitelistEnabled"`
 	MCPWhitelist            []string `json:"mcpWhitelist"`
 	MCPOpenDisplay          bool     `json:"mcpOpenDisplay"`
 	MCPEnabled              bool     `json:"mcpEnabled"`
 	AutoReconnect           bool     `json:"autoReconnect"`
+	RemoteAudio             bool     `json:"remoteAudio"`
+	AudioCodec              string   `json:"audioCodec"`
 	CloseWhenIdle           bool     `json:"closeWhenIdle"`
 	CloseWindowOnDisconnect bool     `json:"closeWindowOnDisconnect"`
 	FitWindow               bool     `json:"fitWindow"`
@@ -472,7 +476,7 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 		if p := s.children["quick"]; p != nil {
 			quick = map[string]any{"room": p.room, "stage": p.stage, "authRequired": p.authRequired, "message": p.authMessage}
 		}
-		respond(w, 200, map[string]any{"incomingConnected": s.incomingActive, "prelogin": s.preloginState(), "info": s.info, "library": publicLibrary(s.library), "running": running, "sessions": sessions, "notice": s.notice, "hostConflict": s.hostConflict, "quick": quick, "passwordPrompt": s.passwordPrompt(), "preferences": s.preferences, "updates": s.updater.snapshot(), "hardwareJPEG": video.CachedHardwareJPEG().Encode, "superResolutionCapabilities": superres.Capabilities(), "coreMLModels": superres.Models(), "appleInterpolationSupported": frameinterp.AppleSupported(), "videoCapabilities": hardwareprobe.CachedVideoCapabilities(), "hardwareDetection": hardwareprobe.Snapshot()})
+		respond(w, 200, map[string]any{"incomingConnected": s.incomingActive, "prelogin": s.preloginState(), "info": s.info, "library": publicLibrary(s.library), "running": running, "sessions": sessions, "notice": s.notice, "hostConflict": s.hostConflict, "quick": quick, "passwordPrompt": s.passwordPrompt(), "preferences": s.preferences, "updates": s.updater.snapshot(), "hardwareJPEG": video.CachedHardwareJPEG().Encode, "superResolutionCapabilities": superres.Capabilities(), "coreMLModels": superres.Models(), "appleInterpolationSupported": frameinterp.AppleSupported(), "audioCapabilities": hardwareprobe.CachedAudioCapabilities(), "videoCapabilities": hardwareprobe.CachedVideoCapabilities(), "hardwareDetection": hardwareprobe.Snapshot()})
 	case r.URL.Path == "/api/local-password" && r.Method == "PUT":
 		if s.preloginBusy || prelogin.Status().Enabled {
 			fail(w, errors.New("請先停用未登入開機，再修改配對密碼。"))
@@ -515,38 +519,9 @@ func (s *server) api(w http.ResponseWriter, r *http.Request) {
 			fail(w, err)
 			return
 		}
-		if (s.preloginBusy || prelogin.Status().Enabled) && (preferences.CodecGoal != s.preferences.CodecGoal || preferences.Codec != s.preferences.Codec || preferences.DirectListen != s.preferences.DirectListen || preferences.TailcatEnabled != s.preferences.TailcatEnabled) {
-			fail(w, errors.New("請先停用未登入開機，再修改 Host 的影像傳輸、IP 直連或 Tailcat 模式。"))
-			return
-		}
-		startedMCP := false
-		if preferences.MCPEnabled && s.mcpStop == nil {
-			stop, err := s.startMCP(s.updater.ctx)
-			if err != nil {
-				fail(w, fmt.Errorf("MCP 無法啟動：%w", err))
-				return
-			}
-			s.mcpStop = stop
-			startedMCP = true
-		}
-		if err := saveJSON(filepath.Join(filepath.Dir(s.configPath), "preferences.json"), preferences); err != nil {
-			if startedMCP {
-				s.mcpStop()
-				s.mcpStop = nil
-			}
+		if err := s.storePreferences(r.Context(), preferences, prelogin.Status().Enabled, prelogin.UpdateStreamSettings); err != nil {
 			fail(w, err)
 			return
-		}
-		if !preferences.MCPEnabled && s.mcpStop != nil {
-			s.mcpStop()
-			s.mcpStop = nil
-		}
-		hostChanged := s.preferences.CodecGoal != preferences.CodecGoal || s.preferences.Codec != preferences.Codec || s.preferences.DirectListen != preferences.DirectListen || s.preferences.TailcatEnabled != preferences.TailcatEnabled
-		s.preferences = preferences
-		if hostChanged {
-			if host := s.children["host"]; host != nil {
-				_ = host.cmd.Process.Kill()
-			}
 		}
 		respond(w, 200, map[string]bool{"ok": true})
 	case r.URL.Path == "/api/library/export" && r.Method == "POST":
@@ -995,7 +970,7 @@ func (s *server) start(kind, siteID, binary string, args []string) error {
 							}
 						case "clipboard-progress":
 							// 傳輸進度由各自的 遠端顯示 顯示，不喚起管理主畫面。
-						case "input-error":
+						case "input-error", "audio-error":
 							s.notice = event.Message
 						case "error":
 							p.failureMessage = event.Message
@@ -1233,6 +1208,9 @@ func (s *server) viewerBinary() string {
 }
 
 func (p Preferences) validate() error {
+	if err := (remoteaudio.Settings{Codec: p.AudioCodec}).Normalized().Validate(); err != nil {
+		return err
+	}
 	if p.AutoReconnect && p.CloseWindowOnDisconnect {
 		return errors.New("自動重連與斷線後自動關閉視窗不可同時啟用")
 	}

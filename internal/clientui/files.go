@@ -21,7 +21,7 @@ func (s *server) filesAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch in.Action {
-	case "status", "list", "stat", "read", "begin", "resume", "write", "commit", "cancel", "mkdir", "remove":
+	case "status", "location", "list", "stat", "read", "begin", "resume", "write", "commit", "cancel", "mkdir", "remove":
 	default:
 		fail(w, errors.New("不支援的檔案操作"))
 		return

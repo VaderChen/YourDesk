@@ -163,13 +163,29 @@ class ReleasePathTests(unittest.TestCase):
             self.assertIn('linux-arm64/ThirdPartyLicenses/nested/LICENSE', entries)
             self.assert_clean_names(entries)
 
+    def test_windows_service_zip_contains_exact_service_payload(self):
+        for arch in ('amd64', 'arm64'):
+            with self.subTest(arch=arch), tempfile.TemporaryDirectory() as temporary:
+                folder = Path(temporary)
+                names = ('yourdesk-client.exe', *release.windows_runtime.FFMPEG_DLLS)
+                for name in (*names, 'YourDesk.exe', 'personal.json'):
+                    self.write(folder, name)
+                self.write(folder, 'ThirdPartyLicenses/example/LICENSE')
+                self.add_metadata(folder / 'ThirdPartyLicenses')
+                with mock.patch.object(release.windows_runtime, 'validate'):
+                    archive = release.windows_service_zip(folder, 'fixture-windows', self.VERSION, arch)
+                with release.zipfile.ZipFile(archive) as package:
+                    self.assertEqual(set(package.namelist()), {*names, 'manifest.json', 'ThirdPartyLicenses/example/LICENSE'})
+                    self.assertEqual(json.loads(package.read('manifest.json')), {
+                        'version': self.VERSION, 'architecture': arch, 'protocol': 1})
+
     def test_mac_bundle_license_resources_omit_metadata(self):
         with tempfile.TemporaryDirectory() as temporary:
             folder = Path(temporary)
             for name in ('YourDesk', 'yourdesk-client', 'yourdesk-remote', *release.macos_build.RUNTIME_LIBRARIES):
                 self.write(folder, name)
             icon = self.write(folder, 'fixture.icns')
-            for name in ('libjpeg-turbo', 'FFmpeg'):
+            for name in ('libjpeg-turbo', 'FFmpeg', 'Opus'):
                 self.write(folder, f'ThirdPartyLicenses/{name}/nested/LICENSE')
                 self.add_metadata(folder / 'ThirdPartyLicenses' / name)
             with mock.patch.dict(release.os.environ, {'YOURDESK_MAC_ICON_PATH': str(icon)}), \
@@ -183,7 +199,7 @@ class ReleasePathTests(unittest.TestCase):
                 release.mac_bundle(folder, self.VERSION)
             resources = folder / 'YourDesk.app/Contents/Resources/ThirdPartyLicenses'
             names = {str(path.relative_to(resources)) for path in resources.rglob('*') if path.is_file()}
-            self.assertEqual(names, {'libjpeg-turbo/nested/LICENSE', 'FFmpeg/nested/LICENSE'})
+            self.assertEqual(names, {'libjpeg-turbo/nested/LICENSE', 'FFmpeg/nested/LICENSE', 'Opus/nested/LICENSE'})
 
     def test_mac_dmg_staging_copy_omits_metadata_before_signing(self):
         with tempfile.TemporaryDirectory() as temporary:

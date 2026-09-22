@@ -15,6 +15,7 @@ import (
 	"strings"
 	"sync"
 	"unicode/utf8"
+	"yourdesk/internal/filetransfer"
 )
 
 type fileProgress struct {
@@ -206,17 +207,21 @@ func safeDownloadName(name string) bool {
 	return name != "." && name != ".."
 }
 
-// 完成的下載是使用者的檔案，保留於下載目錄。OS 拖曳可能在視窗關閉後繼續複製。
+// 完成的下載直接保留於所選目錄；關閉視窗不刪除已完成檔案。
 func (c *fileDownloadClient) prepare(ctx context.Context, path string, progress func(fileProgress)) (out preparedFile, err error) {
-	return c.prepareWithControl(ctx, path, progress, nil)
+	return c.prepareWithControl(ctx, path, c.downloads, progress, nil)
 }
 
 func (c *fileDownloadClient) prepareControlled(control *fileDownloadControl, path string) (out preparedFile, err error) {
-	defer func() { control.finish(err) }()
-	return c.prepareWithControl(control.ctx, path, nil, control)
+	return c.prepareControlledAt(control, path, c.downloads)
 }
 
-func (c *fileDownloadClient) prepareWithControl(ctx context.Context, path string, progress func(fileProgress), control *fileDownloadControl) (out preparedFile, err error) {
+func (c *fileDownloadClient) prepareControlledAt(control *fileDownloadControl, path, directory string) (out preparedFile, err error) {
+	defer func() { control.finish(err) }()
+	return c.prepareWithControl(control.ctx, path, directory, nil, control)
+}
+
+func (c *fileDownloadClient) prepareWithControl(ctx context.Context, path, directory string, progress func(fileProgress), control *fileDownloadControl) (out preparedFile, err error) {
 	defer func() {
 		var pe *os.PathError
 		var le *os.LinkError
@@ -231,23 +236,20 @@ func (c *fileDownloadClient) prepareWithControl(ctx context.Context, path string
 	if meta.Directory || !safeDownloadName(meta.Name) || meta.Size < 0 || meta.Size > 2<<30 || meta.Modified == "" {
 		return out, errors.New("只能下載名稱有效且不超過 2 GiB 的一般檔案")
 	}
-	root, err := os.OpenRoot(c.downloads)
+	root, err := os.OpenRoot(directory)
 	if err != nil {
-		return out, errors.New("無法開啟系統下載目錄")
+		return out, errors.New("無法開啟所選下載目錄")
 	}
 	defer root.Close()
-	if err = root.Mkdir("YourDesk", 0700); err != nil && !errors.Is(err, os.ErrExist) {
+	name := meta.Name
+	if _, err := root.Lstat(name); err == nil {
+		return out, errors.New("下載檔名已存在，不會覆寫既有檔案")
+	} else if !errors.Is(err, os.ErrNotExist) {
 		return out, err
 	}
-	batch := filepath.Join("YourDesk", "transfer-"+rand.Text())
-	if err = root.Mkdir(batch, 0700); err != nil {
-		return out, err
-	}
-	name := filepath.Join(batch, meta.Name)
-	partial := filepath.Join(batch, ".yourdesk-part-"+rand.Text())
+	partial := ".yourdesk-part-" + rand.Text()
 	f, err := root.OpenFile(partial, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 	if err != nil {
-		_ = root.Remove(batch)
 		return out, err
 	}
 	original, err := f.Stat()
@@ -276,7 +278,6 @@ func (c *fileDownloadClient) prepareWithControl(ctx context.Context, path string
 			if ownedPartial() {
 				_ = root.Remove(partial)
 			}
-			_ = root.Remove(batch)
 		}
 	}()
 	emitProgress := func(received int64) {
@@ -346,16 +347,12 @@ func (c *fileDownloadClient) prepareWithControl(ctx context.Context, path string
 	if err = f.Close(); err != nil {
 		return out, err
 	}
-	// Link publishes without replacing an existing destination, even if one
-	// appears after the identity check. Unsupported filesystems fail safely.
+	// 使用與上傳相同的不覆寫提交，不要求目的磁碟支援硬連結。
 	if !ownedPartial() {
 		return out, errors.New("本機暫存檔已被替換；請重新下載")
 	}
-	if err = root.Link(partial, name); err != nil {
-		if errors.Is(err, os.ErrExist) {
-			return out, errors.New("下載檔名已存在，不會覆寫既有檔案")
-		}
-		return out, errors.New("無法安全完成下載；請確認下載目錄可寫入且支援硬連結（exFAT 不支援），或改用其他下載目錄")
+	if err = filetransfer.PublishFile(root, partial, name, original); err != nil {
+		return out, errors.New("無法完成下載：目的檔案已存在或目錄無法寫入")
 	}
 	published, err := root.Lstat(name)
 	if err != nil || !published.Mode().IsRegular() || !os.SameFile(original, published) {
@@ -365,5 +362,5 @@ func (c *fileDownloadClient) prepareWithControl(ctx context.Context, path string
 		_ = root.Remove(partial)
 	}
 	complete = true
-	return preparedFile{Name: meta.Name, Size: meta.Size, Path: filepath.Join(c.downloads, name)}, nil
+	return preparedFile{Name: meta.Name, Size: meta.Size, Path: filepath.Join(directory, name)}, nil
 }

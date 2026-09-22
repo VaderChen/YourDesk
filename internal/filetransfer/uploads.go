@@ -30,11 +30,12 @@ type transferHub struct {
 }
 
 type transferIdentity struct {
-	owner     *session
-	home      os.FileInfo
-	path      string
-	size      int64
-	tokenHash [sha256.Size]byte
+	filesystem bool
+	owner      *session
+	home       os.FileInfo
+	path       string
+	size       int64
+	tokenHash  [sha256.Size]byte
 }
 
 type upload struct {
@@ -128,7 +129,7 @@ func (s *session) begin(raw json.RawMessage) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.uploads[id] = &upload{transferIdentity: transferIdentity{owner: s, home: s.homeInfo, path: name, size: in.Size, tokenHash: sha256.Sum256([]byte(token))}, parent: r, file: f, temp: temp, name: base, touched: s.now()}
+	s.uploads[id] = &upload{transferIdentity: transferIdentity{filesystem: s.filesystem != nil, owner: s, home: s.homeInfo, path: name, size: in.Size, tokenHash: sha256.Sum256([]byte(token))}, parent: r, file: f, temp: temp, name: base, touched: s.now()}
 	s.reserved += in.Size
 	keep = true
 	return map[string]any{"id": id, "resumeToken": token, "state": "uploading", "nextOffset": int64(0)}, nil
@@ -174,7 +175,7 @@ func (s *session) resume(raw json.RawMessage) (any, error) {
 		identity = &c.transferIdentity
 	}
 	hash := sha256.Sum256([]byte(in.Token))
-	if identity == nil || subtle.ConstantTimeCompare(identity.tokenHash[:], hash[:]) != 1 || identity.path != name || identity.size != in.Size || !os.SameFile(identity.home, s.homeInfo) {
+	if identity == nil || identity.filesystem != (s.filesystem != nil) || subtle.ConstantTimeCompare(identity.tokenHash[:], hash[:]) != 1 || identity.path != name || identity.size != in.Size || !os.SameFile(identity.home, s.homeInfo) {
 		return nil, errors.New("續傳憑證不符、已逾時或主機已重新啟動")
 	}
 	if identity.owner != s && ownerLive(identity.owner) {
@@ -431,7 +432,7 @@ func sameVersion(a, b os.FileInfo) bool {
 
 func (s *session) conflictsWithUpload(name string, directory bool) bool {
 	for _, u := range s.uploads {
-		if !os.SameFile(u.home, s.homeInfo) {
+		if u.filesystem != (s.filesystem != nil) || !os.SameFile(u.home, s.homeInfo) {
 			continue
 		}
 		// Actual protected staging names are checked again during traversal; this

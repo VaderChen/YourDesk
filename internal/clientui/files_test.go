@@ -177,12 +177,11 @@ func TestFileDownloadBoundedAndPersistent(t *testing.T) {
 			if out.Size != int64(size) || out.Name != "範例 👋.txt" || len(progress) == 0 {
 				t.Fatal("metadata missing")
 			}
-			second, err := client.prepare(context.Background(), "sample", nil)
-			if err != nil {
-				t.Fatal(err)
+			if out.Path != filepath.Join(client.downloads, out.Name) {
+				t.Fatal("下載未直接存入所選目錄")
 			}
-			if second.Path == out.Path {
-				t.Fatal("second download overwrites source")
+			if _, err := client.prepare(context.Background(), "sample", nil); err == nil {
+				t.Fatal("重複下載不應覆寫既有檔案")
 			}
 			if _, err = os.Stat(out.Path); err != nil {
 				t.Fatal("completed source removed")
@@ -205,7 +204,7 @@ func TestFileDownloadFailureRemovesOnlyOwnPartial(t *testing.T) {
 			if err == nil {
 				t.Fatal("expected failure")
 			}
-			entries, e := os.ReadDir(filepath.Join(client.downloads, "YourDesk"))
+			entries, e := os.ReadDir(client.downloads)
 			if e != nil && !os.IsNotExist(e) {
 				t.Fatal(e)
 			}

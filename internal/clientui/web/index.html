@@ -50,7 +50,7 @@
           <section id="settings-panel-advanced" role="tabpanel" aria-labelledby="settings-tab-advanced" tabindex="0" hidden>
             <h3 class="settings-panel-title">進階設定</h3>
             <div class="preference-row experimental-unavailable" tabindex="0" data-tooltip="登入系統前也能接受遠端連線；目前不支援。"><label for="ui-prelogin"><span>登入前啟動</span> <span class="experimental-badge">實驗性功能</span></label><input id="ui-prelogin" class="preference-switch" type="checkbox" role="switch" disabled aria-describedby="prelogin-access-reason"><span id="prelogin-access-reason" class="help-description">登入系統前也能接受遠端連線；目前不支援。</span></div>
-            <p><button id="authorize-sas" type="button" hidden>授權 Ctrl+Alt+Del</button></p>
+            <div id="sas-permission-row" class="preference-row" hidden data-tooltip="關閉只停用 YourDesk 傳送 Ctrl+Alt+Del，不會關閉登入前服務。"><label for="authorize-sas">授權 Ctrl+Alt+Del</label><input id="authorize-sas" class="preference-switch" type="checkbox" role="switch"></div>
             <p id="prelogin-progress" class="form-note" role="status" aria-live="polite"></p>
             <div class="preference-row"><label for="ui-hints">顯示使用提示</label><input id="ui-hints" class="preference-switch" type="checkbox" role="switch" checked></div>
             <div class="preference-row"><label for="ui-key-mapping">MacOS/Windows 按鍵映射</label><input id="ui-key-mapping" class="preference-switch" type="checkbox" role="switch" checked></div>
@@ -58,6 +58,7 @@
             <div class="preference-row" data-tooltip="斷線後自動關閉桌面或命令列視窗；關閉時保留畫面與輸出。"><label for="ui-close-on-disconnect">斷線後自動關閉視窗</label><input id="ui-close-on-disconnect" class="preference-switch" type="checkbox" role="switch"></div>
             <div class="preference-row" data-tooltip="斷線後保留視窗並在背景重連，連續失敗三次才關閉。與斷線後自動關閉視窗互斥。"><label for="ui-auto-reconnect"><span>斷線後自動重連</span> <span class="experimental-badge">實驗性功能</span></label><input id="ui-auto-reconnect" class="preference-switch" type="checkbox" role="switch"></div>
             <div class="preference-row" data-tooltip="啟用後，遠端桌面連續 15 分鐘沒有滑鼠或鍵盤操作就關閉連線與視窗；心跳與畫面更新不算操作。"><label for="ui-close-when-idle">長時間未操作自動關閉</label><input id="ui-close-when-idle" class="preference-switch" type="checkbox" role="switch"></div>
+            <div class="preference-row"><label for="ui-remote-audio"><span>開啟遠端聲音</span> <span class="experimental-badge">實驗性功能</span></label><input id="ui-remote-audio" class="preference-switch" type="checkbox" role="switch"></div>
           </section>
           <section id="settings-panel-security" role="tabpanel" aria-labelledby="settings-tab-security" tabindex="0" hidden>
             <h3 class="settings-panel-title">網路安全</h3>
@@ -73,7 +74,11 @@
             <div class="preference-row" data-tooltip="FPS 越高越流暢；碼率越高通常越清晰，也更耗流量。"><label for="ui-bitrate-limit">碼率上限（Mbps）</label><input id="ui-bitrate-limit" type="number" required min="1" max="64" step="1" value="12"></div>
 
             <div class="preference-row" data-tooltip="數值越小，畫面越快恢復，也更耗流量；僅適用 H.264／HEVC。"><label for="ui-gop">GOP（關鍵影格間隔）</label><input id="ui-gop" type="number" required min="1" max="300" step="1" value="10"></div>
-            <div class="preference-row" data-tooltip="設定本機畫面傳輸到遠端時使用的編碼；實際使用的編碼也需配合對方的解碼能力。變更會中斷目前連線；無法使用的選項會停用。"><label for="stream-codec">傳輸到遠端的編碼</label><select id="stream-codec" data-tooltip="設定本機畫面傳輸到遠端時使用的編碼；實際使用的編碼也需配合對方的解碼能力。變更會中斷目前連線；無法使用的選項會停用。"></select></div><p class="help-description">設定本機畫面傳輸到遠端時使用的編碼；實際使用的編碼也需配合對方的解碼能力。變更會中斷目前連線；無法使用的選項會停用。</p><div class="preference-row" data-tooltip="自動編碼的選擇偏好；變更會重新建立目前連線。"><label for="stream-codec-goal">傳輸策略</label><select id="stream-codec-goal"><option value="balanced">均衡</option><option value="low-latency">低延遲</option><option value="bandwidth">省頻寬</option></select></div><dl class="settings-details"><div><dt>連線方式</dt><dd id="transport-summary">WebRTC / 自動協商</dd></div><div><dt>畫面通道</dt><dd>低延遲、不重傳</dd></div><div><dt>控制通道</dt><dd>可靠、有序傳輸</dd></div></dl>
+            <div class="preference-row" data-tooltip="設定本機畫面傳輸到遠端時使用的編碼；實際使用的編碼也需配合對方的解碼能力。變更會中斷目前連線；無法使用的選項會停用。"><label for="stream-codec">影像輸出編碼</label><select id="stream-codec" data-tooltip="設定本機畫面傳輸到遠端時使用的編碼；實際使用的編碼也需配合對方的解碼能力。變更會中斷目前連線；無法使用的選項會停用。"></select></div><p class="help-description">設定本機畫面傳輸到遠端時使用的編碼；實際使用的編碼也需配合對方的解碼能力。變更會中斷目前連線；無法使用的選項會停用。</p>
+            <div id="audio-codec-row" class="preference-row"><label for="ui-audio-codec">聲音輸出編碼</label><select id="ui-audio-codec" disabled><option value="opus">聲音能力偵測中…</option><optgroup label="可用"></optgroup><optgroup label="不支援" disabled></optgroup></select></div>
+            <p id="audio-quality-note" class="help-description" hidden>聲音品質跟隨顯示區域的低流量／標準／高畫質選項。</p>
+            <p id="audio-capabilities" class="form-note" role="status" hidden></p>
+            <div class="preference-row" data-tooltip="自動編碼的選擇偏好；變更會重新建立目前連線。"><label for="stream-codec-goal">傳輸策略</label><select id="stream-codec-goal"><option value="balanced">均衡</option><option value="low-latency">低延遲</option><option value="bandwidth">省頻寬</option></select></div><dl class="settings-details"><div><dt>連線方式</dt><dd id="transport-summary">WebRTC / 自動協商</dd></div><div><dt>畫面通道</dt><dd>低延遲、不重傳</dd></div><div><dt>控制通道</dt><dd>可靠、有序傳輸</dd></div></dl>
 <p id="stream-auto-status" class="form-note" role="status" aria-live="polite" hidden></p>
  </section>
           <section id="settings-panel-enhancement" role="tabpanel" aria-labelledby="settings-tab-enhancement" tabindex="0" hidden>

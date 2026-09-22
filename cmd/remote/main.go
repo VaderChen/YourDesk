@@ -81,6 +81,7 @@ type game struct {
 	rawSupported                    atomic.Bool
 	rawActive                       bool
 	rawHeld                         map[int]rawkey.Event
+	audioQuality                    atomic.Int32
 	quality                         int
 	qualitySize                     [2]int
 	qualityChangedAt, qualitySentAt time.Time
@@ -615,6 +616,7 @@ func main() {
 	defer g.preferences.Close()
 	g.mode = viewMode(g.preferences.current.Scale)
 	g.quality = g.preferences.current.Quality
+	g.audioQuality.Store(int32(g.quality))
 	g.controlEnabled = g.preferences.current.Control
 	g.restorePreferences, g.restoreDisplay = true, true
 	connection, err := openViewerConnection(ctx, handshakeCtx, sig, g, *codec, peertransport.Mode(*transport), false)

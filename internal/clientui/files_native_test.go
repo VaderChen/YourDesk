@@ -43,7 +43,7 @@ func TestNativeFilesWindows(t *testing.T) {
 const report=status=>fetch('/notice?id='+encodeURIComponent(id)+'&status='+encodeURIComponent(status));
 (async()=>{
  try {
-  for(const name of ['yourdeskStartFile','yourdeskPrepareFile','yourdeskPauseFile','yourdeskResumeFile','yourdeskCancelFile','yourdeskCloseFiles','yourdeskFilesSession','yourdeskFilesReady'])
+  for(const name of ['yourdeskListDirectories','yourdeskStartFile','yourdeskPrepareFile','yourdeskPauseFile','yourdeskResumeFile','yourdeskCancelFile','yourdeskCloseFiles','yourdeskFilesSession','yourdeskFilesReady'])
    if(typeof window[name]!=='function')throw new Error('missing '+name);
   window.addEventListener('yourdesk-request-close',()=>void window.yourdeskCloseFiles());
   await window.yourdeskFilesReady();
@@ -54,14 +54,15 @@ const report=status=>fetch('/notice?id='+encodeURIComponent(id)+'&status='+encod
    await window.yourdeskCloseFiles();
    return;
   }
+  const destination=(await window.yourdeskListDirectories('',0)).path;
   let rejected=false;
-  try { await window.yourdeskPrepareFile('missing-test-file'); }
+  try { await window.yourdeskPrepareFile('missing-test-file',destination); }
   catch(error) { rejected=String(error).includes('isolated fixture: missing file'); }
   if(!rejected)throw new Error('download did not reject the remote error');
   await window.yourdeskCancelFile();
   await report('rejected');
   let settled=false;
-  const pending=window.yourdeskPrepareFile('cancel-test-file').then(()=>{settled=true;return false},()=>{settled=true;return true});
+  const pending=window.yourdeskPrepareFile('cancel-test-file',destination).then(()=>{settled=true;return false},()=>{settled=true;return true});
   const waiting=await fetch('/wait-pending');
   if(!waiting.ok)throw new Error('pending request did not start');
   const paused=await window.yourdeskPauseFile();

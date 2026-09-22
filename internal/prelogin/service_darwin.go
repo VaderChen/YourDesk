@@ -375,6 +375,7 @@ func runDaemon(ctx context.Context) error {
 	}
 	var lease sync.Mutex
 	var connectionMu sync.Mutex
+	var configRevision uint64
 	var target *net.UnixConn
 	var connected bool
 	for {
@@ -400,15 +401,40 @@ func runDaemon(ctx context.Context) error {
 			decoder := json.NewDecoder(io.LimitReader(conn, 1<<20))
 			conn.SetReadDeadline(time.Now().Add(3 * time.Second))
 			var request struct {
-				Operation string `json:"operation"`
+				Operation string          `json:"operation"`
+				Stream    *StreamSettings `json:"stream,omitempty"`
 			}
 			if decoder.Decode(&request) != nil {
 				return
 			}
 			conn.SetReadDeadline(time.Time{})
-			if request.Operation == "status" || request.Operation == "disconnect" {
+			if request.Operation == "stream-settings" && request.Stream != nil {
+				connectionMu.Lock()
+				changed, err := applyStreamSettings(&c, *request.Stream, func(next Config) error {
+					return saveStreamConfig(configFile, next)
+				})
+				if changed {
+					configRevision++
+					// 只回收目前 Host；broker 與 launchd 註冊持續啟用。
+					if target != nil {
+						_ = target.Close()
+					}
+				}
+				connectionMu.Unlock()
+				reply := streamSettingsReply{OK: err == nil}
+				if err != nil {
+					reply.Error = err.Error()
+				}
+				conn.SetWriteDeadline(time.Now().Add(time.Second))
+				_ = json.NewEncoder(conn).Encode(reply)
+				return
+			}
+			if request.Operation == "status" || request.Operation == "disconnect" || request.Operation == "health" {
 				connectionMu.Lock()
 				active := connected
+				if request.Operation == "health" {
+					active = target != nil
+				}
 				if request.Operation == "disconnect" && connected && target != nil {
 					target.SetWriteDeadline(time.Now().Add(time.Second))
 					if json.NewEncoder(target).Encode(map[string]bool{"disconnect": true}) != nil {
@@ -445,7 +471,10 @@ func runDaemon(ctx context.Context) error {
 				time.Sleep(6 * time.Second)
 			}()
 			conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
-			if json.NewEncoder(conn).Encode(c) != nil {
+			connectionMu.Lock()
+			agentConfig, agentRevision := c, configRevision
+			connectionMu.Unlock()
+			if json.NewEncoder(conn).Encode(agentConfig) != nil {
 				return
 			}
 			// 記錄真正的直屬 Host，工作階段切換時由 broker 保證回收。
@@ -469,6 +498,10 @@ func runDaemon(ctx context.Context) error {
 			}()
 			// 只授權目前圖形工作階段。socket EOF 同時是回收 Host 的指令。
 			connectionMu.Lock()
+			if agentRevision != configRevision {
+				connectionMu.Unlock()
+				return // 啟動途中編碼已更新，重建代理以免套用舊設定。
+			}
 			target = conn
 			connected = false
 			connectionMu.Unlock()

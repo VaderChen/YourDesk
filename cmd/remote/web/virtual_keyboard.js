@@ -38,7 +38,7 @@
    b.onclick=()=>{
     if(bit){mods^=bit;root.querySelectorAll('[data-mod]').forEach(k=>k.setAttribute('aria-pressed',String(!!(mods&Number(k.dataset.mod)))));return}
     if(name==='capslock'){caps=!caps;b.setAttribute('aria-pressed',String(caps))}
-    send(1000+(platform==='windows'?8192:0)+(caps?16384:0)+(mods&15)*512+(mods&32?32768:0)+code);reset();
+    send(1000+(platform==='windows'?8192:0)+(caps?16384:0)+(mods&15)*512+(mods&32?32768:0)+((mods>>6)&15)*65536+code);reset();
    };
    if(bit)b.dataset.mod=bit;
    return b;
@@ -55,9 +55,9 @@
     [['graveaccent','`'],...Array.from('1234567890',n=>[n,n]),['minus','−'],['equal','='],['backspace',mac?'Delete':'Backspace',2]],
     [['tab','Tab',1.5],...Array.from('qwertyuiop',n=>[n]),['leftbracket','['],['rightbracket',']'],['backslash','\\',1.5]],
     [['capslock','Caps Lock',1.8],...Array.from('asdfghjkl',n=>[n]),['semicolon',';'],['apostrophe',"'"],['enter',mac?'Return':'Enter',2.2]],
-    [['leftshift','Shift',2.3,1],...Array.from('zxcvbnm',n=>[n]),['comma',','],['period','.'],['slash','/'],['rightshift','Shift',2.7,1]],
-    mac?[['leftcontrol','Control',1.5,2],['leftalt','Option',1.5,4],['leftsuper','⌘',1.5,8],['space','',6],['rightsuper','⌘',1.5,8],['rightalt','Option',1.5,4],['rightcontrol','Control',1.5,2]]:
-    [['leftcontrol','Ctrl',1.4,2],['leftsuper','Win',1.2,8],['leftalt','Alt',1.2,4],['space','',6],['rightalt','Alt',1.2,4],['rightsuper','Win',1.2,8],['menu','Menu',1.2],['rightcontrol','Ctrl',1.4,2]]
+    [['leftshift','Shift',2.3,1],...Array.from('zxcvbnm',n=>[n]),['comma',','],['period','.'],['slash','/'],['rightshift','Shift',2.7,64]],
+    mac?[['leftcontrol','Control',1.5,2],['leftalt','Option',1.5,4],['leftsuper','⌘',1.5,8],['space','',6],['rightsuper','⌘',1.5,512],['rightalt','Option',1.5,256],['rightcontrol','Control',1.5,128]]:
+    [['leftcontrol','Ctrl',1.4,2],['leftsuper','Win',1.2,8],['leftalt','Alt',1.2,4],['space','',6],['rightalt','Alt',1.2,256],['rightsuper','Win',1.2,512],['menu','Menu',1.2],['rightcontrol','Ctrl',1.4,128]]
    ];
    rows.forEach(row=>{const el=document.createElement('div');el.className='vk-row';row.forEach(args=>el.append(key(...args)));main.append(el)});
    const nav=document.createElement('div');nav.className='vk-nav';body.append(nav);

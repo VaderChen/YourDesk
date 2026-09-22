@@ -43,7 +43,7 @@ func (s *session) cancel(raw json.RawMessage) (any, error) {
 		}
 		if identity != nil {
 			hash := sha256.Sum256([]byte(*in.Token))
-			if subtle.ConstantTimeCompare(identity.tokenHash[:], hash[:]) != 1 || identity.path != name || identity.size != *in.Size || !os.SameFile(identity.home, s.homeInfo) {
+			if identity.filesystem != (s.filesystem != nil) || subtle.ConstantTimeCompare(identity.tokenHash[:], hash[:]) != 1 || identity.path != name || identity.size != *in.Size || !os.SameFile(identity.home, s.homeInfo) {
 				return nil, errors.New("取消憑證不符")
 			}
 			if identity.owner != s && ownerLive(identity.owner) {

@@ -235,6 +235,7 @@ func openViewerConnection(parent, handshakeCtx context.Context, sig *signaling.C
 		return connection, err
 	}
 	connection.peer = peer
+	connection.startAudio(ctx, g)
 	connection.workers.Add(1)
 	go func() {
 		defer connection.workers.Done()

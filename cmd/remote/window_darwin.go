@@ -22,6 +22,7 @@ int yd_titlebar_action(void);
 int yd_virtual_keyboard_hit(void);
 void yd_set_titlebar_mode(int mode);
 void yd_set_codec_status(const char *codec,const char *source,const char *receiver);
+void yd_set_audio_status(const char *json);
 void yd_set_traffic(double tx, double rx, double fps, int render);
 void yd_set_quality(int quality);
 void yd_set_enhancement_status(const char *json);
@@ -86,6 +87,16 @@ func nativeSetCodecStatus(codec, source, receiver string) {
 	defer C.free(unsafe.Pointer(s))
 	defer C.free(unsafe.Pointer(r))
 	C.yd_set_codec_status(c, s, r)
+}
+
+func nativeSetAudioStatus(status audioDisplayStatus) {
+	data, err := json.Marshal(status)
+	if err != nil {
+		return
+	}
+	value := C.CString(string(data))
+	defer C.free(unsafe.Pointer(value))
+	C.yd_set_audio_status(value)
 }
 
 func nativeShowCloseConfirmation() { C.yd_show_close_confirmation() }

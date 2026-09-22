@@ -18,6 +18,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 import turbojpeg
 import ffmpeg
+import opus
 import windows_runtime
 import macos_build
 
@@ -163,7 +164,9 @@ def compile_program(name, folder, target, version):
             turbojpeg.copy_licenses(source, folder)
             if system in ('windows', 'darwin'):
                 env, ffmpeg_prefix = ffmpeg.prepare(target, env)
-                tags = ['-tags', 'turbojpeg,ffmpeg']
+                env, opus_source = opus.prepare(target, env)
+                opus.copy_licenses(opus_source, folder)
+                tags = ['-tags', 'turbojpeg,ffmpeg,opus']
                 ffmpeg.copy_runtime(ffmpeg_prefix, folder)
         run(['go', 'build', *tags, '-buildvcs=false', '-trimpath', '-ldflags', flags, '-o', folder / output, './cmd/' + name], env)
         if system == 'darwin':
@@ -282,10 +285,8 @@ def mac_bundle(folder, version):
             run(['iconutil', '-c', 'icns', iconset, '-o', resources / 'AppIcon.icns'])
         info['CFBundleIconFile'] = 'AppIcon.icns'
     copy_project_licenses(resources)
-    if (folder / 'ThirdPartyLicenses' / 'libjpeg-turbo').is_dir():
-        shutil.copytree(folder / 'ThirdPartyLicenses' / 'libjpeg-turbo', resources / 'ThirdPartyLicenses' / 'libjpeg-turbo', dirs_exist_ok=True, ignore=ignore_filesystem_metadata)
-    if (folder / 'ThirdPartyLicenses/FFmpeg').is_dir():
-        shutil.copytree(folder / 'ThirdPartyLicenses/FFmpeg', resources / 'ThirdPartyLicenses/FFmpeg', dirs_exist_ok=True, ignore=ignore_filesystem_metadata)
+    if (folder / 'ThirdPartyLicenses').is_dir():
+        shutil.copytree(folder / 'ThirdPartyLicenses', resources / 'ThirdPartyLicenses', dirs_exist_ok=True, ignore=ignore_filesystem_metadata)
     copy_model_licenses(resources)
     (app / 'Contents/Info.plist').write_bytes(plistlib.dumps(info))
     identity = signing_identity()
@@ -525,6 +526,25 @@ def windows_installer(folder, stem, version, arch):
         old_zip.unlink()
 
 
+def windows_service_zip(folder, stem, version, arch):
+    # 服務只載入此專用套件；普通使用者安裝器不能以 SYSTEM 執行。
+    files = ('yourdesk-client.exe', *windows_runtime.FFMPEG_DLLS)
+    windows_runtime.validate(folder, ('yourdesk-client.exe',))
+    with tempfile.TemporaryDirectory(prefix='yourdesk-service-') as temporary:
+        stage = Path(temporary)
+        archive = stage / (stem + '-service.zip')
+        with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as output:
+            output.writestr('manifest.json', json.dumps({
+                'version': version, 'architecture': arch, 'protocol': 1}))
+            for name in files:
+                output.write(folder / name, name)
+            for item in sorted((folder / 'ThirdPartyLicenses').rglob('*')):
+                if item.is_file() and not is_filesystem_metadata(item.relative_to(folder)):
+                    output.write(item, item.relative_to(folder))
+        shutil.copy2(archive, folder / archive.name)
+    return folder / archive.name
+
+
 def windows_portable_zip(folder, stem, version):
     # 明列執行時內容，避免把舊安裝程式或 ZIP 再包入免安裝版。
     programs = ('YourDesk.exe', 'yourdesk-client.exe', 'yourdesk-remote.exe')
@@ -595,6 +615,7 @@ def pack(release, targets=None):
                 run(['spctl', '--assess', '--type', 'open', '--context', 'context:primary-signature', '--verbose=2', output])
         elif system == 'windows':
             windows_installer(folder, stem, version, arch)
+            windows_service_zip(folder, stem, version, arch)
             if arch == 'amd64':
                 windows_portable_zip(folder, stem, version)
         elif system == 'linux':

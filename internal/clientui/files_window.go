@@ -34,15 +34,11 @@ func RunFilesWindow(parent context.Context) error {
 	if err != nil {
 		return err
 	}
-	downloads, err := fileDownloadsDirectory()
-	if err != nil {
-		return err
-	}
 	ctx, stop := context.WithCancel(parent)
 	defer stop()
 	transport := &http.Transport{Proxy: nil, MaxConnsPerHost: 2}
 	defer transport.CloseIdleConnections()
-	client := &fileDownloadClient{endpoint: u.Scheme + "://" + u.Host + "/api/files", token: params.Get("token"), session: params.Get("session"), instance: params.Get("instance"), downloads: downloads,
+	client := &fileDownloadClient{endpoint: u.Scheme + "://" + u.Host + "/api/files", token: params.Get("token"), session: params.Get("session"), instance: params.Get("instance"),
 		client: &http.Client{Transport: transport, Timeout: 12 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("不允許下載連線重新導向") }}}
 	window := webview.New(false)
 	defer window.Destroy()
@@ -52,11 +48,6 @@ func RunFilesWindow(parent context.Context) error {
 	window.SetTitle(in.Title)
 	window.SetSize(700, 560, webview.HintMin)
 	window.SetSize(1000, 740, webview.HintNone)
-	setPaths, cleanup, err := installFileDrag(window.Window())
-	if err != nil {
-		return err
-	}
-	defer cleanup()
 	var lifetime sync.Mutex
 	alive := true
 	dispatch := func(f func()) {
@@ -86,6 +77,11 @@ func RunFilesWindow(parent context.Context) error {
 		return err
 	}
 	defer removeClose()
+	removePicker, err := installFilesPicker(window.Window())
+	if err != nil {
+		return err
+	}
+	defer removePicker()
 	var jobMu sync.Mutex
 	var current *fileDownloadControl
 	var workers sync.WaitGroup
@@ -103,7 +99,34 @@ func RunFilesWindow(parent context.Context) error {
 		}
 		workers.Wait()
 	}()
-	if err = window.Bind("yourdeskStartFile", func(path, id string) error {
+	directorySlot := make(chan struct{}, 1)
+	if err = window.Bind("yourdeskStartDirectoryList", func(path string, offset int, id string) error {
+		if len(path) > 4096 || id == "" || len(id) > 64 {
+			return errors.New("目錄參數無效")
+		}
+		select {
+		case directorySlot <- struct{}{}:
+		default:
+			return errors.New("正在讀取本機目錄")
+		}
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			defer func() { <-directorySlot }()
+			out, err := listLocalDirectories(ctx, path, offset)
+			dispatch(func() {
+				result := map[string]any{"id": id, "result": out}
+				if err != nil {
+					result["error"] = err.Error()
+				}
+				emit("yourdesk-directory-result", result)
+			})
+		}()
+		return nil
+	}); err != nil {
+		return err
+	}
+	if err = window.Bind("yourdeskStartFile", func(path, directory, id string) error {
 		if len(path) > 2048 || path == "" || len(id) > 64 || id == "" {
 			return errors.New("下載參數無效")
 		}
@@ -113,7 +136,11 @@ func RunFilesWindow(parent context.Context) error {
 			return errors.New("請等待目前下載完成或取消")
 		}
 		jobMu.Unlock()
-		if err := setPaths(nil); err != nil {
+		if directory == "" {
+			return errors.New("請先選擇下載目錄")
+		}
+		destination, err := localDirectoryPath(directory)
+		if err != nil {
 			return err
 		}
 		var job *fileDownloadControl
@@ -135,7 +162,7 @@ func RunFilesWindow(parent context.Context) error {
 		workers.Add(1)
 		go func() {
 			defer workers.Done()
-			out, err := client.prepareControlled(job, path)
+			out, err := client.prepareControlledAt(job, path, destination)
 			dispatch(func() {
 				if err == nil {
 					err = job.ctx.Err()
@@ -150,10 +177,7 @@ func RunFilesWindow(parent context.Context) error {
 				if !active {
 					return
 				}
-				if err == nil {
-					err = setPaths([]string{out.Path})
-				}
-				result := map[string]any{"id": id, "name": out.Name, "size": out.Size}
+				result := map[string]any{"id": id, "name": out.Name, "size": out.Size, "path": out.Path}
 				if err != nil {
 					result["error"] = err.Error()
 				}
@@ -212,11 +236,17 @@ func RunFilesWindow(parent context.Context) error {
 		return err
 	}
 	// Interruption keeps this Promise pending until explicit resume/cancel.
-	window.Init(`window.yourdeskPrepareFile = path => new Promise((resolve,reject) => {
+	window.Init(`window.yourdeskListDirectories = (path,offset=0) => new Promise((resolve,reject) => {
+	 const id=crypto.randomUUID();
+	 const done=event=>{if(event.detail.id!==id)return;window.removeEventListener('yourdesk-directory-result',done);event.detail.error?reject(new Error(event.detail.error)):resolve(event.detail.result)};
+	 window.addEventListener('yourdesk-directory-result',done);
+	 window.yourdeskStartDirectoryList(path,offset,id).catch(error=>{window.removeEventListener('yourdesk-directory-result',done);reject(new Error(String(error)))});
+	});
+	window.yourdeskPrepareFile = (path,directory) => new Promise((resolve,reject) => {
 	 const id=crypto.randomUUID();
 	 const done=event=>{if(event.detail.id!==id)return;window.removeEventListener('yourdesk-file-result',done);event.detail.error?reject(new Error(event.detail.error)):resolve(event.detail)};
 	 window.addEventListener('yourdesk-file-result',done);
-	 window.yourdeskStartFile(path,id).catch(error=>{window.removeEventListener('yourdesk-file-result',done);reject(new Error(String(error)))});
+	 window.yourdeskStartFile(path,directory,id).catch(error=>{window.removeEventListener('yourdesk-file-result',done);reject(new Error(String(error)))});
 	});`)
 	window.Navigate(in.URL)
 	done := make(chan struct{})

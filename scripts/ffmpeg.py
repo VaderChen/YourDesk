@@ -374,10 +374,12 @@ if __name__ == '__main__':
         raise SystemExit('用法：python3 scripts/ffmpeg.py 平台/架構 go test|build [參數]')
     import release
     import turbojpeg
+    import opus
     target = sys.argv[1]
     try:
         env, prefix = prepare(target, release.environment(target, True))
         env, jpeg_source = turbojpeg.prepare(target, env)
+        env, opus_source = opus.prepare(target, env)
     except RuntimeError as error:
         raise SystemExit(str(error))
     except subprocess.CalledProcessError as error:
@@ -390,7 +392,7 @@ if __name__ == '__main__':
         libraries = os.pathsep.join(filter(None, (str(prefix / 'lib'), env.get('DYLD_LIBRARY_PATH', ''))))
         test_flags = ['-exec', '/usr/bin/env ' + shlex.quote('DYLD_LIBRARY_PATH=' + libraries)]
     try:
-        subprocess.run(sys.argv[2:4] + ['-tags', 'turbojpeg,ffmpeg'] + test_flags + sys.argv[4:], env=env, check=True)
+        subprocess.run(sys.argv[2:4] + ['-tags', 'turbojpeg,ffmpeg,opus'] + test_flags + sys.argv[4:], env=env, check=True)
     except subprocess.CalledProcessError as error:
         raise SystemExit(error.returncode)
     if sys.argv[3] == 'build' and '-o' in sys.argv[4:]:
@@ -403,3 +405,4 @@ if __name__ == '__main__':
         output = executable.parent
         copy_runtime(prefix, output)
         turbojpeg.copy_licenses(jpeg_source, output)
+        opus.copy_licenses(opus_source, output)

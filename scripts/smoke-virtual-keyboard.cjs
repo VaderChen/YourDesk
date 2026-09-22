@@ -42,6 +42,8 @@ const codes={};for(const platform of ['darwin','windows']){
  await mac.selectOption('select','windows');assert.equal(await mac.locator('[data-key="f19"]').count(),0);
  assert.equal(await mac.locator('[data-key="printscreen"]').count(),1);
  assert.equal(await mac.locator('[data-key="leftsuper"]').textContent(),'Win');
+ await mac.locator('[data-key="rightalt"]').click();await mac.locator('[data-key="e"]').click();
+ assert.equal((await mac.evaluate(()=>messages.filter(m=>typeof m==='number'))).at(-1),1000+8192+16384+4*65536+codes.windows.e);
  await mac.selectOption('select','numeric');
  assert.equal(await mac.locator('.vk-main:visible').count(),0);
  assert.equal(await mac.locator('[data-key="kp7"]:visible').count(),1);

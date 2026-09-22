@@ -47,9 +47,11 @@ func (g *game) showVirtualKeyboard() {
 
 func virtualKeyRequest(action int) (shortcut.Request, bool) {
 	n := action - 1000
-	if n < 0 || n >= 65536 {
+	if n < 0 || n >= 1048576 {
 		return shortcut.Request{}, false
 	}
+	right := uint64(n / 65536)
+	n %= 65536
 	caps := uint64(0)
 	if n >= 32768 {
 		caps |= 32
@@ -68,7 +70,7 @@ func virtualKeyRequest(action int) (shortcut.Request, bool) {
 	if key == "" {
 		return shortcut.Request{}, false
 	}
-	return shortcut.Request{Platform: platform, Key: key, Modifiers: uint64(n/512) | caps}, true
+	return shortcut.Request{Platform: platform, Key: key, Modifiers: uint64(n/512) | right | caps, SideModifiers: uint8(n/512) | uint8(right)<<4}, true
 }
 
 func (g *game) sendVirtualKey(action int) {

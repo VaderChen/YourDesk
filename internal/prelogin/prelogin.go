@@ -29,20 +29,11 @@ func (c Config) validate() error {
 	if _, err := security.DecodeSecret(c.Secret); err != nil {
 		return err
 	}
-	switch c.CodecGoal {
-	case "", "balanced", "low-latency", "bandwidth":
-	default:
-		return errors.New("不支援的串流偏好")
-	}
-	switch c.Codec {
-	case "auto", "hardware-h264", "hardware-hevc", "software-jpeg", "software", "":
-	default:
-		return errors.New("不支援的影像格式")
-	}
-	return nil
+	return (StreamSettings{Codec: c.Codec, CodecGoal: c.CodecGoal}).Validate()
 }
 
 type State struct {
+	SASDisabled  bool   `json:"sasDisabled"`
 	SASSupported bool   `json:"sasSupported"`
 	SASAllowed   bool   `json:"sasAllowed"`
 	Room         string `json:"room,omitempty"`
@@ -59,8 +50,21 @@ func Handle(ctx context.Context, args []string) (bool, error) {
 		return false, nil
 	}
 	switch args[1] {
-	case "status", "disconnect":
+	case "stream-settings":
+		if len(args) != 4 {
+			return true, errors.New("缺少編碼設定")
+		}
+		err := requestStreamSettings(ctx, StreamSettings{Codec: args[2], CodecGoal: args[3]})
+		reply := streamSettingsReply{OK: err == nil}
+		if err != nil {
+			reply.Error = err.Error()
+		}
+		return true, json.NewEncoder(os.Stdout).Encode(reply)
+	case "status", "disconnect", "health":
 		value, err := brokerRequest(ctx, args[1])
+		if err == nil && args[1] == "health" && !value {
+			err = errors.New("登入前服務尚未就緒")
+		}
 		if err == nil {
 			err = json.NewEncoder(os.Stdout).Encode(value)
 		}
@@ -69,6 +73,11 @@ func Handle(ctx context.Context, args []string) (bool, error) {
 		return true, runDaemon(ctx)
 	case "agent":
 		return true, runAgent(ctx)
+	case "update-worker":
+		if len(args) != 3 {
+			return true, errors.New("缺少服務更新工作")
+		}
+		return true, runUpdateWorker(ctx, args[2])
 	case "sas-enable":
 		if len(args) != 2 {
 			return true, errors.New("無效的 SAS 授權參數")

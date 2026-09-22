@@ -63,6 +63,7 @@ type windowsTitlebarState struct {
 	SourceEncoding   string                   `json:"sourceEncoding"`
 	Enhancement      enhancementDisplayStatus `json:"enhancement"`
 	ReceiverDecoding string                   `json:"receiverDecoding"`
+	Audio            audioDisplayStatus       `json:"audio"`
 	Fullscreen       bool                     `json:"fullscreen"`
 	Maximized        bool                     `json:"maximized"`
 }
@@ -319,6 +320,11 @@ func nativeSetCodecStatus(codec, source, receiver string) {
 	winChrome.state.VideoCodec = codec
 	winChrome.state.SourceEncoding = source
 	winChrome.state.ReceiverDecoding = receiver
+	winChrome.mu.Unlock()
+}
+func nativeSetAudioStatus(status audioDisplayStatus) {
+	winChrome.mu.Lock()
+	winChrome.state.Audio = status
 	winChrome.mu.Unlock()
 }
 func nativeSetLanguage(dictionary, language string) {

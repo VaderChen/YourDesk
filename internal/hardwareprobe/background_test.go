@@ -15,7 +15,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 func TestBackgroundDetectorSmoke(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(3*((len(platformJobs())+Workers-1)/Workers)*8+10)*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(3*((len(probeJobs())+Workers-1)/Workers)*8+10)*time.Second)
 	defer cancel()
 	Start(ctx)
 	select {
@@ -24,7 +24,7 @@ func TestBackgroundDetectorSmoke(t *testing.T) {
 		t.Fatal("背景偵測未在 smoke 預算內結束")
 	}
 	s := Snapshot()
-	if s.Workers != 4 || s.Completed != len(platformJobs()) || s.Status != "complete" {
+	if s.Workers != 4 || s.Completed != len(probeJobs()) || s.Status != "complete" {
 		t.Fatalf("偵測未完整結束：%+v", s)
 	}
 	// 連續兩輪驗證完整重測、禁止重入，以及保留原始啟動結果。
@@ -44,7 +44,7 @@ func TestBackgroundDetectorSmoke(t *testing.T) {
 			t.Fatal("深度測試未在 smoke 預算內結束")
 		}
 		deep := DeepSnapshot()
-		if deep.Status != "complete" || deep.Completed != len(platformJobs()) || len(deep.Results) != len(platformJobs()) {
+		if deep.Status != "complete" || deep.Completed != len(probeJobs()) || len(deep.Results) != len(probeJobs()) {
 			t.Fatalf("深度測試未完整結束：%+v", deep)
 		}
 		for i, j := range platformJobs() {

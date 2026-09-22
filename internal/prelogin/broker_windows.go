@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+	"yourdesk/internal/buildinfo"
 
 	winio "github.com/tailscale/go-winio"
 	"golang.org/x/sys/windows"
@@ -51,7 +52,11 @@ func (s *windowsService) Execute(_ []string, requests <-chan svc.ChangeRequest, 
 	if json.Unmarshal(data, &config) != nil || config.validate() != nil {
 		return false, 1
 	}
-	// 本機互動使用者僅能查詢狀態或要求斷線；不提供密碼、程序啟動或設定寫入。
+	if err = markServiceUpdater(root); err != nil {
+		slog.Error("無法記錄服務更新能力", "error", err)
+		return false, 1
+	}
+	// 不提供密碼或任意命令；更新只啟動受保護、驗證官方套件的固定 worker。
 	listener, err := winio.ListenPipe(controlPipe, &winio.PipeConfig{SecurityDescriptor: "D:P(D;;GA;;;NU)(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;IU)"})
 	if err != nil {
 		slog.Error("服務控制管線無法啟動", "error", err)
@@ -61,6 +66,7 @@ func (s *windowsService) Execute(_ []string, requests <-chan svc.ChangeRequest, 
 	var mu sync.Mutex
 	connected := false
 	disconnect := make(chan struct{}, 1)
+	restart := make(chan struct{}, 1)
 	go serveControl(ctx, listener, func(operation string) bool {
 		mu.Lock()
 		defer mu.Unlock()
@@ -71,6 +77,19 @@ func (s *windowsService) Execute(_ []string, requests <-chan svc.ChangeRequest, 
 			}
 		}
 		return connected
+	}, func(settings StreamSettings) error {
+		mu.Lock()
+		defer mu.Unlock()
+		changed, err := applyStreamSettings(&config, settings, func(next Config) error {
+			return saveStreamConfig(filepath.Join(root, "config.json"), next)
+		})
+		if changed {
+			select {
+			case restart <- struct{}{}:
+			default:
+			}
+		}
+		return err
 	})
 	setConnected := func(value bool) { mu.Lock(); connected = value; mu.Unlock() }
 	status := svc.Status{State: svc.Running, Accepts: svc.AcceptStop | svc.AcceptShutdown | svc.AcceptSessionChange}
@@ -107,6 +126,8 @@ func (s *windowsService) Execute(_ []string, requests <-chan svc.ChangeRequest, 
 			}
 		case <-agentDone:
 			stopAgent()
+		case <-restart:
+			stopAgent() // SCM 服務保留，只重建取得新編碼設定的代理與 Host。
 		case event := <-events:
 			setConnected(event.Event == "host-connected")
 		case <-disconnect:
@@ -133,14 +154,17 @@ func (s *windowsService) Execute(_ []string, requests <-chan svc.ChangeRequest, 
 			eventContext, eventCancel = context.WithCancel(ctx)
 			events = make(chan serviceEvent, 16)
 			go watchServiceOutput(eventContext, agent, events)
-			if err = agent.send(config); err != nil {
+			mu.Lock()
+			agentConfig := config
+			mu.Unlock()
+			if err = agent.send(agentConfig); err != nil {
 				stopAgent()
 			}
 		}
 	}
 }
 
-func serveControl(ctx context.Context, listener net.Listener, operation func(string) bool) {
+func serveControl(ctx context.Context, listener net.Listener, operation func(string) bool, streamSettings func(StreamSettings) error) {
 	// 限制未完成請求數量與期限，避免本機程式累積無上限的工作。
 	slots := make(chan struct{}, 8)
 	for {
@@ -159,9 +183,36 @@ func serveControl(ctx context.Context, listener net.Listener, operation func(str
 			defer func() { <-slots }()
 			conn.SetDeadline(time.Now().Add(2 * time.Second))
 			var request struct {
-				Operation string `json:"operation"`
+				Operation string          `json:"operation"`
+				URL       string          `json:"url"`
+				Stream    *StreamSettings `json:"stream,omitempty"`
+				Enabled   *bool           `json:"enabled,omitempty"`
 			}
 			if json.NewDecoder(io.LimitReader(conn, 1024)).Decode(&request) != nil || ctx.Err() != nil {
+				return
+			}
+			if request.Operation == "stream-settings" && request.Stream != nil {
+				err := authorizeConsoleSettings(conn)
+				if err == nil {
+					err = streamSettings(*request.Stream)
+				}
+				reply := streamSettingsReply{OK: err == nil}
+				if err != nil {
+					reply.Error = err.Error()
+				}
+				_ = json.NewEncoder(conn).Encode(reply)
+				return
+			}
+			if request.Operation == "sas-settings" && request.Enabled != nil {
+				err := authorizeConsoleSettings(conn)
+				if err == nil {
+					err = setSecureAttentionEnabled(*request.Enabled)
+				}
+				reply := streamSettingsReply{OK: err == nil}
+				if err != nil {
+					reply.Error = err.Error()
+				}
+				_ = json.NewEncoder(conn).Encode(reply)
 				return
 			}
 			if request.Operation == "sas" {
@@ -170,6 +221,19 @@ func serveControl(ctx context.Context, listener net.Listener, operation func(str
 					message = err.Error()
 				}
 				_ = json.NewEncoder(conn).Encode(map[string]string{"error": message})
+				return
+			}
+			if request.Operation == "update-capabilities" || request.Operation == "update-prepare" {
+				reply := updateReply{Protocol: 1, Version: buildinfo.Current()}
+				if request.Operation == "update-prepare" {
+					_ = conn.SetDeadline(time.Now().Add(8 * time.Second))
+					var err error
+					reply.Ticket, err = startServiceUpdate(conn, request.URL)
+					if err != nil {
+						reply.Error = err.Error()
+					}
+				}
+				_ = json.NewEncoder(conn).Encode(reply)
 				return
 			}
 			if request.Operation != "status" && request.Operation != "disconnect" {

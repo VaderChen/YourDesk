@@ -4,12 +4,13 @@ package shortcut
 import "yourdesk/internal/rawkey"
 
 type Request struct {
-	Platform    string
-	Key         string
-	Modifiers   uint64
-	Label       string
-	LocalAction int
-	Secure      bool
+	Platform      string
+	Key           string
+	SideModifiers uint8 // 低四位為左側、高四位為右側；零值沿用一般快捷鍵。
+	Modifiers     uint64
+	Label         string
+	LocalAction   int
+	Secure        bool
 }
 
 func Match(platform, key string, mods uint64) (Request, bool) {
@@ -50,12 +51,16 @@ func (r Request) Chord() []rawkey.Event {
 		name string
 		bit  uint64
 	}
-	order := []modifier{{"leftshift", 1}, {"leftcontrol", 2}, {"leftalt", 4}, {"leftsuper", 8}}
+	order := []modifier{{"leftshift", 1}, {"leftcontrol", 2}, {"leftalt", 4}, {"leftsuper", 8}, {"rightshift", 1}, {"rightcontrol", 2}, {"rightalt", 4}, {"rightsuper", 8}}
+	held := uint8(r.Modifiers & 15)
+	if r.SideModifiers != 0 {
+		held = r.SideModifiers
+	}
 	appendKey := func(code int, down bool) {
 		events = append(events, rawkey.Event{Platform: r.Platform, Code: code, Modifiers: mods, Down: down})
 	}
-	for _, m := range order {
-		if r.Modifiers&m.bit != 0 {
+	for i, m := range order {
+		if held&(1<<i) != 0 {
 			mods |= m.bit
 			code, _ := rawkey.Code(r.Platform, m.name)
 			appendKey(code, true)
@@ -65,8 +70,11 @@ func (r Request) Chord() []rawkey.Event {
 	appendKey(key, false)
 	for i := len(order) - 1; i >= 0; i-- {
 		m := order[i]
-		if mods&m.bit != 0 {
-			mods &^= m.bit
+		if held&(1<<i) != 0 {
+			held &^= 1 << i
+			if held&(uint8(m.bit)|uint8(m.bit)<<4) == 0 {
+				mods &^= m.bit
+			}
 			code, _ := rawkey.Code(r.Platform, m.name)
 			appendKey(code, false)
 		}

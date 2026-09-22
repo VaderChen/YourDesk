@@ -1,4 +1,116 @@
 {
+  "AAC 硬體": [
+    "AAC Hardware",
+    "AAC ハードウェア",
+    "AAC 하드웨어"
+  ],
+  "Opus 軟體": [
+    "Opus Software",
+    "Opus ソフトウェア",
+    "Opus 소프트웨어"
+  ],
+  "AAC 軟體": [
+    "AAC Software",
+    "AAC ソフトウェア",
+    "AAC 소프트웨어"
+  ],
+  "PCM 未壓縮": [
+    "PCM Uncompressed",
+    "PCM 非圧縮",
+    "PCM 비압축"
+  ],
+  "關閉只停用 YourDesk 傳送 Ctrl+Alt+Del，不會關閉登入前服務。": [
+    "Turning this off disables Ctrl+Alt+Del in YourDesk while keeping the pre-login service running.",
+    "オフにすると YourDesk の Ctrl+Alt+Del 送信のみ停止し、ログイン前サービスは維持します。",
+    "끄면 YourDesk의 Ctrl+Alt+Del 전송만 중지하며 로그인 전 서비스는 유지됩니다."
+  ],
+  "登入前服務尚未支援 Ctrl+Alt+Del 開關，請更新 APP 與服務後再試。": [
+    "The pre-login service does not support the Ctrl+Alt+Del switch yet. Update the app and service, then try again.",
+    "ログイン前サービスは Ctrl+Alt+Del スイッチに未対応です。アプリとサービスを更新して再試行してください。",
+    "로그인 전 서비스가 아직 Ctrl+Alt+Del 스위치를 지원하지 않습니다. 앱과 서비스를 업데이트한 후 다시 시도하세요."
+  ],
+  "請在目前主控台修改服務設定。": [
+    "Change service settings from the active console session.",
+    "現在のコンソールセッションでサービス設定を変更してください。",
+    "현재 콘솔 세션에서 서비스 설정을 변경하세요."
+  ],
+  "請先停用未登入開機，再修改 IP 直連或 Tailcat 模式。": [
+    "Disable pre-login access before changing direct IP access or Tailcat mode.",
+    "IP 直接接続または Tailcat モードを変更する前に、未ログイン接続を無効にしてください。",
+    "IP 직접 연결 또는 Tailcat 모드를 변경하기 전에 로그인 전 접속을 비활성화하세요."
+  ],
+  "登入前服務尚未支援同步編碼設定，請更新 APP 與服務後再試。": [
+    "The pre-login service does not yet support codec setting updates. Update the app and service, then try again.",
+    "ログイン前サービスはコーデック設定の更新に未対応です。アプリとサービスを更新してから再試行してください。",
+    "로그인 전 서비스가 아직 코덱 설정 동기화를 지원하지 않습니다. 앱과 서비스를 업데이트한 후 다시 시도하세요."
+  ],
+  "無法確認服務編碼設定，請稍後重試。": [
+    "Could not confirm the service codec settings. Please try again.",
+    "サービスのコーデック設定を確認できません。しばらくしてから再試行してください。",
+    "서비스 코덱 설정을 확인할 수 없습니다. 잠시 후 다시 시도하세요."
+  ],
+  "無法儲存服務編碼設定，請稍後重試。": [
+    "Could not save the service codec settings. Please try again.",
+    "サービスのコーデック設定を保存できません。しばらくしてから再試行してください。",
+    "서비스 코덱 설정을 저장할 수 없습니다. 잠시 후 다시 시도하세요."
+  ],
+  "請在目前主控台修改編碼設定。": [
+    "Change codec settings from the active console session.",
+    "現在のコンソールセッションでコーデック設定を変更してください。",
+    "현재 콘솔 세션에서 코덱 설정을 변경하세요."
+  ],
+  "Opus（預設）": ["Opus (default)", "Opus（既定）", "Opus (기본값)"],
+  "聲音編解碼實測": ["Audio codec tests", "音声コーデックの実測", "오디오 코덱 테스트"],
+  "開啟遠端聲音": [
+    "Enable remote audio",
+    "リモート音声を有効にする",
+    "원격 오디오 켜기"
+  ],
+  "聲音輸出編碼": [
+    "Audio output codec",
+    "音声出力コーデック",
+    "오디오 출력 코덱"
+  ],
+  "AAC（硬體優先）": [
+    "AAC (prefer hardware)",
+    "AAC（ハードウェア優先）",
+    "AAC (하드웨어 우선)"
+  ],
+  "AAC（軟體）": [
+    "AAC (software)",
+    "AAC（ソフトウェア）",
+    "AAC (소프트웨어)"
+  ],
+  "PCM（未壓縮）": [
+    "PCM (uncompressed)",
+    "PCM（非圧縮）",
+    "PCM (비압축)"
+  ],
+  "聲音品質跟隨顯示區域的低流量／標準／高畫質選項。": [
+    "Audio quality follows the display area’s Low traffic / Standard / High quality setting.",
+    "音声品質は表示領域の低通信量／標準／高画質設定に連動します。",
+    "오디오 품질은 표시 영역의 저용량 / 표준 / 고화질 설정을 따릅니다."
+  ],
+  "聲音能力偵測中…": [
+    "Detecting audio capabilities…",
+    "音声機能を検出中…",
+    "오디오 기능 감지 중…"
+  ],
+  "本機 {codec}：硬體解碼可用": [
+    "Local {codec}: hardware decoding available",
+    "ローカル {codec}：ハードウェアデコード利用可能",
+    "로컬 {codec}: 하드웨어 디코딩 사용 가능"
+  ],
+  "本機 {codec}：軟體解碼可用": [
+    "Local {codec}: software decoding available",
+    "ローカル {codec}：ソフトウェアデコード利用可能",
+    "로컬 {codec}: 소프트웨어 디코딩 사용 가능"
+  ],
+  "本機 {codec}：不可用": [
+    "Local {codec}: unavailable",
+    "ローカル {codec}：利用不可",
+    "로컬 {codec}: 사용 불가"
+  ],
   "檔案傳輸視窗意外結束，請查看啟動終端的錯誤訊息。": ["The file transfer window exited unexpectedly. Check the launch terminal for details.", "ファイル転送ウィンドウが予期せず終了しました。起動端末のエラーを確認してください。", "파일 전송 창이 예기치 않게 종료되었습니다. 실행 터미널의 오류를 확인하세요."],
   "開啟檔案傳輸": ["Open file transfer", "ファイル転送を開く", "파일 전송 열기"],
   "正在準備檔案傳輸…": ["Preparing file transfer…", "ファイル転送を準備中…", "파일 전송 준비 중…"],
@@ -503,10 +615,10 @@
     "アプリの起動中は Client が動作します。ウィンドウを閉じても非表示になるだけです。完全に終了するにはトレイメニューから終了を選択してください。",
     "앱이 실행되는 동안 Client가 작동합니다. 창을 닫으면 화면만 숨겨집니다. 완전히 종료하려면 트레이 메뉴에서 프로그램 종료를 선택하세요."
   ],
-  "傳輸到遠端的編碼": [
-    "Encoding for transmission to the remote device",
-    "リモートへの送信に使用するエンコード",
-    "원격 장치로 전송할 인코딩"
+  "影像輸出編碼": [
+    "Video output codec",
+    "映像出力コーデック",
+    "영상 출력 코덱"
   ],
   "增量 JPEG": [
     "Incremental JPEG",

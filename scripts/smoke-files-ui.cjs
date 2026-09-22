@@ -11,9 +11,9 @@ async function main() {
   const cache = path.join(root,'.local-run'); fs.mkdirSync(cache,{recursive:true});
   const output = process.env.FILES_SMOKE_OUTPUT ? path.resolve(root,process.env.FILES_SMOKE_OUTPUT) : fs.mkdtempSync(path.join(cache,'files-ui-smoke-'));
   assert.ok(output.startsWith(cache + path.sep),'Screenshots must stay in the local build area'); fs.mkdirSync(output,{recursive:true});
-  const browser = await chromium.launch({headless:true,channel:process.env.FILES_BROWSER_CHANNEL || 'msedge'});
+  const browser = await chromium.launch({headless:true,...(process.env.FILES_BROWSER_CHANNEL?{channel:process.env.FILES_BROWSER_CHANNEL}:{})});
   const errors = [], unexpected = [], actions = [], uploads = new Map(); let fileConnected = true, currentInstance='demo-instance', holdWrites=false,holdLists=false,holdCancels=false,loseCancelAck=false;
-  const heldWrites=[],heldLists=[],heldCancels=[];
+  const heldWrites=[],heldLists=[],heldCancels=[];let filesystem=null;
   const state = {
     info:{room:'YD-DEMO-0000-0000-0000-0000',secret:'',hostname:'Demo Mac',platform:'darwin',architecture:'arm64',version:'YourDesk · Demo',configPath:'demo/config'},
     running:{host:true},sessions:{},quick:null,updates:{},hardwareDetection:{status:'complete'},
@@ -24,7 +24,7 @@ async function main() {
     ]}
   };
   const entry = (name,directory=false,parent='') => ({name,path:parent ? `${parent}/${name}` : name,directory,size:directory ? 0 : 12,modified:'2026-01-01T12:00:00Z'});
-  const remoteEntries=new Map([entry('資料',true),entry('子檔案.txt',false,'資料'),entry('示範檔案.txt'),entry('很長的 Unicode 檔名 — '.repeat(3)+'🗂.txt')].map(item=>[item.path,item]));
+  const remoteEntries=new Map([entry('z-notes.txt'),entry('zeta',true),entry('.hidden.txt'),entry('.private',true),entry('Alpha',true),entry('資料',true),entry('子檔案.txt',false,'資料'),entry('示範檔案.txt'),entry('很長的 Unicode 檔名 — '.repeat(3)+'🗂.txt')].map(item=>[item.path,item]));
   try {
     const context = await browser.newContext({viewport:{width:820,height:640},deviceScaleFactor:1,locale:'zh-TW',colorScheme:'light',serviceWorkers:'block'});
     context.on('page',page => page.on('pageerror',error => errors.push(error.message)));
@@ -45,6 +45,10 @@ async function main() {
           assert.equal(request.headers()['x-yourdesk-token'],'demo-file-token');
           assert.equal(body.session,'viewer:files'); assert.equal(body.instance,currentInstance);
           const {action,params} = body;
+          if (action === 'location') return filesystem?route.fulfill({json:{path:filesystem.initial}}):route.fulfill({status:400,json:{error:'old host'}});
+          if(action==='list'&&filesystem){
+            const item=filesystem.directories[params.path];assert(item,'未知磁碟目錄：'+params.path);return route.fulfill({json:{path:params.path,nextOffset:-1,...item}});
+          }
           if (action === 'status') value = {connected:fileConnected};
           else if (action === 'list') {
             if(holdLists){await new Promise(resolve=>heldLists.push(resolve));return route.fulfill({status:400,json:{code:'files_session_unavailable'}});}
@@ -68,7 +72,7 @@ async function main() {
       }
       const name = url.pathname === '/' ? 'index.html' : url.pathname.slice(1), target = path.resolve(web,name);
       if (!target.startsWith(web + path.sep) || !fs.existsSync(target) || !fs.statSync(target).isFile()) {unexpected.push(name); return route.abort();}
-      const type = {'.html':'text/html','.css':'text/css','.js':'text/javascript','.json':'application/json','.png':'image/png'}[path.extname(target)];
+      const type = {'.html':'text/html','.css':'text/css','.js':'text/javascript','.json':'application/json','.png':'image/png','.woff2':'font/woff2'}[path.extname(target)];
       if (!type) {unexpected.push(name); return route.abort();}
       return route.fulfill({body:fs.readFileSync(target),contentType:type});
     });
@@ -92,8 +96,11 @@ async function main() {
       window.__closedCount=0;window.yourdeskCloseFiles = async () => {window.__closedCount++;};
       window.yourdeskPauseFile=async()=>({paused:true,received:4,total:12});
       window.yourdeskResumeFile=async()=>{window.dispatchEvent(new CustomEvent('yourdesk-file-progress',{detail:{state:'running',received:8,total:12,speed:40,eta:1}}));setTimeout(()=>window.__downloadFinish(),40);return{resumed:true};};
-      window.yourdeskPrepareFile = path => new Promise(resolve=>{
-        window.__downloadFinish=()=>resolve({name:path.split('/').pop(),size:12});
+      window.__downloadRequests=[];
+      window.yourdeskListDirectories=async(path)=>{const current=path||'/Users/Smoke';return {path:current,parent:current==='/'?'':current.split('/').slice(0,-1).join('/')||'/',entries:current==='/Users/Smoke'?[{name:'Downloads',path:'/Users/Smoke/Downloads'}]:[],nextOffset:-1}};
+      window.yourdeskPrepareFile = (path,directory) => new Promise(resolve=>{
+        window.__downloadRequests.push({path,directory});
+        window.__downloadFinish=()=>resolve({name:path.split('/').pop(),size:12,path:directory+'/'+path.split('/').pop()});
         window.dispatchEvent(new CustomEvent('yourdesk-file-progress',{detail:{state:'running',received:4,total:12,name:path.split('/').pop(),speed:40,eta:1}}));
       });
     });
@@ -104,12 +111,37 @@ async function main() {
       assert.equal(new URL(filesPage.url()).hash,'');
       assert.equal(await filesPage.locator('html').getAttribute('lang'),language);
       assert.equal(await filesPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth),true,`${language} file window overflow`);
-      const reserve = await filesPage.locator('.native-space').boundingBox(); assert.equal(reserve.height,72); assert.equal(reserve.y + reserve.height,560);
+      assert.equal(await filesPage.locator('.native-space,.download,.reconnect-hint,[data-text=downloadHint]').count(),0,'移除底部下載區塊與說明');
+      assert(!(await filesPage.locator('#download-transfer').isVisible()),'閒置時不顯示下載進度');
+      assert.equal(await filesPage.locator('#files-list tr[data-parent] button').isDisabled(),true);
       await filesPage.screenshot({path:path.join(output,`files-${language}-700x560.png`)});
     }
     await filesPage.goto('about:blank'); await filesPage.goto(fileURL('zh-Hant')); await filesPage.locator('#files-list tr').nth(2).waitFor();
+    const names=await filesPage.locator('#files-list .entry-name').allTextContents();
+    assert.deepEqual(names.slice(0,3),['Alpha','zeta','資料']);assert(!names.some(name=>name.startsWith('.')));
+    await filesPage.evaluate(()=>document.fonts.ready);
+    assert.equal(await filesPage.evaluate(()=>document.fonts.check('900 18px "YourDesk File Icons"')),true);
+    assert.equal(await filesPage.locator('.entry-icon-folder').count(),3);
+    assert.equal(await filesPage.locator('.entry-icon-file').first().evaluate(el=>getComputedStyle(el,'::before').content),'"\uf15b"');
+    await filesPage.getByRole('button',{name:'z-notes.txt',exact:true}).click();
+    await filesPage.getByRole('button',{name:'示範檔案.txt',exact:true}).click({modifiers:['ControlOrMeta']});
+    assert.equal(await filesPage.locator('#files-list .entry-check:checked').count(),2);
+    await filesPage.screenshot({path:path.join(output,'files-multiple-selection.png')});
+    await filesPage.emulateMedia({colorScheme:'dark'});await filesPage.screenshot({path:path.join(output,'files-multiple-selection-dark.png')});await filesPage.emulateMedia({colorScheme:'light'});
+    const chooserPromise=filesPage.waitForEvent('filechooser');await filesPage.locator('#files-input').click();
+    const chooser=await chooserPromise;assert(chooser.isMultiple());
+    await chooser.setFiles([{name:'picker-one.txt',mimeType:'text/plain',buffer:Buffer.from('one')},{name:'picker-two.txt',mimeType:'text/plain',buffer:Buffer.from('two')}]);
+    await filesPage.waitForFunction(()=>document.querySelectorAll('#files-queue .transfer-state').length===2&&[...document.querySelectorAll('#files-queue .transfer-state')].every(el=>el.textContent.startsWith('完成')));
     await filesPage.getByRole('button',{name:'示範檔案.txt',exact:true}).click();
-    await filesPage.locator('#files-prepare').click();await filesPage.locator('#download-pause').click();
+    await filesPage.locator('#files-prepare').click();await filesPage.locator('#destination-select').waitFor({state:'visible'});
+    await filesPage.waitForFunction(()=>!document.querySelector('#destination-select').disabled);
+    assert.equal(await filesPage.locator('#destination-path').inputValue(),'/Users/Smoke');assert.equal(await filesPage.evaluate(()=>window.__downloadRequests.length),0);
+    await filesPage.locator('#destination-cancel').click();assert.equal(await filesPage.evaluate(()=>window.__downloadRequests.length),0);
+    await filesPage.locator('#files-prepare').click();await filesPage.locator('#destination-list').getByRole('button',{name:'Downloads',exact:true}).click();
+    await filesPage.waitForFunction(()=>document.querySelector('#destination-path').value==='/Users/Smoke/Downloads');
+    await filesPage.screenshot({path:path.join(output,'files-destination.png')});
+    await filesPage.locator('#destination-select').click();await filesPage.locator('#download-pause').click();
+    assert.deepEqual(await filesPage.evaluate(()=>window.__downloadRequests),[{path:'示範檔案.txt',directory:'/Users/Smoke/Downloads'}]);
     await filesPage.waitForFunction(()=>document.querySelector('#download-status').textContent.includes('已暫停'));
     assert.match(await filesPage.locator('#download-status').textContent(),/33%/);
     await filesPage.locator('#download-resume').click();await filesPage.waitForFunction(() => document.querySelector('#download-status').textContent.startsWith('下載完成'));
@@ -118,7 +150,8 @@ async function main() {
     const uploaded=[...uploads.values()].find(item=>item.path==='upload-demo.txt');assert.equal(uploaded.committed,true);assert.equal(Buffer.from(uploaded.data).toString(),'Isolated upload fixture');
     await filesPage.getByRole('button',{name:'資料',exact:true}).dblclick();
     await filesPage.getByRole('button',{name:'子檔案.txt',exact:true}).waitFor();
-    await filesPage.locator('#files-up').click(); await filesPage.locator('#files-list tr').nth(2).waitFor();
+    await filesPage.locator('#files-list tr[data-parent] button').click(); await filesPage.locator('#files-list tr').nth(2).waitFor();
+    assert.equal(await filesPage.locator('#files-delete').isDisabled(),true,'上一層不是可刪除的項目');
     await filesPage.screenshot({path:path.join(output,'files-upload-download.png')});
     await filesPage.locator('#files-new-folder').click();await filesPage.locator('#folder-name').fill('Smoke Folder');await filesPage.locator('#folder-create').click();
     await filesPage.getByRole('button',{name:'Smoke Folder',exact:true}).click();await filesPage.locator('#files-delete').click();
@@ -135,7 +168,7 @@ async function main() {
     await filesPage.screenshot({path:path.join(output,'files-paused.png')});
     fileConnected = false;
     await filesPage.waitForFunction(() => document.querySelector('#files-status').textContent.includes('已中斷'));
-    assert.equal(await filesPage.locator('#files-pick').isDisabled(),true);
+    assert.equal(await filesPage.locator('#files-input').isDisabled(),true);
     assert.equal(await filesPage.locator('#files-refresh').isDisabled(),true);
     assert.equal(await filesPage.locator('#files-prepare').isDisabled(),true);
     assert.equal(await filesPage.evaluate(() => window.__cancelCount),0,'completed native download must remain available');
@@ -156,9 +189,9 @@ async function main() {
     currentInstance='demo-instance-3';
     await filesPage.evaluate(instance=>window.dispatchEvent(new CustomEvent('yourdesk-files-session',{detail:{instance}})),currentInstance);
     holdLists=false;heldLists.shift()();
-    await filesPage.waitForFunction(()=>!document.querySelector('#files-pick').disabled);
+    await filesPage.waitForFunction(()=>!document.querySelector('#files-input').disabled);
     assert.match(await filesPage.locator('#files-status').textContent(),/Reconnected/);
-    await filesPage.locator('#files-refresh').click();await filesPage.locator('#files-list tr').first().waitFor();
+    await filesPage.locator('#files-refresh').click();await filesPage.waitForFunction(()=>!document.querySelector('#files-input').disabled);
 
     // Cancel ACK loss preserves a retry button and does not block the next job.
     holdWrites=true;loseCancelAck=true;
@@ -184,10 +217,35 @@ async function main() {
     assert.equal(await filesPage.evaluate(()=>window.__closedCount),0);assert.equal(await filesPage.locator('#files-close').isDisabled(),true);
     holdCancels=false;heldCancels.shift()();await filesPage.waitForFunction(()=>window.__closedCount===1);
     assert.equal([...uploads.values()].some(upload=>upload.path==='close-paused.bin'),false);
+    // 新版遠端提供實際磁碟位置；上一層可離開家目錄，虛擬磁碟清單不允許上傳／刪除。
+    filesystem={initial:'C',directories:{
+      'C':{entries:[entry('Users',true,'C')],location:{display:'C:\\',parent:'',virtual:false}},
+      '':{entries:[{...entry('C',true),root:true},{...entry('D',true),root:true}],location:{display:'',parent:null,virtual:true}},
+      'D':{entries:[],location:{display:'D:\\',parent:'',virtual:false}}
+    }};
+    await filesPage.goto('about:blank');await filesPage.goto(fileURL('zh-Hant'));
+    await filesPage.waitForFunction(()=>document.querySelector('#files-path').textContent==='C:\\');
+    assert(!(await filesPage.locator('#files-up').isDisabled()));
+    await filesPage.locator('#files-list tr[data-parent] button').click();await filesPage.waitForFunction(()=>document.querySelector('#files-path').textContent==='遠端電腦');
+    assert(await filesPage.locator('#files-input').isDisabled());assert(await filesPage.locator('#files-new-folder').isDisabled());
+    await filesPage.getByRole('button',{name:'D',exact:true}).click();assert(await filesPage.locator('#files-delete').isDisabled());
+    await filesPage.locator('#files-open').click();await filesPage.waitForFunction(()=>document.querySelector('#files-path').textContent==='D:\\');
+    await filesPage.screenshot({path:path.join(output,'files-windows-drive.png')});
+    filesystem={initial:'root/Users/demo',directories:{
+      'root/Users/demo':{entries:[],location:{display:'~/',parent:'root/Users',virtual:false}},
+      'root/Users':{entries:[],location:{display:'/Users',parent:'root',virtual:false}},
+      'root':{entries:[],location:{display:'/',parent:null,virtual:false}}
+    }};
+    await filesPage.goto('about:blank');await filesPage.goto(fileURL('zh-Hant'));
+    await filesPage.waitForFunction(()=>document.querySelector('#files-path').textContent==='~/');
+    await filesPage.locator('#files-list tr[data-parent] button').click();await filesPage.waitForFunction(()=>document.querySelector('#files-path').textContent==='/Users');
+    await filesPage.locator('#files-up').click();await filesPage.waitForFunction(()=>document.querySelector('#files-path').textContent==='/');
+    assert(await filesPage.locator('#files-up').isDisabled());
+    await filesPage.screenshot({path:path.join(output,'files-mac-root.png')});
     assert.deepEqual(errors,[]); assert.deepEqual(unexpected,[]);
-    console.log('PASS: Edge mock UI smoke, 4 languages, station icon / capability / connection, bounded upload, cancellation ACK loss, stale rebind reply, bounded close lifecycle, native binding mock, 72px footer.');
+    console.log('PASS: Browser mock UI smoke, 4 languages, station icon / capability / connection, bounded upload, cancellation ACK loss, stale rebind reply, bounded close lifecycle, native binding mock, parent entry and local destination picker.');
     console.log('Screenshots:',path.relative(root,output));
-    console.log('Not tested: real remote sessions, Finder / Explorer native drag-and-drop.');
+    console.log('Not tested: real remote sessions, actual local directory bridge and filesystem access.');
   } finally {await browser.close();}
 }
 main().catch(error => {console.error(error); process.exitCode = 1;});

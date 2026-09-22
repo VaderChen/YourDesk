@@ -518,7 +518,7 @@ func (u *updateManager) startDownload(onOpened func()) error {
 				return
 			}
 		}
-		err = prepareAutomaticUpdate(u.ctx, path)
+		err = prepareAutomaticUpdate(u.ctx, path, asset.URL)
 		u.mu.Lock()
 		// 交接成功後維持忙碌，直到 APP 退出，避免顯示可重複啟動的重試按鈕。
 		u.state.Opening = err == nil

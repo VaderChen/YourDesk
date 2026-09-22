@@ -18,3 +18,7 @@ func ConfigureSecureAttention(context.Context, Config) error {
 func enableSecureAttentionPolicy() error {
 	return errors.New("此平台不支援 Windows SAS 授權。")
 }
+
+func SetSecureAttentionEnabled(context.Context, bool) error {
+	return errors.New("此平台不需要 Windows SAS 授權。")
+}

@@ -18,3 +18,8 @@ func AcquireHost(context.Context) (func(), error) { return nil, errors.New(Statu
 
 func Incoming(context.Context, bool) (bool, error)        { return false, errors.New(Status().Message) }
 func brokerRequest(context.Context, string) (bool, error) { return false, errors.New(Status().Message) }
+
+func UpdateStreamSettings(context.Context, StreamSettings) error { return errors.New(Status().Message) }
+func requestStreamSettings(context.Context, StreamSettings) error {
+	return errors.New(Status().Message)
+}

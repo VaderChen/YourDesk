@@ -25,6 +25,9 @@
  .win-popup hr{border:0;border-top:1px solid var(--edge);margin:6px 4px}
  .win-popup .status-row{display:grid;grid-template-columns:auto 1fr;gap:18px;white-space:nowrap}
  .win-popup .status-row b{font-weight:600;color:var(--muted)}
+ .win-popup.status-table:not([hidden]){display:grid;grid-template-columns:max-content 1fr;column-gap:18px}
+ .win-popup.status-table .status-row{display:contents}
+ .win-popup.status-table hr{grid-column:1 / -1;width:100%;margin:10px 0}
  @media(max-width:760px){.windows .fps{width:60px;margin-right:8px;padding-right:8px}.windows .title{padding-left:8px;padding-right:6px}}
  @media(max-width:640px){.windows .title svg{display:none}.windows .window{width:108px}.windows .window button{width:36px}.windows .actions{width:auto;gap:3px}.windows .title{font-size:11px}}
  `;
@@ -100,9 +103,10 @@
   if('tooltip' in message){
    if(!message.tooltip){if(kind==='tooltip')window.closeWindowsPopup();return}
    kind='tooltip';popup.className='win-popup tip';popup.setAttribute('role','status');popup.replaceChildren();
-   if(Array.isArray(message.rows)) message.rows.forEach(row=>{
+   if(Array.isArray(message.rows)) {popup.classList.add('status-table');message.rows.forEach(row=>{
+    if(row.separator){popup.append(document.createElement('hr'));return}
     const line=document.createElement('div');line.className='status-row';const label=document.createElement('b'),value=document.createElement('span');label.textContent=row.label;value.textContent=row.value;line.append(label,value);popup.append(line);
-   }); else popup.textContent=message.tooltip;
+   });} else popup.textContent=message.tooltip;
    position({right:message.x+message.width});
   }
  };

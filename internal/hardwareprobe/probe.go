@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 	"yourdesk/internal/childprocess"
+	"yourdesk/internal/remoteaudio"
 )
 
 const helperFlag = "--hardware-probe"
@@ -63,7 +64,7 @@ func StartDeep() bool {
 	if lifetime == nil || lifetime.Err() != nil || state.Status == "running" || state.Status == "not-started" || deepState.Status == "running" {
 		return false
 	}
-	deepState = State{Status: "running", Workers: Workers, Total: len(platformJobs())}
+	deepState = State{Status: "running", Workers: Workers, Total: len(probeJobs())}
 	finished := make(chan struct{})
 	deepDone = finished
 	ctx := lifetime
@@ -124,7 +125,7 @@ func detect(ctx context.Context) {
 
 func detectInto(ctx context.Context, state *State) {
 	start := time.Now()
-	jobs := platformJobs()
+	jobs := probeJobs()
 	mu.Lock()
 	state.Status = "running"
 	state.Total = len(jobs)
@@ -256,7 +257,7 @@ func HandleHelper(args []string) bool {
 		return false
 	}
 	var chosen *job
-	for _, j := range platformJobs() {
+	for _, j := range probeJobs() {
 		valid := len(args) == 2 && args[1] == "inventory" && j.Codec == ""
 		if (len(args) == 5 && j.Phase == "" || len(args) == 6 && args[5] == j.Phase) && j.Codec != "" {
 			valid = args[1] == j.Codec && args[2] == j.Format && args[3] == strconv.Itoa(j.Width) && args[4] == strconv.Itoa(j.Height)
@@ -271,7 +272,13 @@ func HandleHelper(args []string) bool {
 		fmt.Fprintln(os.Stdout, `{"status":"invalid-request"}`)
 		return true
 	}
-	data, err := platformProbe(*chosen)
+	var data []byte
+	var err error
+	if chosen.Codec == "audio-codecs" {
+		data, err = json.Marshal(map[string]any{"capabilities": remoteaudio.Probe()})
+	} else {
+		data, err = platformProbe(*chosen)
+	}
 	if err != nil {
 		fmt.Fprintln(os.Stdout, `{"status":"probe-failed"}`)
 		return true
@@ -295,4 +302,21 @@ func splitJobs(cases []job) []job {
 		}
 	}
 	return jobs
+}
+
+func probeJobs() []job {
+	return append(platformJobs(), job{Codec: "audio-codecs", Format: "PCM", Width: 48000, Height: 2})
+}
+func CachedAudioCapabilities() []remoteaudio.Capability {
+	for _, r := range Snapshot().Results {
+		if r.Key == "audio-codecs/PCM/48000x2" && r.State == "complete" {
+			var result struct {
+				Capabilities []remoteaudio.Capability `json:"capabilities"`
+			}
+			if json.Unmarshal(r.Data, &result) == nil {
+				return result.Capabilities
+			}
+		}
+	}
+	return nil
 }

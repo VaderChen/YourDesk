@@ -4,6 +4,7 @@ package hostsession
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"image"
@@ -24,6 +25,7 @@ import (
 	"yourdesk/internal/peertransport"
 	"yourdesk/internal/prelogin"
 	"yourdesk/internal/rawkey"
+	"yourdesk/internal/remoteaudio"
 	"yourdesk/internal/remotedata"
 	"yourdesk/internal/signaling"
 	"yourdesk/internal/streamconfig"
@@ -347,6 +349,28 @@ func Stream(ctx context.Context, sig *signaling.Client, options Options) error {
 	}
 	configPeer.Store(peer)
 	authorized.Store(true)
+	audioSource := &remoteaudio.Source{}
+	audioCtx, stopAudio := context.WithCancel(ctx)
+	audioDone := make(chan struct{})
+	go func() { defer close(audioDone); audioSource.Run(audioCtx, peer.SendAudio) }()
+	defer func() { stopAudio(); <-audioDone }()
+	_ = peer.RegisterCommand("audio.capabilities", func(commandCtx context.Context) (any, error) {
+		if !authorized.Load() || commandCtx.Err() != nil {
+			return nil, fmt.Errorf("聲音連線未授權或已結束")
+		}
+		return remoteaudio.CachedCapabilities(), nil
+	})
+	_ = peer.RegisterCommandParams("audio.configure", func(commandCtx context.Context, data json.RawMessage) (any, error) {
+		if !authorized.Load() || commandCtx.Err() != nil {
+			return nil, fmt.Errorf("聲音連線未授權或已結束")
+		}
+		var settings remoteaudio.Settings
+		if err := json.Unmarshal(data, &settings); err != nil {
+			return nil, err
+		}
+		return audioSource.Configure(settings)
+	})
+
 	if runtime.GOOS == "windows" {
 		_ = peer.RegisterCommand("input.secure-attention", func(commandCtx context.Context) (any, error) {
 			if !authorized.Load() {

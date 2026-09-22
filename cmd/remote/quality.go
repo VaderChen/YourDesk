@@ -54,6 +54,7 @@ func applyKeyframeInterval(r *streamconfig.Request, c *streamconfig.Capabilities
 
 // 使用遠端畫面的可用實體像素，扣除工具列；連續調整視窗時等待尺寸穩定。
 func (g *game) updateQuality() {
+	g.audioQuality.Store(int32(g.quality))
 	if nativeFullscreenTransitioning() {
 		g.qualityChangedAt = time.Now()
 		return

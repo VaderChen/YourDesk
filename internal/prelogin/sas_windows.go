@@ -47,6 +47,11 @@ func SendSecureAttention(ctx context.Context) error {
 
 // 在真正的 SCM 服務內呼叫；僅接受目前主控台的 SYSTEM Host，不接受客戶端指定 session。
 func sendClientSAS(conn net.Conn) error {
+	sasToggleMu.RLock()
+	defer sasToggleMu.RUnlock()
+	if secureAttentionDisabled() {
+		return errors.New("遠端 YourDesk 已關閉 Ctrl+Alt+Del，請先在遠端設定開啟。")
+	}
 	pipe, ok := conn.(interface{ Fd() uintptr })
 	if !ok {
 		return errors.New("無法驗證 SAS 控制管線")

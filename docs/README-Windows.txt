@@ -10,7 +10,7 @@ Antivirus notice: some antivirus products currently flag YourDesk. Our empty Go 
 
 繁體中文
 --------------------
-登入前啟動（實驗性功能）：在進階設定開啟後，經管理員授權安裝 Windows 自動啟動服務；開機後不需先登入，即啟動 Host，登入後持續運作。關閉時亦需管理員授權。更新或解除安裝前請先停用；不支援 BitLocker 開機前解鎖，登入畫面操作仍待實機驗證。
+登入前啟動（實驗性功能）：在進階設定開啟後，經管理員授權安裝 Windows 自動啟動服務；開機後不需先登入，即啟動 Host，登入後持續運作。關閉時亦需管理員授權。APP 內更新會自動交接服務，首次安裝或舊服務遷移需一次 UAC，後續支援的更新沿用已授權服務。手動安裝、ZIP 更新或解除安裝前仍請先停用；不支援 BitLocker 開機前解鎖，登入畫面操作仍待實機驗證。
 
 執行 setup.exe 安裝後，從桌面或開始功能表啟動 YourDesk。需要 Microsoft Edge WebView2 Runtime。
 新增站台並輸入對方 ID，選擇桌面或命令列圖示，再輸入對方密碼。雙擊站台可選擇模式。
@@ -26,7 +26,7 @@ CLI：-signal 指定配對伺服器；-print-uid 顯示裝置 ID；-print-secret
 
 English
 --------------------
-Start before login (experimental): enable it in Advanced Settings to install an automatic Windows service with administrator approval. The Host starts at boot before sign-in and continues after sign-in. Disabling also requires approval. Turn it off before updating or uninstalling. BitLocker pre-boot unlock is unsupported; login-screen control still requires on-device validation.
+Start before login (experimental): enable it in Advanced Settings to install an automatic Windows service with administrator approval. The Host starts at boot before sign-in and continues after sign-in. Disabling also requires approval. In-app updates hand off the service automatically. Initial installation or legacy migration needs one UAC approval; subsequent supported updates use the authorized service. Turn it off before manual installation, ZIP updates or uninstalling. BitLocker pre-boot unlock is unsupported; login-screen control still requires on-device validation.
 
 Run setup.exe and launch YourDesk from the desktop or Start menu. Microsoft Edge WebView2 Runtime is required.
 Add a site with the remote ID, choose Desktop or Terminal, then enter the remote password. Double-click a site to choose a mode.
@@ -42,7 +42,7 @@ Set the password for this run with -secret "your password"; no JSON input is nee
 
 日本語
 --------------------
-ログイン前の起動（実験的機能）：詳細設定から管理者の許可で Windows 自動起動サービスをインストールします。ログイン前に Host が起動し、ログイン後も継続します。無効化にも管理者の許可が必要です。更新やアンインストール前に無効にしてください。BitLocker の起動前解除には非対応で、ログイン画面の操作は実機確認が必要です。
+ログイン前の起動（実験的機能）：詳細設定から管理者の許可で Windows 自動起動サービスをインストールします。ログイン前に Host が起動し、ログイン後も継続します。無効化にも管理者の許可が必要です。アプリ内更新ではサービスを自動で引き継ぎます。初回導入や旧サービス移行は一度 UAC 承認が必要で、以後の対応更新は承認済みサービスを使います。手動インストール、ZIP 更新やアンインストール前には無効にしてください。BitLocker の起動前解除には非対応で、ログイン画面の操作は実機確認が必要です。
 
 setup.exe でインストールし、デスクトップまたはスタートメニューから起動します。Microsoft Edge WebView2 Runtime が必要です。
 接続先の ID を登録し、デスクトップまたはターミナルを選んで相手のパスワードを入力します。ダブルクリックでもモードを選べます。
@@ -58,7 +58,7 @@ CLI：-signal は配対サーバー、-print-uid は装置 ID 表示、-print-se
 
 한국어
 --------------------
-로그인 전 시작(실험적 기능): 고급 설정에서 관리자 승인으로 Windows 자동 시작 서비스를 설치합니다. 부팅 시 로그인 전에 Host가 시작되며 로그인 후에도 계속 실행됩니다. 끌 때도 승인이 필요합니다. 업데이트 또는 제거 전에 꺼 주세요. BitLocker 부팅 전 잠금 해제는 지원하지 않으며 로그인 화면 제어는 실제 장치에서 확인이 필요합니다.
+로그인 전 시작(실험적 기능): 고급 설정에서 관리자 승인으로 Windows 자동 시작 서비스를 설치합니다. 부팅 시 로그인 전에 Host가 시작되며 로그인 후에도 계속 실행됩니다. 끌 때도 승인이 필요합니다. 앱 내 업데이트는 서비스를 자동으로 인계합니다. 최초 설치나 구형 서비스 이전은 한 번의 UAC 승인이 필요하며 이후 지원 업데이트는 승인된 서비스를 사용합니다. 수동 설치, ZIP 업데이트 또는 제거 전에는 꺼 주세요. BitLocker 부팅 전 잠금 해제는 지원하지 않으며 로그인 화면 제어는 실제 장치에서 확인이 필요합니다.
 
 setup.exe로 설치한 후 바탕 화면이나 시작 메뉴에서 실행하세요. Microsoft Edge WebView2 Runtime이 필요합니다.
 상대 장치 ID로 연결을 추가하고 데스크톱 또는 터미널을 선택한 뒤 상대 암호를 입력하세요. 더블 클릭으로도 모드를 선택할 수 있습니다.

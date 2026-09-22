@@ -4,6 +4,7 @@ RequestExecutionLevel user
 !include "MUI2.nsh"
 !include "LogicLib.nsh"
 !include "x64.nsh"
+!include "FileFunc.nsh"
 Name "YourDesk"
 OutFile "${OUTPUT_FILE}"
 InstallDir "$LOCALAPPDATA\Programs\YourDesk"
@@ -88,7 +89,28 @@ Function un.onInit
  !insertmacro MUI_UNGETLANGUAGE
 FunctionEnd
 Section "YourDesk"
- !insertmacro CheckPreloginService
+ ; 僅自動更新交接可略過已註冊檢查，而且 SCM 必須確認已停止。
+ ${GetParameters} $1
+ ClearErrors
+ ${GetOptions} $1 "/SERVICEUPDATE" $2
+ ${If} ${Errors}
+  !insertmacro CheckPreloginService
+ ${Else}
+  System::Call 'advapi32::OpenSCManagerW(p 0, p 0, i 1) p.r1'
+  System::Call 'advapi32::OpenServiceW(p r1, w "YourDeskPrelogin", i 4) p.r2'
+  System::Alloc 28
+  Pop $3
+  System::Call 'advapi32::QueryServiceStatus(p r2, p r3) i.r4'
+  System::Call '*$3(i, i.r5)'
+  System::Free $3
+  System::Call 'advapi32::CloseServiceHandle(p r2)'
+  System::Call 'advapi32::CloseServiceHandle(p r1)'
+  ${If} $4 == 0
+  ${OrIf} $5 != 1
+   SetErrorLevel 3
+   Abort
+  ${EndIf}
+ ${EndIf}
  !insertmacro CheckFileClosed "YourDesk.exe"
  !insertmacro CheckFileClosed "yourdesk-client.exe"
  !insertmacro CheckFileClosed "yourdesk-remote.exe"

@@ -1,5 +1,5 @@
 'use strict';
-// Bounded browser-side metadata and 4 KiB reads; native staging owns drag-out.
+// Bounded browser-side metadata and 4 KiB reads; 本機下載由使用者選擇目的目錄。
 const YourDeskFiles = (() => {
   const MAX_ITEMS = 64, MAX_BYTES = 2 * 1024 ** 3, MAX_DEPTH = 16, CHUNK = 4096;
   class FileError extends Error { constructor(code) { super(code); this.code = code; } }

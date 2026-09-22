@@ -1,4 +1,4 @@
-// Package filetransfer provides bounded, home-relative file transfers for an
+// Package filetransfer provides bounded, user-authorized file transfers for an
 // authenticated P2P session. It never invokes a shell or changes the clipboard.
 package filetransfer
 
@@ -39,24 +39,27 @@ type Entry struct {
 	Directory bool   `json:"directory"`
 	Size      int64  `json:"size"`
 	Modified  string `json:"modified"`
+	Root      bool   `json:"root,omitempty"`
 }
 
 type listResult struct {
-	Path       string  `json:"path"`
-	Entries    []Entry `json:"entries"`
-	NextOffset int     `json:"nextOffset"`
+	Path       string             `json:"path"`
+	Entries    []Entry            `json:"entries"`
+	NextOffset int                `json:"nextOffset"`
+	Location   *directoryLocation `json:"location,omitempty"`
 }
 
 type session struct {
 	*transferHub
-	root     *os.Root
-	homeInfo os.FileInfo
-	closed   bool
-	allowed  func() bool
-	alive    func() bool
+	root       *os.Root
+	homeInfo   os.FileInfo
+	closed     bool
+	allowed    func() bool
+	alive      func() bool
+	filesystem *filesystemScope
 }
 
-// Available reports whether this process may offer home-scoped transfer access.
+// Available reports whether this interactive account may offer file transfers.
 func Available() bool {
 	if !useraccess.Allowed() {
 		return false
@@ -87,6 +90,10 @@ func Register(peer *p2p.Peer, authorized func() bool) {
 	if err != nil {
 		return
 	}
+	if s.filesystem, err = systemFilesystem(home); err != nil {
+		s.close()
+		return
+	}
 	s.alive = func() bool {
 		select {
 		case <-peer.Done():
@@ -96,7 +103,7 @@ func Register(peer *p2p.Peer, authorized func() bool) {
 		}
 	}
 	processHub.startMaintenance()
-	for _, method := range []string{"list", "stat", "read", "begin", "resume", "write", "commit", "cancel", "mkdir", "remove"} {
+	for _, method := range []string{"location", "list", "stat", "read", "begin", "resume", "write", "commit", "cancel", "mkdir", "remove"} {
 		name := method
 		_ = peer.RegisterCommandParams("xfer."+name, func(ctx context.Context, raw json.RawMessage) (any, error) {
 			return s.command(ctx, name, raw)
@@ -151,7 +158,7 @@ func relative(name string) (string, error) {
 		return ".", nil
 	}
 	if len(name) > maxPathBytes || !utf8.ValidString(name) || strings.HasPrefix(name, "/") || strings.ContainsAny(name, "\\:") {
-		return "", errors.New("路徑必須是使用者目錄內的相對路徑")
+		return "", errors.New("路徑必須是有效的相對路徑")
 	}
 	for _, part := range strings.Split(name, "/") {
 		if part == "" || part == "." || part == ".." || len(part) > maxNameBytes || strings.HasPrefix(strings.ToLower(part), tempPrefix) || strings.HasSuffix(part, ".") || strings.HasSuffix(part, " ") {
@@ -173,7 +180,13 @@ func relative(name string) (string, error) {
 // openDir pins each directory in turn and verifies that no component is a
 // symlink. os.Root remains the containment boundary if a local rename races us.
 func (s *session) openDir(name string) (*os.Root, error) {
-	r, err := s.root.OpenRoot(".")
+	var r *os.Root
+	var err error
+	if s.filesystem != nil {
+		r, name, err = s.filesystem.openRoot(name)
+	} else {
+		r, err = s.root.OpenRoot(".")
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -211,6 +224,9 @@ func (s *session) parent(name string) (*os.Root, string, error) {
 	if name == "." {
 		return nil, "", errors.New("不能以使用者目錄作為檔案")
 	}
+	if s.filesystem != nil && !strings.Contains(name, "/") {
+		return nil, "", errors.New("不能修改磁碟根目錄")
+	}
 	r, err := s.openDir(path.Dir(name))
 	return r, path.Base(name), err
 }
@@ -237,6 +253,14 @@ func (s *session) command(ctx context.Context, method string, raw json.RawMessag
 		}
 	}()
 	switch method {
+	case "location":
+		if err := decode(raw, &struct{}{}); err != nil {
+			return nil, err
+		}
+		if s.filesystem == nil {
+			return map[string]string{"path": ""}, nil
+		}
+		return map[string]string{"path": s.filesystem.initial}, nil
 	case "list":
 		var in struct {
 			Path   string `json:"path"`
@@ -257,8 +281,13 @@ func (s *session) command(ctx context.Context, method string, raw json.RawMessag
 		if e != nil {
 			return nil, e
 		}
-		if name == "." {
-			info, e := s.root.Stat(".")
+		if name == "." || (s.filesystem != nil && !strings.Contains(name, "/")) {
+			root, e := s.openDir(name)
+			if e != nil {
+				return nil, e
+			}
+			defer root.Close()
+			info, e := root.Stat(".")
 			if e != nil {
 				return nil, e
 			}
@@ -322,65 +351,39 @@ func (s *session) list(ctx context.Context, name string, offset int) (any, error
 	if offset < 0 || offset > maxListOffset {
 		return nil, errors.New("目錄分頁位移超出上限")
 	}
+	if s.filesystem != nil && name == "." {
+		return s.filesystem.listRoots(ctx, offset)
+	}
+	var location *directoryLocation
+	if s.filesystem != nil {
+		location = s.filesystem.location(name)
+	}
 	r, err := s.openDir(name)
 	if err != nil {
 		return nil, err
 	}
 	defer r.Close()
-	f, err := openDirectory(r, ".")
+	entries, err := sortedVisibleEntries(ctx, r, name, maxListOffset+pageSize)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
-	for left := offset; left > 0; {
-		if err := ctx.Err(); err != nil {
-			return nil, err
-		}
-		items, e := f.ReadDir(min(left, 128))
-		left -= len(items)
-		if e == io.EOF {
-			return listResult{Path: name, Entries: []Entry{}, NextOffset: -1}, nil
-		}
-		if e != nil {
-			return nil, e
-		}
-	}
-	out := listResult{Path: name, Entries: []Entry{}, NextOffset: offset}
+	out := listResult{Path: name, Entries: []Entry{}, NextOffset: -1, Location: location}
 	encodedBase, _ := json.Marshal(out)
 	// Count the actual JSON representation, including HTML escapes in paths.
 	// The margin also covers nextOffset gaining decimal digits during this page.
 	budget := len(encodedBase) + 32
-	for visited := 0; visited < 256 && len(out.Entries) < pageSize; visited++ {
+	for i := offset; i < len(entries); i++ {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		items, e := f.ReadDir(1)
-		if e == io.EOF {
-			out.NextOffset = -1
-			break
-		}
-		if e != nil {
-			return nil, e
-		}
-		item := items[0]
-		p := path.Join(name, item.Name())
-		if _, e := relative(p); e != nil {
-			out.NextOffset++
-			continue
-		}
-		info, e := r.Lstat(item.Name())
-		if e != nil || (!info.IsDir() && !info.Mode().IsRegular()) {
-			out.NextOffset++
-			continue
-		}
-		v := entry(p, info)
+		v := entries[i]
 		encoded, _ := json.Marshal(v)
-		if budget+len(encoded) > 14000 {
+		if len(out.Entries) == pageSize || budget+len(encoded) > 14000 {
+			out.NextOffset = i
 			break
 		}
 		out.Entries = append(out.Entries, v)
 		budget += len(encoded) + 1
-		out.NextOffset++
 	}
 	return out, nil
 }

@@ -20,12 +20,16 @@ func clipboardTestPeers(t *testing.T, handle func(Control)) (*Peer, *Peer) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		p := &Peer{pc: pc, done: make(chan struct{}), clipboardInbox: make(chan []byte, 128), clipboardDone: make(chan struct{})}
+		p := &Peer{pc: pc, done: make(chan struct{}), audioInbox: make(chan []byte, 8), clipboardInbox: make(chan []byte, 128), clipboardDone: make(chan struct{})}
 		t.Cleanup(func() { _ = p.Close() })
 		return p
 	}
 	a, b := makePeer(), makePeer()
 	bind := func(p *Peer, dc *webrtc.DataChannel) {
+		if dc.Label() == AudioChannel {
+			p.bindAudio(dc)
+			return
+		}
 		if dc.Label() == ClipboardChannel {
 			p.bindClipboard(dc)
 			return
@@ -42,8 +46,12 @@ func clipboardTestPeers(t *testing.T, handle func(Control)) (*Peer, *Peer) {
 		dc.OnOpen(func() { p.announceCommands() })
 	}
 	b.pc.OnDataChannel(func(dc *webrtc.DataChannel) { bind(b, dc) })
-	for _, name := range []string{ControlChannel, ClipboardChannel} {
-		dc, err := a.pc.CreateDataChannel(name, nil)
+	for _, name := range []string{ControlChannel, ClipboardChannel, AudioChannel} {
+		var options *webrtc.DataChannelInit
+		if name == AudioChannel {
+			options = &webrtc.DataChannelInit{Ordered: boolPtr(true), MaxRetransmits: uint16Ptr(0)}
+		}
+		dc, err := a.pc.CreateDataChannel(name, options)
 		if err != nil {
 			t.Fatal(err)
 		}

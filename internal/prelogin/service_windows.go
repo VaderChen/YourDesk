@@ -39,7 +39,7 @@ func servicePaths() (root, executable string, err error) {
 }
 
 func Status() State {
-	s := State{Supported: true, Message: serviceHint, SASSupported: true, SASAllowed: secureAttentionPolicyAllowed()}
+	s := State{Supported: true, Message: serviceHint, SASSupported: true, SASAllowed: secureAttentionPolicyAllowed(), SASDisabled: secureAttentionDisabled()}
 	// WinPE 不安裝持久服務。
 	if key, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\CurrentControlSet\Control\MiniNT`, registry.QUERY_VALUE); err == nil {
 		key.Close()
@@ -65,12 +65,19 @@ func Status() State {
 }
 
 func Configure(ctx context.Context, enabled bool, c Config) error {
-	return configureWindows(ctx, enabled, c, false)
+	// 登入前服務及 SAS 共用第一次安裝授權，避免稍後再跳一次 UAC。
+	return configureWindows(ctx, enabled, c, true)
 }
 func ConfigureSecureAttention(ctx context.Context, c Config) error {
 	state := Status()
 	if !state.SASSupported {
 		return errors.New("這台電腦不支援 Ctrl+Alt+Del 授權。")
+	}
+	if state.Enabled && state.SASAllowed {
+		if state.SASDisabled {
+			return SetSecureAttentionEnabled(ctx, true)
+		}
+		return nil
 	}
 	var err error
 	if state.Enabled {
@@ -83,6 +90,9 @@ func ConfigureSecureAttention(ctx context.Context, c Config) error {
 	}
 	if !Status().SASAllowed {
 		return errors.New("Windows 原則仍未允許服務產生 Ctrl+Alt+Del，請洽系統管理員。")
+	}
+	if secureAttentionDisabled() {
+		return SetSecureAttentionEnabled(ctx, true)
 	}
 	return nil
 }

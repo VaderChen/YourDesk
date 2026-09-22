@@ -162,7 +162,7 @@ func TestDownloadPauseResumeKeepsConfirmedOffset(t *testing.T) {
 		t.Fatalf("pause finished the promise: %+v", result)
 	default:
 	}
-	files, err := filepath.Glob(filepath.Join(client.downloads, "YourDesk", "transfer-*", ".yourdesk-part-*"))
+	files, err := filepath.Glob(filepath.Join(client.downloads, ".yourdesk-part-*"))
 	if err != nil || len(files) != 1 {
 		t.Fatalf("partial missing: %v %v", files, err)
 	}
@@ -255,7 +255,7 @@ func TestDownloadSourceChangedOnResumeCleansPartial(t *testing.T) {
 	if result.err == nil || !strings.Contains(result.err.Error(), "來源檔案已變更") {
 		t.Fatalf("changed source accepted: %v", result.err)
 	}
-	entries, err := os.ReadDir(filepath.Join(client.downloads, "YourDesk"))
+	entries, err := downloadPartials(client.downloads)
 	if err != nil || len(entries) != 0 {
 		t.Fatalf("partial retained after fatal source change: %v %v", entries, err)
 	}
@@ -279,7 +279,7 @@ func TestDownloadCancelWhileInterruptedRemovesOnlyPartial(t *testing.T) {
 	if result := awaitControlledResult(t, done); result.err == nil {
 		t.Fatal("cancel succeeded")
 	}
-	entries, err := os.ReadDir(filepath.Join(client.downloads, "YourDesk"))
+	entries, err := downloadPartials(client.downloads)
 	if err != nil || len(entries) != 0 {
 		t.Fatalf("cancelled partial retained: %v %v", entries, err)
 	}
@@ -357,7 +357,7 @@ func TestDownloadReplacementDuringPauseIsPreserved(t *testing.T) {
 			})
 			control, done := startControlledDownload(t, client)
 			waitControlledState(t, control, "interrupted")
-			partials, err := filepath.Glob(filepath.Join(client.downloads, "YourDesk", "transfer-*", ".yourdesk-part-*"))
+			partials, err := filepath.Glob(filepath.Join(client.downloads, ".yourdesk-part-*"))
 			if err != nil || len(partials) != 1 {
 				t.Fatal("partial missing", err)
 			}
@@ -423,7 +423,7 @@ func assertFailedDownloadCleaned(t *testing.T, client *fileDownloadClient, contr
 	if state := control.snapshot().State; state != "failed" {
 		t.Fatalf("permanent failure left state %q", state)
 	}
-	entries, err := os.ReadDir(filepath.Join(client.downloads, "YourDesk"))
+	entries, err := downloadPartials(client.downloads)
 	if !errors.Is(err, os.ErrNotExist) && (err != nil || len(entries) != 0) {
 		t.Fatalf("permanent failure retained partial: %v %v", entries, err)
 	}
@@ -606,8 +606,13 @@ func TestDownloadCancelAfterBridgeInterruptionCleansPartial(t *testing.T) {
 	if result := awaitControlledResult(t, done); !errors.Is(result.err, context.Canceled) {
 		t.Fatalf("cancel result: %+v", result)
 	}
-	entries, err := os.ReadDir(filepath.Join(client.downloads, "YourDesk"))
+	entries, err := downloadPartials(client.downloads)
 	if err != nil || len(entries) != 0 {
 		t.Fatalf("cancel retained partial: %v %v", entries, err)
 	}
+}
+
+// 只檢查本次下載暫存；目的資料夾可能已含使用者自己的檔案。
+func downloadPartials(directory string) ([]string, error) {
+	return filepath.Glob(filepath.Join(directory, ".yourdesk-part-*"))
 }

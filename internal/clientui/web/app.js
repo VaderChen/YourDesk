@@ -97,6 +97,7 @@ function rememberGroup(id) {
 let busy = false;
 let toastTimer;
 let confirmAction = null;
+let confirmCancelAction = null;
 let groupDrag = null;
 let siteDrag = null;
 let sitePresence = {};
@@ -360,11 +361,12 @@ function editGroup(group) {
   $('#group-dialog-title').textContent = group ? i18n.t('編輯群組') : i18n.t('新增群組');
   openDialog('#group-dialog');
 }
-function confirmDelete(title, description, callback) {
+function confirmDelete(title, description, callback, onCancel = null) {
   $('#confirm-form button[type="submit"]').textContent = i18n.t('確認刪除');
   $('#confirm-title').textContent = title;
   $('#confirm-description').textContent = description;
   confirmAction = callback;
+  confirmCancelAction = onCancel;
   openDialog('#confirm-dialog');
 }
 function deleteSite(site) {
@@ -458,6 +460,7 @@ function connect(site,terminal=false,files=false) {
 async function updateRunning() {
   const latest = await api('state');
   state.hardwareDetection = latest.hardwareDetection;
+ state.audioCapabilities=latest.audioCapabilities;renderAudioSettings();
   if(!$('#settings-panel-hardware').hidden||deepHardwareState?.status==='running')deepHardwareState=await api('hardware-deep');
   renderHardwareAnalysis();
   state.passwordPrompt = latest.passwordPrompt;
@@ -618,6 +621,8 @@ function renderHardwareAnalysis() {
   const mode=decode?data.decodingMode:null;
   return t(hardware===true||mode==='hardware'?'硬體加速可用':hardware===false||mode==='software'?'軟體運算':'可用 (加速未知)');
  };
+ const audio=results.find(r=>r.key==='audio-codecs/PCM/48000x2'&&r.state==='complete')?.data?.capabilities||[];
+ if(audio.length){heading('聲音編解碼實測');const section=list();for(const cap of audio){row(section,cap.codec.toUpperCase()+' · '+t('編碼實測'),t(cap.encode?(cap.hardwareEncode?'硬體加速可用':'軟體運算'):'不支援'));row(section,cap.codec.toUpperCase()+' · '+t('解碼實測'),t(cap.decode?(cap.hardwareDecode?'硬體加速可用':'軟體運算'):'不支援'));}}
  const separated=results.some(r=>/\/(encode|decode)$/.test(r.key));
  for(const decode of [false,true]){
   heading(decode?'解碼實測':'編碼實測');
@@ -626,7 +631,7 @@ function renderHardwareAnalysis() {
   const head=table.createTHead().insertRow();
   for(const label of [decode?'格式 / 輸出':'格式 / 輸入','結果','後端','耗時']){const th=text('th',t(label));th.scope='col';head.append(th);}
   const body=table.createTBody();
-  for(const result of results.filter(r=>r.key!=='inventory'&&!(r.data?.width===128&&r.data?.height===128)&&!/(?:^|\/)128x128(?:\/|$)/.test(r.key)&&(!separated||r.key.endsWith(decode?'/decode':'/encode')))){
+  for(const result of results.filter(r=>r.key!=='inventory'&&!r.key.startsWith('audio-')&&!(r.data?.width===128&&r.data?.height===128)&&!/(?:^|\/)128x128(?:\/|$)/.test(r.key)&&(!separated||r.key.endsWith(decode?'/decode':'/encode')))){
    const data=result.data||{};const tr=body.insertRow();const base=result.key.replace(/\/(encode|decode)$/,'').replace(/\/1920x1080$/,'');
    tr.append(text('td',(data.probeKind==='windows-software'||data.probeKind==='software')?`${data.codec} / ${t('軟體獨立測試')}${data.width===1920&&data.height===1080?'':` / ${data.width}×${data.height}`}`:data.probeKind==='windows-native'?`${t('Windows 原生格式')} / ${base}`:base));
    tr.append(text('td',result.state==='complete'?outcome(data,decode):t(states[result.state]||'偵測未完成')));
@@ -723,7 +728,12 @@ $('#connect-form').addEventListener('submit', event => {
 });
 $('#confirm-form').addEventListener('submit', event => {
   event.preventDefault();
-  action(async () => { if (confirmAction) await confirmAction(); $('#confirm-dialog').close(); confirmAction = null; });
+  action(async () => { if (confirmAction) await confirmAction(); confirmCancelAction = null; $('#confirm-dialog').close(); confirmAction = null; });
+});
+$('#confirm-dialog').addEventListener('close', () => {
+  const onCancel = confirmCancelAction;
+  confirmAction = confirmCancelAction = null;
+  if (onCancel) Promise.resolve().then(onCancel).catch(error => toast(error.message, true));
 });
 function renderQuick() {
   const quick = state.quick;
@@ -810,6 +820,7 @@ function applyPreferences(preferences) {
  $('#ui-fit-window').checked=!!values.fitWindow;
  $('#ui-close-on-disconnect').checked=!!values.closeWindowOnDisconnect;
  $('#ui-close-when-idle').checked=!!values.closeWhenIdle;
+ $('#ui-remote-audio').checked=!!values.remoteAudio;renderAudioSettings(values.audioCodec||'opus');
  $('#ui-auto-reconnect').checked=!!values.autoReconnect;
  if(values.autoReconnect)$('#ui-close-on-disconnect').checked=false;
  $('#ui-enhancement').checked=!!values.imageEnhancement;
@@ -832,6 +843,43 @@ function applyPreferences(preferences) {
  $('#stream-codec-goal').value=values.codecGoal||'balanced';
   if (state) { renderDevice(); renderLibrary(); renderQuick();
  renderRelease(state.updates); }
+}
+function refreshAudioCodecOptions(selected){
+ const codecs=$('#ui-audio-codec'),capabilities=state?.audioCapabilities;
+ const pending=!Array.isArray(capabilities);
+ // 此偏好要求遠端使用指定格式；本機須能解碼，來源能力仍由連線協商確認。
+ // AAC 硬體優先允許軟體備援，不能只因本機沒有硬體加速就停用。
+ const options=[['auto','自動 (按排列順序優先)'],['aac','AAC 硬體'],['opus','Opus 軟體'],['aac-software','AAC 軟體'],['pcm','PCM 未壓縮']]
+  .map(([value,label])=>[value,i18n.t(label),!!capabilities?.some(cap=>(value==='auto'||cap.codec===value.replace('-software',''))&&cap.decode)]);
+ const labels=[i18n.t('可用'),i18n.t('不支援'),i18n.t('聲音能力偵測中…')];
+ const signature=JSON.stringify([pending,options,labels]);
+ if(codecs.dataset.optionsSignature!==signature){
+  const available=document.createElement('optgroup');available.label=labels[0];
+  const unsupported=document.createElement('optgroup');unsupported.label=labels[1];unsupported.disabled=true;
+  codecs.replaceChildren();
+  if(pending){
+   const option=text('option',labels[2]);option.value=selected;option.disabled=true;codecs.append(option);
+  }else{
+   for(const [value,label,supported] of options){
+    const option=text('option',label);option.value=value;option.disabled=!supported;
+    (supported?available:unsupported).append(option);
+   }
+  }
+  codecs.append(available,unsupported);
+  codecs.dataset.optionsSignature=signature;
+ }
+ if(pending)codecs.querySelector('option').value=selected;
+ codecs.value=selected;
+ codecs.disabled=pending||busy;
+}
+function renderAudioSettings(selected=$('#ui-audio-codec').value||state?.preferences?.audioCodec||'opus'){
+ refreshAudioCodecOptions(selected);
+ const enabled=$('#ui-remote-audio').checked;
+ for(const id of ['#audio-quality-note','#audio-capabilities'])$(id).hidden=!enabled;
+ const codec=$('#ui-audio-codec').value.replace('-software','');
+ if(codec==='auto'&&Array.isArray(state?.audioCapabilities)){$('#audio-capabilities').textContent=['AAC 硬體','Opus 軟體','AAC 軟體','PCM 未壓縮'].map(label=>i18n.t(label)).join(' → ');return;}
+ const caps=state?.audioCapabilities?.find(c=>c.codec===codec);
+ $('#audio-capabilities').textContent=!caps?i18n.t('聲音能力偵測中…'):i18n.t(caps.hardwareDecode?'本機 {codec}：硬體解碼可用':caps.decode?'本機 {codec}：軟體解碼可用':'本機 {codec}：不可用').replace('{codec}',codec==='opus'?'Opus':codec.toUpperCase());
 }
 function refreshCodecGoalState() {
  const codecs=$('#stream-codec');
@@ -864,14 +912,14 @@ async function savePreferences() {
  for(const id of ['#ui-source-fps','#ui-bitrate-limit','#ui-gop']){if(!$(id).checkValidity()){$(id).reportValidity();return}}
   const previous = state.preferences;
  if(!$('#ui-enhancement-budget').checkValidity()){$('#ui-enhancement-budget').reportValidity();return}
-	const preferences = { tailcatEnabled:$('#tailcat-mode').checked, mcpOpenDisplay:$('#ui-mcp-open-display').checked, mcpWhitelistEnabled:$('#ui-mcp-whitelist-enabled').checked, mcpWhitelist:[...new Set($('#ui-mcp-whitelist').value.split(/\r?\n/).map(v=>v.trim()).filter(Boolean))], mcpEnabled:$('#ui-mcp-enabled').checked, fitWindow:$('#ui-fit-window').checked, autoReconnect:$('#ui-auto-reconnect').checked, closeWhenIdle:$('#ui-close-when-idle').checked, closeWindowOnDisconnect:$('#ui-close-on-disconnect').checked, sourceFPSLimit:Number($('#ui-source-fps').value), bitrateLimitMbps:Number($('#ui-bitrate-limit').value), keyframeInterval:Number($('#ui-gop').value), interpolation: $('#ui-interpolation').checked, interpolationMethod: $('#ui-interpolation-method').value, coreMLModel: $('#ui-coreml-model').value || 'quicksrnet-small', enhancementStrategy: $('#ui-enhancement-strategy').value, enhancementBitrateMbps: Number($('#ui-enhancement-budget').value), superResolution: $('#ui-super-resolution').value, imageEnhancement: $('#ui-enhancement').checked, language: $('#ui-language').value, theme: $('#ui-theme').value, codec: $('#stream-codec').value, codecGoal: $('#stream-codec-goal').value, disableHints: !$('#ui-hints').checked, disableKeyMapping:!$('#ui-key-mapping').checked, directListen: $('#direct-listen').checked };
+	const preferences = { remoteAudio:$('#ui-remote-audio').checked, audioCodec:$('#ui-audio-codec').value, tailcatEnabled:$('#tailcat-mode').checked, mcpOpenDisplay:$('#ui-mcp-open-display').checked, mcpWhitelistEnabled:$('#ui-mcp-whitelist-enabled').checked, mcpWhitelist:[...new Set($('#ui-mcp-whitelist').value.split(/\r?\n/).map(v=>v.trim()).filter(Boolean))], mcpEnabled:$('#ui-mcp-enabled').checked, fitWindow:$('#ui-fit-window').checked, autoReconnect:$('#ui-auto-reconnect').checked, closeWhenIdle:$('#ui-close-when-idle').checked, closeWindowOnDisconnect:$('#ui-close-on-disconnect').checked, sourceFPSLimit:Number($('#ui-source-fps').value), bitrateLimitMbps:Number($('#ui-bitrate-limit').value), keyframeInterval:Number($('#ui-gop').value), interpolation: $('#ui-interpolation').checked, interpolationMethod: $('#ui-interpolation-method').value, coreMLModel: $('#ui-coreml-model').value || 'quicksrnet-small', enhancementStrategy: $('#ui-enhancement-strategy').value, enhancementBitrateMbps: Number($('#ui-enhancement-budget').value), superResolution: $('#ui-super-resolution').value, imageEnhancement: $('#ui-enhancement').checked, language: $('#ui-language').value, theme: $('#ui-theme').value, codec: $('#stream-codec').value, codecGoal: $('#stream-codec-goal').value, disableHints: !$('#ui-hints').checked, disableKeyMapping:!$('#ui-key-mapping').checked, directListen: $('#direct-listen').checked };
   $('#ui-mcp-whitelist-enabled').disabled=true;$('#ui-mcp-whitelist').disabled=true;
  $('#ui-mcp-enabled').disabled=true;
  $('#ui-language').disabled = true;
   $('#ui-theme').disabled = true;
   $('#ui-hints').disabled = true;
  $('#ui-key-mapping').disabled=true;
- $('#ui-fit-window').disabled=true;
+ $('#ui-fit-window').disabled=true;$('#ui-remote-audio').disabled=true;$('#ui-audio-codec').disabled=true;
  $('#ui-source-fps').disabled=true;$('#ui-bitrate-limit').disabled=true;$('#ui-gop').disabled=true;$('#ui-interpolation').disabled=true;$('#ui-interpolation-method').disabled=true;$('#ui-enhancement').disabled=true;$('#ui-super-resolution').disabled=true;$('#ui-coreml-model').disabled=true;$('#ui-enhancement-strategy').disabled=true;$('#ui-enhancement-budget').disabled=true;
   $('#stream-codec').disabled = true;
  $('#stream-codec-goal').disabled = true;
@@ -880,8 +928,8 @@ async function savePreferences() {
   await action(async () => {
     try {
       await api('preferences', 'PUT', preferences);
-      state.preferences = preferences;
-      applyPreferences(preferences);
+      state.preferences = {...state.preferences, ...preferences};
+      applyPreferences(state.preferences);
     } catch (error) { applyPreferences(previous); throw error; }
   });
   $('#ui-mcp-whitelist-enabled').disabled=false;$('#ui-mcp-whitelist').disabled=!$('#ui-mcp-whitelist-enabled').checked;
@@ -890,7 +938,7 @@ async function savePreferences() {
   $('#ui-theme').disabled = false;
   $('#ui-hints').disabled = false;
  $('#ui-key-mapping').disabled=false;
- $('#ui-fit-window').disabled=false;
+ $('#ui-fit-window').disabled=false;$('#ui-remote-audio').disabled=false;renderAudioSettings();
  $('#ui-source-fps').disabled=false;$('#ui-bitrate-limit').disabled=false;$('#ui-gop').disabled=false;$('#ui-interpolation').disabled=false;renderInterpolationSupport();$('#ui-enhancement').disabled=false;$('#ui-super-resolution').disabled=false;$('#ui-coreml-model').disabled=false;$('#ui-enhancement-strategy').disabled=false;$('#ui-enhancement-budget').disabled=false;
   $('#stream-codec').disabled = false;
  refreshCodecGoalState();
@@ -909,6 +957,8 @@ $('#ui-fit-window').addEventListener('change',savePreferences);
 $('#ui-close-on-disconnect').addEventListener('change',()=>{if($('#ui-close-on-disconnect').checked)$('#ui-auto-reconnect').checked=false;savePreferences();});
 $('#ui-auto-reconnect').addEventListener('change',()=>{if($('#ui-auto-reconnect').checked)$('#ui-close-on-disconnect').checked=false;savePreferences();});
 $('#ui-close-when-idle').addEventListener('change',savePreferences);
+$('#ui-remote-audio').addEventListener('change',()=>{renderAudioSettings();if($('#ui-remote-audio').checked)$('#audio-quality-note').scrollIntoView({block:'nearest'});savePreferences()});
+$('#ui-audio-codec').addEventListener('change',()=>{renderAudioSettings();savePreferences()});
  $('#ui-enhancement').addEventListener('change',savePreferences);
  $('#ui-interpolation').addEventListener('change',savePreferences);
  $('#ui-interpolation-method').addEventListener('change',savePreferences);
@@ -1451,16 +1501,23 @@ function showHostConflict(owner) {
 
 $('#copy-mcp-address').addEventListener('click',()=>action(async()=>{await navigator.clipboard.writeText($('#mcp-address').textContent);toast(i18n.t('MCP 位址已複製'));}));
 
-let preloginWasBusy=false, sasPermissionPrompted=false;
+let preloginWasBusy=false, sasToggleBusy=false, sasToggleTarget=false;
 function requestSASPermission(){
  const service=state?.prelogin;
  if(!service?.sasSupported||service.busy)return;
- sasPermissionPrompted=true;
  const message=service.enabled?'允許 YourDesk 服務傳送 Ctrl+Alt+Del？接著會要求 Windows 管理員授權。':'允許 YourDesk 傳送 Ctrl+Alt+Del？將啟用登入前連線服務及開機自動啟動，接著會要求 Windows 管理員授權。';
  confirmDelete(i18n.t('授權 Ctrl+Alt+Del'),i18n.t(message),async()=>{await api('prelogin','POST',{enabled:true,secureAttention:true});await updateRunning();});
  $('#confirm-form button[type="submit"]').textContent=i18n.t('授權');
 }
-$('#authorize-sas').addEventListener('click',requestSASPermission);
+$('#authorize-sas').addEventListener('change',()=>{
+ const toggle=$('#authorize-sas'),service=state?.prelogin,enabled=toggle.checked;
+ if(busy||sasToggleBusy||!service?.sasSupported||service.busy){renderPrelogin();return;}
+ if(enabled&&(!service.enabled||!service.sasAllowed)){
+  toggle.checked=false;requestSASPermission();return;
+ }
+ sasToggleBusy=true;sasToggleTarget=enabled;renderPrelogin();
+ action(async()=>{try{await api('prelogin/sas','POST',{enabled});await updateRunning();}finally{sasToggleBusy=false;renderPrelogin();}});
+});
 // 服務狀態由系統安裝結果決定，不存成一般偏好值。
 function renderPrelogin() {
  const service=state?.prelogin;
@@ -1474,10 +1531,11 @@ function renderPrelogin() {
  $('#prelogin-progress').textContent=service?.busy ? i18n.t(service.message) : '';
  if (!service?.busy && preloginWasBusy && service?.error) toast(i18n.t(service.error),false,{warning:true,duration:15000});
  preloginWasBusy=!!service?.busy;
- const ready=!!service?.enabled&&!!service?.sasAllowed;
- $('#authorize-sas').hidden=!service?.sasSupported;
- $('#authorize-sas').disabled=ready||!!service?.busy;
- if(service?.sasSupported&&!ready&&!service.busy&&!sasPermissionPrompted&&!document.querySelector('dialog[open]'))requestSASPermission();
+ const ready=!!service?.enabled&&!!service?.sasAllowed&&!service?.sasDisabled;
+ $('#sas-permission-row').hidden=!service?.sasSupported;
+ $('#authorize-sas').checked=sasToggleBusy?sasToggleTarget:ready;
+ $('#authorize-sas').disabled=!service?.sasSupported||!!service?.busy||sasToggleBusy;
+ // 啟動及背景輪詢只呈現狀態；授權只由使用者手動開啟 Switch 觸發。
 }
 $('#ui-prelogin').addEventListener('change',()=>action(async()=>{
  const toggle=$('#ui-prelogin');

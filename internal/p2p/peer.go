@@ -21,6 +21,7 @@ const (
 	ScreenChannel    = "screen"
 	ControlChannel   = "control"
 	ClipboardChannel = "clipboard"
+	AudioChannel     = "audio-v1"
 	chunkSize        = 28 * 1024
 	frameHeaderSize  = 44
 	maxScreenBuffer  = 2 * 1024 * 1024
@@ -108,6 +109,9 @@ type Peer struct {
 	pc                  *webrtc.PeerConnection
 	screen              *webrtc.DataChannel
 	control             *webrtc.DataChannel
+	audio               *webrtc.DataChannel
+	audioInbox          chan []byte
+	audioWriteMu        sync.Mutex
 	clipboard           *webrtc.DataChannel
 	clipboardInbox      chan []byte
 	clipboardDone       chan struct{}
@@ -136,7 +140,7 @@ func NewHostWithTransport(ctx context.Context, signal *signaling.Client, mode pe
 	if err != nil {
 		return nil, err
 	}
-	p := &Peer{pc: pc, done: make(chan struct{}), clipboardInbox: make(chan []byte, 128), clipboardDone: make(chan struct{})}
+	p := &Peer{pc: pc, done: make(chan struct{}), audioInbox: make(chan []byte, 8), clipboardInbox: make(chan []byte, 128), clipboardDone: make(chan struct{})}
 	p.bindTransport(link, mode)
 	pc.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
 		if state == webrtc.PeerConnectionStateClosed || state == webrtc.PeerConnectionStateFailed {
@@ -155,6 +159,8 @@ func NewHostWithTransport(ctx context.Context, signal *signaling.Client, mode pe
 	})
 	pc.OnDataChannel(func(dc *webrtc.DataChannel) {
 		switch dc.Label() {
+		case AudioChannel:
+			p.bindAudio(dc)
 		case ClipboardChannel:
 			p.bindClipboard(dc)
 		case ScreenChannel:
@@ -191,6 +197,12 @@ func NewHostWithTransport(ctx context.Context, signal *signaling.Client, mode pe
 		return nil, err
 	}
 	p.bindClipboard(dc)
+	audio, err := pc.CreateDataChannel(AudioChannel, &webrtc.DataChannelInit{Ordered: boolPtr(true), MaxRetransmits: uint16Ptr(0)})
+	if err != nil {
+		_ = pc.Close()
+		return nil, err
+	}
+	p.bindAudio(audio)
 	// This channel is created locally by the host, so OnDataChannel is not
 	// invoked for it. Bind the receive callback explicitly.
 	p.onMessage(p.control, func(m webrtc.DataChannelMessage) {
@@ -305,7 +317,7 @@ func newViewerWithTransport(ctx context.Context, signal *signaling.Client, mode 
 	if err != nil {
 		return nil, err
 	}
-	p := &Peer{pc: pc, done: make(chan struct{}), clipboardInbox: make(chan []byte, 128), clipboardDone: make(chan struct{})}
+	p := &Peer{pc: pc, done: make(chan struct{}), audioInbox: make(chan []byte, 8), clipboardInbox: make(chan []byte, 128), clipboardDone: make(chan struct{})}
 	p.filesOnly.Store(filesOnly)
 	p.bindTransport(link, mode)
 	pc.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
@@ -321,6 +333,8 @@ func newViewerWithTransport(ctx context.Context, signal *signaling.Client, mode 
 	var assembler frameAssembler
 	pc.OnDataChannel(func(dc *webrtc.DataChannel) {
 		switch dc.Label() {
+		case AudioChannel:
+			p.bindAudio(dc)
 		case ClipboardChannel:
 			p.bindClipboard(dc)
 		case ScreenChannel:

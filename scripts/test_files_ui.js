@@ -153,17 +153,18 @@ class Element {
   setAttribute(name,value){this[name]=value;}
   addEventListener(name,callback){this.events.set(name,callback);}
   querySelector(tag){for(const child of this.children){if(child.tagName===tag)return child;const found=child.querySelector(tag);if(found)return found;}return null;}
-  showModal(){this.open=true;}close(){this.open=false;}focus(){}click(){this.events.get('click')?.();}
+  showModal(){this.open=true;}close(){this.open=false;this.events.get('close')?.();}focus(){}click(){this.events.get('click')?.();}
 }
 function browser(respond,language='en',bindings={}){
   const elements=new Map(),calls=[],events=new Map(),timers=new Map(),closeTimers=new Map();let replaced='',connection=true;
   const get=id=>{if(!elements.has(id))elements.set(id,new Element());return elements.get(id);};
   const document={documentElement:{},getElementById:get,querySelectorAll:()=>[],createElement:tag=>new Element(tag),addEventListener:()=>{}};
-  const window={...bindings,addEventListener:(name,callback)=>events.set(name,callback)};
+  const window={yourdeskListDirectories:async()=>({path:'/local',parent:'/',entries:[],nextOffset:-1}),...bindings,addEventListener:(name,callback)=>events.set(name,callback)};
   const schedule=(callback,delay)=>{if(delay!==3000&&delay!==8000)return setTimeout(callback,delay);const id=Symbol('timer');(delay===3000?timers:closeTimers).set(id,callback);return id;};
   const clear=id=>{if(typeof id==='symbol'){timers.delete(id);closeTimers.delete(id);}else clearTimeout(id);};
   const context={document,window,location:{hash:'#token=secret-token&session=demo&instance=one&language='+language+'&name=Example',pathname:'/files.html'},history:{replaceState:(_,__,value)=>{replaced=value;}},navigator:{language:'en'},URLSearchParams,AbortController,TextEncoder,setTimeout:schedule,clearTimeout:clear,Uint8Array,btoa,crypto:webcrypto,fetch:async(url,options)=>{
-    calls.push({url,options});const body=JSON.parse(options.body);
+    const body=JSON.parse(options.body);if(body.action==='location')return{ok:false,status:400,json:async()=>({error:'old host'})};
+    calls.push({url,options});
     if(body.action==='status'){const connected=typeof connection==='function'?await connection():connection;return{ok:true,status:200,json:async()=>({connected})};}
     return respond(body);
   }};
@@ -171,6 +172,7 @@ function browser(respond,language='en',bindings={}){
   return{get,calls,events,document,window,replaced,setConnection:value=>{connection=value;},pendingPolls:()=>timers.size,expireClose:()=>{for(const callback of [...closeTimers.values()])callback();},poll:async()=>{const next=timers.entries().next().value;if(!next)return false;timers.delete(next[0]);await next[1]();return true;}};
 }
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
+async function chooseDownload(env){await env.get('files-prepare').events.get('click')();await flush();return {done:env.get('destination-select').events.get('click')()};}
 const response=value=>({ok:true,status:200,json:async()=>value});
 const fileEntry=(name='a',directory=false)=>({name,path:name,directory,size:directory?0:3,modified:'2026-01-01T00:00:00Z'});
 function uiHost(entries=[fileEntry()]){
@@ -183,11 +185,62 @@ const rowText=(env,index=0)=>env.get('files-queue').children[index].children[2].
 test('browser strips fragment token and renders only relative plain-text names',async()=>{
   const entry=fileEntry('Unicode & 文字.txt'),env=uiHost([entry]);await flush();
   assert.equal(env.replaced,'/files.html');assert.equal(env.calls[0].options.headers['X-YourDesk-Token'],'secret-token');
-  assert.equal(env.get('files-list').children[0].querySelector('bdi').textContent,entry.name);
+  assert.equal(env.get('files-list').children[1].querySelector('bdi').textContent,entry.name);
   assert.equal(env.get('files-status').textContent,'Connected');
 });
+test('listing merges pages with folders first, hides dot names, and uses distinct icons',async()=>{
+  const pages=[{entries:[fileEntry('Zulu.txt'),fileEntry('.hidden'),fileEntry('zeta',true)],nextOffset:3},{entries:[fileEntry('Bravo.txt'),fileEntry('alpha.txt'),fileEntry('.private',true),fileEntry('Alpha',true)],nextOffset:-1}];
+  const env=browser(async request=>response({path:'',...pages[request.params.offset===0?0:1]}));await flush();
+  env.get('files-more').click();await flush();
+  const rows=env.get('files-list').children.slice(1);
+  assert.deepEqual(rows.map(row=>row.querySelector('bdi').textContent),['Alpha','zeta','alpha.txt','Bravo.txt','Zulu.txt']);
+  assert.deepEqual(rows.map(row=>row.querySelector('span').className),['entry-icon entry-icon-folder','entry-icon entry-icon-folder','entry-icon entry-icon-file','entry-icon entry-icon-file','entry-icon entry-icon-file']);
+  assert.equal(env.get('files-more').hidden,true);
+  assert.equal(env.get('files-list').children[0].querySelector('button').textContent,'..');
+});
+test('remote selection supports checkboxes, modifier ranges and select all',async()=>{
+  const env=uiHost(['a','b','c','d'].map(name=>fileEntry(name)));await flush();
+  const rows=env.get('files-list').children.slice(1),click=(i,options={})=>rows[i].querySelector('button').events.get('click')(options);
+  click(0);click(2,{ctrlKey:true});assert.deepEqual(rows.map(row=>row.querySelector('input').checked),[true,false,true,false]);
+  click(3,{shiftKey:true});assert.deepEqual(rows.map(row=>row.querySelector('input').checked),[false,false,true,true]);
+  rows[0].querySelector('input').events.get('click')({});assert.equal(rows[0].querySelector('input').checked,true);
+  env.get('files-select-all').events.get('change')({target:{checked:true}});assert(rows.every(row=>row.querySelector('input').checked));
+  env.get('files-select-all').events.get('change')({target:{checked:false}});assert(rows.every(row=>!row.querySelector('input').checked));
+  assert.equal(env.get('files-prepare').disabled,true);
+});
+test('multiple remote downloads share one chosen destination and stop the batch on failure',async()=>{
+  const env=uiHost(['a','b','c'].map(name=>fileEntry(name)));await flush();
+  env.get('files-select-all').events.get('change')({target:{checked:true}});
+  const requests=[];env.window.yourdeskPrepareFile=async(path,directory)=>{requests.push({path,directory});if(path==='b')throw Error('disk full');return{name:path,size:3};};env.window.yourdeskCancelFile=async()=>{};
+  const {done}=await chooseDownload(env);await done;
+  assert.deepEqual(requests,[{path:'a',directory:'/local'},{path:'b',directory:'/local'}]);
+  assert.match(env.get('download-status').textContent,/1 of 3/);assert.equal(env.get('files-prepare').disabled,false);
+});
+test('cancelling a multiple download never starts the next selected file',async()=>{
+  const env=uiHost(['a','b'].map(name=>fileEntry(name)));await flush();env.get('files-select-all').events.get('change')({target:{checked:true}});
+  let reject;const requests=[];env.window.yourdeskPrepareFile=path=>{requests.push(path);return new Promise((_,fail)=>{reject=fail;});};env.window.yourdeskCancelFile=async()=>reject(Error('cancelled'));
+  const {done}=await chooseDownload(env);await env.get('download-cancel').events.get('click')();await done;
+  assert.deepEqual(requests,['a']);assert.match(env.get('download-status').textContent,/Cancelled/);
+});
+test('pause at a download boundary keeps the next file waiting for explicit resume',async()=>{
+  const env=uiHost(['a','b'].map(name=>fileEntry(name)));await flush();env.get('files-select-all').events.get('change')({target:{checked:true}});
+  let finish;const requests=[];env.window.yourdeskPrepareFile=path=>{requests.push(path);return path==='a'?new Promise(resolve=>{finish=resolve;}):Promise.resolve({name:path,size:3});};env.window.yourdeskCancelFile=async()=>{};
+  env.window.yourdeskPauseFile=async()=>({paused:true,received:0,total:3});env.window.yourdeskResumeFile=async()=>assert.fail('上一檔已完成，不能續傳不存在的原生工作');
+  const {done}=await chooseDownload(env);await env.get('download-pause').events.get('click')();finish({name:'a',size:3});await flush();
+  assert.deepEqual(requests,['a']);await env.get('download-resume').events.get('click')();await done;assert.deepEqual(requests,['a','b']);
+  assert.match(env.get('download-status').textContent,/2 of 2/);
+});
+test('multiple local files upload independently and remote batch delete stops on uncertainty',async()=>{
+  const env=uiHost(['a','b','c'].map(name=>fileEntry(name)));await flush();
+  input(env,file('upload1','one'),file('upload2','two'));await flush();await flush();
+  assert.equal(env.h.calls.filter(call=>call.action==='commit').length,2);
+  const calls=[],failed=browser(async request=>{if(request.action==='list')return response({path:'',entries:['a','b','c'].map(name=>fileEntry(name)),nextOffset:-1});calls.push(request.params.path);if(request.params.path==='b')throw Error('unknown');return response({ok:true,removedCount:1});});await flush();
+  failed.get('files-select-all').events.get('change')({target:{checked:true}});failed.get('files-delete').click();
+  await failed.get('delete-form').events.get('submit')({preventDefault(){}});
+  assert.deepEqual(calls,['a','b']);assert.equal(failed.get('delete-confirm').disabled,true);
+});
 test('folder single-click selects, explicit Open browses, and create validates a single name',async()=>{
-  const env=uiHost([fileEntry('folder',true)]);await flush();const button=env.get('files-list').children[0].querySelector('button');button.click();
+  const env=uiHost([fileEntry('folder',true)]);await flush();const button=env.get('files-list').children[1].querySelector('button');button.click();
   assert.equal(env.calls.length,1);assert.equal(env.get('files-open').disabled,false);env.get('files-open').click();await flush();
   assert.equal(JSON.parse(env.calls.at(-1).options.body).params.path,'folder');
   env.get('files-new-folder').click();env.get('folder-name').value='../escape';await env.get('folder-form').events.get('submit')({preventDefault(){}});
@@ -198,7 +251,7 @@ test('folder single-click selects, explicit Open browses, and create validates a
 test('folder delete requires typed name and recursive confirmation, preserving metadata',async()=>{
   const requests=[],entry=fileEntry('folder',true),env=browser(async request=>{
     requests.push(request);return response(request.action==='list'?{path:'',entries:[entry],nextOffset:-1}:{ok:true,removedCount:2});
-  });await flush();env.get('files-list').children[0].querySelector('button').click();env.get('files-delete').click();
+  });await flush();env.get('files-list').children[1].querySelector('button').click();env.get('files-delete').click();
   env.get('delete-name').value='wrong';env.get('delete-recursive-check').checked=true;await env.get('delete-form').events.get('submit')({preventDefault(){}});
   assert.equal(requests.some(request=>request.action==='remove'),false);
   env.get('delete-name').value='folder';await env.get('delete-form').events.get('submit')({preventDefault(){}});
@@ -207,7 +260,7 @@ test('folder delete requires typed name and recursive confirmation, preserving m
 test('partial delete reports removed count; unknown outcome never promises rollback',async()=>{
   for(const partial of [true,false]){
     const env=browser(async request=>request.action==='list'?response({path:'',entries:[fileEntry()],nextOffset:-1}):response(partial?{ok:false,partial:true,removedCount:2,error:'private details'}:{error:'private details'}));
-    await flush();env.get('files-list').children[0].querySelector('button').click();env.get('files-delete').click();
+    await flush();env.get('files-list').children[1].querySelector('button').click();env.get('files-delete').click();
     await env.get('delete-form').events.get('submit')({preventDefault(){}});
     assert.match(env.get('delete-error').textContent,partial?/2 items were deleted/:/outcome is unknown/);assert.doesNotMatch(env.get('delete-error').textContent,/private/);assert.equal(env.get('delete-confirm').disabled,true);
   }
@@ -230,9 +283,9 @@ test('disconnect preserves upload and new session does not auto-resume',async()=
 });
 test('a paused queued descendant prevents deleting its ancestor',async()=>{
   const env=uiHost([fileEntry('folder',true)]);await flush();let release;env.h.setHook(actionName=>{if(actionName==='write')return new Promise(resolve=>{release=resolve;});});
-  env.get('files-list').children[0].querySelector('button').click();env.get('files-open').click();await flush();
+  env.get('files-list').children[1].querySelector('button').click();env.get('files-open').click();await flush();
   input(env,file('a'));await flush();action(env,0,'pause');release();await flush();await flush();env.get('files-up').click();await flush();
-  env.get('files-list').children[0].querySelector('button').click();assert.equal(env.get('files-delete').disabled,true);
+  env.get('files-list').children[1].querySelector('button').click();assert.equal(env.get('files-delete').disabled,true);
 });
 test('directory creation failure blocks children without starting them',async()=>{
   const env=uiHost();await flush();env.h.setHook(actionName=>{if(actionName==='mkdir')throw Error('exists');});
@@ -241,25 +294,25 @@ test('directory creation failure blocks children without starting them',async()=
   assert.deepEqual(env.h.calls.map(call=>call.action),['mkdir']);assert.match(rowText(env,1),/parent folder was not created/);
 });
 test('native download pause/resume and disconnect preserve pending promise',async()=>{
-  const env=uiHost();await flush();env.get('files-list').children[0].querySelector('button').click();
+  const env=uiHost();await flush();env.get('files-list').children[1].querySelector('button').click();
   let finish,cancelled=0,paused=0,resumed=0;
   env.window.yourdeskPrepareFile=()=>new Promise(resolve=>{finish=resolve;});
   env.window.yourdeskPauseFile=async()=>{paused++;return{paused:true,received:1,total:3};};
   env.window.yourdeskResumeFile=async()=>{resumed++;return{resumed:true};};
   env.window.yourdeskCancelFile=async()=>{cancelled++;};
-  const prepare=env.get('files-prepare').events.get('click')();await env.get('download-pause').events.get('click')();
+  const {done:prepare}=await chooseDownload(env);await env.get('download-pause').events.get('click')();
   assert.match(env.get('download-status').textContent,/Paused.*33%/);await env.get('download-resume').events.get('click')();assert.equal(resumed,1);
   env.setConnection(false);await env.poll();await flush();assert.equal(cancelled,0);assert.equal(paused,2);
   env.events.get('yourdesk-files-session')({detail:{instance:'two'}});assert.equal(resumed,1);
   await env.get('download-resume').events.get('click')();finish({name:'a',size:3});await prepare;
-  assert.match(env.get('download-status').textContent,/Download complete.*100%/);assert.equal(cancelled,0);
+  assert.match(env.get('download-status').textContent,/Downloaded.*100%/);assert.equal(cancelled,0);
 });
-test('completed native drag source survives disconnect and status polling is single-flight',async()=>{
-  const env=uiHost();await flush();env.get('files-list').children[0].querySelector('button').click();let cancelled=0;
+test('completed download survives disconnect and status polling is single-flight',async()=>{
+  const env=uiHost();await flush();env.get('files-list').children[1].querySelector('button').click();let cancelled=0;
   env.window.yourdeskPrepareFile=async()=>({name:'a',size:3});env.window.yourdeskCancelFile=async()=>{cancelled++;};
-  await env.get('files-prepare').events.get('click')();let release;env.setConnection(()=>new Promise(resolve=>{release=resolve;}));
+  const {done}=await chooseDownload(env);await done;let release;env.setConnection(()=>new Promise(resolve=>{release=resolve;}));
   const check=env.poll();assert.equal(await env.poll(),false);release(false);await check;
-  assert.equal(cancelled,0);assert.match(env.get('download-status').textContent,/Download complete/);assert.equal(env.pendingPolls(),0);
+  assert.equal(cancelled,0);assert.match(env.get('download-status').textContent,/Downloaded/);assert.equal(env.pendingPolls(),0);
 });
 test('portable path validation mirrors byte limits and reserved names',()=>{
   for(const value of ['x*','a?','a<','a>','a"','a|','end.','end ','CON','con.txt','COM0','LPT9.doc','.YOURDESK-transfer-x','中'.repeat(86)])assert.throws(()=>files.component(value),isCode('invalidName'));
@@ -283,9 +336,9 @@ test('rebind during in-flight cancellation schedules one cleanup pass on new ins
   const cancel=env.calls.filter(call=>JSON.parse(call.options.body).action==='cancel');assert.equal(cancel.length,2);assert.equal(JSON.parse(cancel[1].options.body).instance,'two');
 });
 test('native cancel keeps Prepare disabled until original promise settles',async()=>{
-  const env=uiHost();await flush();env.get('files-list').children[0].querySelector('button').click();let rejectPrepare;
+  const env=uiHost();await flush();env.get('files-list').children[1].querySelector('button').click();let rejectPrepare;
   env.window.yourdeskPrepareFile=()=>new Promise((_,reject)=>{rejectPrepare=reject;});env.window.yourdeskCancelFile=async()=>({cancelled:true});
-  const prepare=env.get('files-prepare').events.get('click')();await env.get('download-cancel').events.get('click')();
+  const {done:prepare}=await chooseDownload(env);await env.get('download-cancel').events.get('click')();
   assert.equal(env.get('files-prepare').disabled,true);assert.match(env.get('download-status').textContent,/Cancelling/);
   rejectPrepare(Error('cancelled'));await prepare;assert.equal(env.get('files-prepare').disabled,false);assert.match(env.get('download-status').textContent,/Cancelled/);
 });
@@ -367,22 +420,22 @@ test('closing while disconnected keeps unconfirmed transfers and their cancellat
 });
 test('late native pause and resume results cannot overwrite completed download state',async()=>{
   for(const operation of ['pause','resume']){
-    const env=uiHost();await flush();env.get('files-list').children[0].querySelector('button').click();let finish,rejectControl;
+    const env=uiHost();await flush();env.get('files-list').children[1].querySelector('button').click();let finish,rejectControl;
     env.window.yourdeskPrepareFile=()=>new Promise(resolve=>{finish=resolve;});env.window.yourdeskCancelFile=async()=>{};
     env.window.yourdeskPauseFile=async()=>({paused:true,received:0,total:3});
-    const preparing=env.get('files-prepare').events.get('click')();
+    const {done:preparing}=await chooseDownload(env);
     if(operation==='resume')await env.get('download-pause').events.get('click')();
     env.window[operation==='pause'?'yourdeskPauseFile':'yourdeskResumeFile']=()=>new Promise((_,reject)=>{rejectControl=reject;});
     const control=env.get('download-'+operation).events.get('click')();finish({name:'a',size:3});await preparing;
     rejectControl(Error('no current download'));await control;
-    assert.match(env.get('download-status').textContent,/Download complete/);assert.equal(env.get('download-resume').hidden,true);
+    assert.match(env.get('download-status').textContent,/Downloaded/);assert.equal(env.get('download-resume').hidden,true);
   }
 });
 test('late pause reply cannot overwrite a cancellation already in progress',async()=>{
-  const env=uiHost();await flush();env.get('files-list').children[0].querySelector('button').click();let rejectPrepare,finishPause;
+  const env=uiHost();await flush();env.get('files-list').children[1].querySelector('button').click();let rejectPrepare,finishPause;
   env.window.yourdeskPrepareFile=()=>new Promise((_,reject)=>{rejectPrepare=reject;});env.window.yourdeskCancelFile=async()=>{};
   env.window.yourdeskPauseFile=()=>new Promise(resolve=>{finishPause=resolve;});
-  const preparing=env.get('files-prepare').events.get('click')(),pausing=env.get('download-pause').events.get('click')();
+  const {done:preparing}=await chooseDownload(env),pausing=env.get('download-pause').events.get('click')();
   await env.get('download-cancel').events.get('click')();finishPause({paused:true,received:1,total:3});await pausing;
   assert.match(env.get('download-status').textContent,/Cancelling/);assert.equal(env.get('download-resume').hidden,true);
   rejectPrepare(Error('cancelled'));await preparing;assert.match(env.get('download-status').textContent,/Cancelled/);

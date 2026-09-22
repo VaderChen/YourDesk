@@ -4,7 +4,6 @@ package clientui
 
 import (
 	"os"
-	"path/filepath"
 )
 
 func fileDownloadsDirectory() (string, error) {
@@ -12,5 +11,5 @@ func fileDownloadsDirectory() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(home, "Downloads"), nil
+	return home, nil
 }

@@ -30,6 +30,7 @@ func nativeTitlebarVisible() bool { return false }
 func nativeSetLanguage(string, string) {}
 
 func nativeSetCodecStatus(string, string, string) {}
+func nativeSetAudioStatus(audioDisplayStatus)     {}
 
 func nativeShowCloseConfirmation() {}
 
