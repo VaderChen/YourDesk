@@ -34,12 +34,13 @@ const (
 )
 
 type Entry struct {
-	Name      string `json:"name"`
-	Path      string `json:"path"`
-	Directory bool   `json:"directory"`
-	Size      int64  `json:"size"`
-	Modified  string `json:"modified"`
-	Root      bool   `json:"root,omitempty"`
+	DisplayName string `json:"displayName,omitempty"`
+	Name        string `json:"name"`
+	Path        string `json:"path"`
+	Directory   bool   `json:"directory"`
+	Size        int64  `json:"size"`
+	Modified    string `json:"modified"`
+	Root        bool   `json:"root,omitempty"`
 }
 
 type listResult struct {
@@ -354,15 +355,15 @@ func (s *session) list(ctx context.Context, name string, offset int) (any, error
 	if s.filesystem != nil && name == "." {
 		return s.filesystem.listRoots(ctx, offset)
 	}
-	var location *directoryLocation
-	if s.filesystem != nil {
-		location = s.filesystem.location(name)
-	}
 	r, err := s.openDir(name)
 	if err != nil {
 		return nil, err
 	}
 	defer r.Close()
+	var location *directoryLocation
+	if s.filesystem != nil {
+		location = s.filesystem.location(name)
+	}
 	entries, err := sortedVisibleEntries(ctx, r, name, maxListOffset+pageSize)
 	if err != nil {
 		return nil, err

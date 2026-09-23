@@ -61,3 +61,14 @@ func (s *server) storePreferences(ctx context.Context, preferences Preferences, 
 	}
 	return nil
 }
+
+// 呼叫端持有 s.mu；僅更新聲音開關，避免覆蓋其他設定或重啟 Host。
+func (s *server) toggleRemoteAudio() error {
+	preferences := s.preferences
+	preferences.RemoteAudio = !preferences.RemoteAudio
+	if err := saveJSON(filepath.Join(filepath.Dir(s.configPath), "preferences.json"), preferences); err != nil {
+		return err
+	}
+	s.preferences = preferences
+	return nil
+}

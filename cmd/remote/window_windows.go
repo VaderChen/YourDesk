@@ -165,7 +165,7 @@ func runWindowsTitlebar() {
 		switch message.Action {
 		case 7, 8, 9:
 			C.yd_win_command(C.int(message.Action))
-		case 1, 2, 3, 4, 5, 6, 10, 11, 12, 13, 14, 16, 17, 40, 41, 42, 50, 51, 52, 53, 55, 56:
+		case 1, 2, 3, 4, 5, 6, 10, 11, 12, 13, 14, 16, 17, 18, 40, 41, 42, 50, 51, 52, 53, 55, 56:
 			C.yd_win_command(0)
 			select {
 			case winChrome.actions <- message.Action:

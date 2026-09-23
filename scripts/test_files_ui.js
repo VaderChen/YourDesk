@@ -198,6 +198,24 @@ test('listing merges pages with folders first, hides dot names, and uses distinc
   assert.equal(env.get('files-more').hidden,true);
   assert.equal(env.get('files-list').children[0].querySelector('button').textContent,'..');
 });
+test('ordinary spaced and bracketed names survive pagination and open correctly',async()=>{
+  const names=['projects','My Code','[projects]','[My Code]'];
+  const entries=[...Array.from({length:32},(_,i)=>fileEntry(`Folder ${String(i).padStart(2,'0')}`,true)),...names.map(name=>fileEntry(name,true)),...names.map(name=>fileEntry(name+'.txt'))];
+  const env=browser(async request=>{
+    const {path,offset}=request.params;
+    return response({path,entries:path?[]:entries.slice(offset,offset+16),nextOffset:!path&&offset+16<entries.length?offset+16:-1});
+  });
+  await flush();
+  while(!env.get('files-more').hidden){env.get('files-more').click();await flush();}
+  const rows=env.get('files-list').children.slice(1);
+  assert.equal(rows.length,entries.length);
+  for(const name of names){
+    assert(rows.some(row=>row.querySelector('bdi').textContent===name+'.txt'));
+    const row=rows.find(row=>row.querySelector('bdi').textContent===name);assert(row);
+    row.querySelector('button').events.get('dblclick')();await flush();
+    assert.equal(JSON.parse(env.calls.at(-1).options.body).params.path,name);
+  }
+});
 test('remote selection supports checkboxes, modifier ranges and select all',async()=>{
   const env=uiHost(['a','b','c','d'].map(name=>fileEntry(name)));await flush();
   const rows=env.get('files-list').children.slice(1),click=(i,options={})=>rows[i].querySelector('button').events.get('click')(options);
@@ -451,4 +469,16 @@ test('close during a write waits for the active worker then cancels its upload',
   input(env,file('active',new Uint8Array(5000)));await flush();env.get('files-close').click();await flush();assert.equal(closed,false);
   release();await flush();await flush();assert.equal(closed,true);assert.equal(env.h.uploads.size,0);
   assert.deepEqual(env.h.calls.map(call=>call.action),['begin','write','cancel']);
+});
+
+test('mounted disk labels sort by visible name and navigate with opaque IDs',async()=>{
+  const disks=[{...fileEntry('volume-a',true),root:true,displayName:'Z 工作'},{...fileEntry('volume-z',true),root:true,displayName:'Alpha:資料'}];
+  const env=browser(async request=>response({path:request.params.path,entries:request.params.path?[]:disks,nextOffset:-1,location:{display:request.params.path?'/Volumes/Alpha:資料':'',parent:request.params.path?'':null,virtual:!request.params.path}}));await flush();
+  const rows=env.get('files-list').children.slice(1);
+  assert.deepEqual(rows.map(row=>row.querySelector('bdi').textContent),['Alpha:資料','Z 工作']);
+  assert.equal(env.get('files-disks').hidden,false);assert.equal(env.get('files-pick').disabled,true);
+  rows[0].querySelector('button').click();assert.equal(env.get('files-delete').disabled,true);
+  rows[0].querySelector('button').events.get('dblclick')();await flush();
+  assert.equal(JSON.parse(env.calls.at(-1).options.body).params.path,'volume-z');assert.equal(env.get('files-disks').disabled,false);
+  env.get('files-disks').click();await flush();assert.equal(JSON.parse(env.calls.at(-1).options.body).params.path,'');
 });

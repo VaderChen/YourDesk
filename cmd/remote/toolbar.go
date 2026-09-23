@@ -68,6 +68,8 @@ func (g *game) updateToolbar() (bool, error) {
 			g.selectDisplay(action - 100)
 		}
 		switch action {
+		case 18:
+			emitUIEvent("remote-audio-toggle", "")
 		case 56:
 			g.showVirtualKeyboard()
 			return true, nil

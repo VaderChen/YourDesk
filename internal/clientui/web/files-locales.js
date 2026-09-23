@@ -2,6 +2,7 @@
 // Independent file-window strings; user paths and names are never translated.
 const YourDeskFileLocales = {
   "zh-Hant": {
+    "disks": "磁碟",
     "selectedCount": "已選取 {count} 個項目",
     "selectEntry": "選取 {name}",
     "selectAll": "全選目前清單",
@@ -96,6 +97,7 @@ const YourDeskFileLocales = {
     "computer": "遠端電腦"
   },
   "en": {
+    "disks": "Disks",
     "selectedCount": "{count} items selected",
     "selectEntry": "Select {name}",
     "selectAll": "Select all listed items",
@@ -190,6 +192,7 @@ const YourDeskFileLocales = {
     "computer": "Remote computer"
   },
   "ja": {
+    "disks": "ディスク",
     "selectedCount": "{count} 項目を選択中",
     "selectEntry": "{name} を選択",
     "selectAll": "一覧の項目をすべて選択",
@@ -284,6 +287,7 @@ const YourDeskFileLocales = {
     "computer": "リモートコンピューター"
   },
   "ko": {
+    "disks": "디스크",
     "selectedCount": "{count}개 항목 선택됨",
     "selectEntry": "{name} 선택",
     "selectAll": "목록의 모든 항목 선택",

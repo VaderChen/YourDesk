@@ -16,16 +16,19 @@ button{font:inherit;color:var(--ink);border:0;background:transparent;cursor:defa
 .display-button{display:flex;align-items:center;gap:6px;min-width:48px;width:auto;justify-content:center;border:1px solid var(--edge)}.icon{width:34px;padding:5px}.divider{height:18px;width:1px;background:var(--edge)}svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
 .display-number{font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;min-width:9px;text-align:center}
 .display-buttons{position:absolute;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:4px;border-left:1px solid var(--edge);border-right:1px solid var(--edge);padding-left:8px;padding-right:8px;margin-left:0;height:22px}.display-buttons[hidden],.display-button[hidden]{display:none}.display-button[aria-pressed=true]{background:var(--selected);color:var(--ink);border-color:#20b66a;box-shadow:0 0 0 1px #20b66a}
+.audio-control{flex:none;display:flex;align-items:center;height:20px;padding-right:8px;margin-right:8px;border-right:1px solid var(--edge)}.audio-control button[aria-pressed=true]{color:var(--accent)}
 .crop-control{flex:none;display:flex;align-items:center;height:20px;padding-right:8px;margin-right:8px;border-right:1px solid var(--edge)}
 .codec-status{flex:none;display:flex;align-items:center;padding-right:10px;margin-right:8px;border-right:1px solid var(--edge);height:20px}.codec-status button{color:var(--muted)}
 .fps{flex:none;width:76px;height:20px;display:flex;align-items:center;justify-content:flex-end;gap:6px;padding-right:12px;margin-right:12px;border-right:1px solid var(--edge);font-size:11px;font-variant-numeric:tabular-nums;white-space:nowrap}.fps b{font-size:10px;font-weight:600;color:var(--muted)}.fps output{min-width:24px;text-align:right}.fps.enhancement-active output,.fps.enhancement-active b{color:#20d86b}
 .traffic{width:88px;flex:none;display:flex;flex-direction:column;align-items:stretch;justify-content:center;gap:1px;padding-right:8px;margin-right:4px;border-right:1px solid var(--edge);font-size:10px;line-height:12px;font-variant-numeric:tabular-nums;white-space:nowrap;height:28px}.traffic span{display:flex;gap:4px;align-items:center;justify-content:space-between}.traffic b{font-size:9px;font-weight:600;color:var(--muted)}.traffic output{display:inline-block;min-width:54px;text-align:right}
 .traffic span:first-child,.traffic span:first-child b{color:#963d3d}.traffic span:last-child,.traffic span:last-child b{color:#286744}
 @media(prefers-color-scheme:dark){.traffic span:first-child,.traffic span:first-child b{color:#d88d8d}.traffic span:last-child,.traffic span:last-child b{color:#7eb994}}
+@media(max-width:760px){.audio-control,.crop-control{padding-right:4px;margin-right:4px}.codec-status{margin-right:4px}.fps{margin-right:8px}.actions{gap:4px}}
 </style></head><body><header>
 <div class="window"><button class="close" data-action="5" data-tip="關閉 遠端顯示" aria-label="關閉 遠端顯示">×</button><button class="minimize" data-action="7" data-tip="最小化" aria-label="最小化">−</button><button class="maximize" data-action="4" data-tip="全螢幕／視窗" aria-label="全螢幕／視窗">+</button></div>
 <div class="title"><svg viewBox="0 0 20 20"><rect x="2" y="3" width="16" height="11" rx="2"/><path d="M7 18h6M10 14v4"/></svg><span id="title">YourDesk</span></div>
 <div id="display-buttons" class="display-buttons" role="group" aria-label="選擇螢幕" hidden><button class="icon display-button" data-display="0" data-action="100" data-tip="選擇螢幕" aria-label="選擇螢幕" aria-pressed="false" hidden><i class="fa" aria-hidden="true">&#xf390;</i><span class="display-number">1</span></button><button class="icon display-button" data-display="1" data-action="101" data-tip="選擇螢幕" aria-label="選擇螢幕" aria-pressed="false" hidden><i class="fa" aria-hidden="true">&#xf390;</i><span class="display-number">2</span></button><button class="icon display-button" data-display="2" data-action="102" data-tip="選擇螢幕" aria-label="選擇螢幕" aria-pressed="false" hidden><i class="fa" aria-hidden="true">&#xf390;</i><span class="display-number">3</span></button><button class="icon display-button" data-display="3" data-action="103" data-tip="選擇螢幕" aria-label="選擇螢幕" aria-pressed="false" hidden><i class="fa" aria-hidden="true">&#xf390;</i><span class="display-number">4</span></button></div>
+<div class="audio-control"><button id="audio-toggle" class="icon" data-action="18" data-tip="開啟遠端聲音" aria-label="開啟遠端聲音" aria-pressed="false"><i class="fa" aria-hidden="true">&#xf6a9;</i></button></div>
 <div class="crop-control"><button id="crop" class="icon" data-action="14" data-tip="裁切：拖曳調整，再按一次套用" aria-label="裁切"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 2v16h16M2 6h16v16"/></svg></button></div>
 <div class="codec-status"><button id="codec-status" class="icon" data-tip="編碼狀態" aria-label="編碼狀態"><i class="fa" aria-hidden="true">&#xf2db;</i></button></div>
 <div class="fps" tabindex="0" data-tip="畫面增強" aria-label="畫面增強"><b>FPS</b><output id="viewer-fps">0</output></div>
@@ -81,7 +84,7 @@ function positionDisplayButtons(){
  if(group.hidden){title.style.minWidth='';text.style.maxWidth='';updateInteractiveRects();return;}
  const header=document.querySelector('header').getBoundingClientRect(),width=group.getBoundingClientRect().width;
  title.style.minWidth=(width+40)+'px';
- const area=title.getBoundingClientRect(),right=document.querySelector('.crop-control').getBoundingClientRect().left;
+ const area=title.getBoundingClientRect(),right=document.querySelector('.audio-control').getBoundingClientRect().left;
  const left=Math.max(area.left+28,Math.min(header.left+(header.width-width)/2,right-width-12));
  group.style.left=(left-header.left)+'px';
  text.style.maxWidth=Math.max(0,left-text.getBoundingClientRect().left-12)+'px';
@@ -147,6 +150,11 @@ window.setTitlebarState=state=>{
  const sourceValue=modeLabel(state.sourceEncoding)+' · '+(state.videoCodec||t('等待影格'));
  const receiverValue=modeLabel(state.receiverDecoding);
  const audio=state.audio||{};
+ const audioButton=document.getElementById('audio-toggle'),audioEnabled=audio.enabled===true;
+ audioButton.setAttribute('aria-pressed',String(audioEnabled));
+ audioButton.querySelector('.fa').textContent=audioEnabled?'\uf028':'\uf6a9';
+ audioButton.dataset.tip=t(audioEnabled?'關閉遠端聲音':'開啟遠端聲音');
+ audioButton.setAttribute('aria-label',audioButton.dataset.tip);
  const audioValue=(backend,decoding=false)=>{
   if(!audio.enabled)return t('關閉');
   if(!backend?.enabled)return t(backend?.error||audio.error?'無法使用':'等待聲音');

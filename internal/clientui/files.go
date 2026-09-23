@@ -86,7 +86,11 @@ func (s *server) openFilesWindow(w http.ResponseWriter, r *http.Request) {
 	}
 	windowID := remote.siteID + ":" + remote.terminalInstance
 	key := "files-window:" + windowID
-	if s.children[key] != nil {
+	if window := s.children[key]; window != nil {
+		if err := queueFilesWindowFocus(window); err != nil {
+			fail(w, err)
+			return
+		}
 		respond(w, 200, map[string]bool{"ok": true})
 		return
 	}
@@ -106,6 +110,10 @@ func (s *server) openFilesWindow(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if window.fileOwner == remote {
+			if err := queueFilesWindowFocus(window); err != nil {
+				fail(w, err)
+				return
+			}
 			respond(w, 200, map[string]bool{"ok": true, "reused": true})
 			return
 		}
@@ -170,4 +178,13 @@ func queueFilesWindowSession(window, remote *process, address, title string) err
 	// session. Native/JS still require the new instance plus explicit Resume.
 	window.fileOwner = remote
 	return nil
+}
+
+// 只喚起既有視窗，不重新載入頁面或變更傳輸佇列。
+func queueFilesWindowFocus(window *process) error {
+	input, ok := window.stdin.(*processInput)
+	if !ok {
+		return errors.New("檔案傳輸視窗的控制通道不可用")
+	}
+	return json.NewEncoder(input).Encode(filesWindowMessage{Event: "files-focus"})
 }

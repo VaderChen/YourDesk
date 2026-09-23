@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func systemFilesystem(home string) (*filesystemScope, error) {
+func unixFilesystem(home string) (*filesystemScope, error) {
 	resolved, err := filepath.EvalSymlinks(home)
 	if err != nil {
 		return nil, err

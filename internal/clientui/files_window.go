@@ -229,7 +229,18 @@ func RunFilesWindow(parent context.Context) error {
 	}); err != nil {
 		return err
 	}
-	if err = window.Bind("yourdeskFilesReady", closeGate.markReady); err != nil {
+	// 頁面的關閉攔截就緒後喚起一次；重連不重新載入頁面。
+	var readyOnce sync.Once
+	if err = window.Bind("yourdeskFilesReady", func() {
+		closeGate.markReady()
+		readyOnce.Do(func() {
+			dispatch(func() {
+				if ctx.Err() == nil {
+					showUpdateWindow(window.Window())
+				}
+			})
+		})
+	}); err != nil {
 		return err
 	}
 	if err = window.Bind("yourdeskCloseFiles", closeGate.forceClose); err != nil {
@@ -266,6 +277,10 @@ func RunFilesWindow(parent context.Context) error {
 			if err != nil {
 				pipeErrors <- err
 				return
+			}
+			if message.Event == "files-focus" {
+				dispatch(func() { showUpdateWindow(window.Window()) })
+				continue
 			}
 			address, next, err := parseFilesAddress(message.URL)
 			if err != nil || address.Scheme+"://"+address.Host+"/api/files" != client.endpoint || next.Get("token") != client.token || next.Get("session") != client.session {

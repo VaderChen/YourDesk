@@ -1,10 +1,12 @@
 # 遠端聲音
 
+顯示區域標題列在裁切按鈕左側提供喇叭快捷開關，右側有分隔線；喇叭／靜音圖示與泡泡文字反映已保存的開關狀態。此開關與進階設定共用同一份偏好，會同步到其他已開啟的顯示區域，通常在約一秒內套用，不改動編碼、畫質或重啟 Host。Mac 與 Windows 使用相同操作。
+
 進階設定在「長時間未操作自動關閉」下方提供「開啟遠端聲音」，預設關閉。啟用後播放遠端電腦的系統輸出，不擷取麥克風；偏好會保存，已開啟的顯示區域會隨設定更新。兩端皆需支援此功能，舊端會顯示不支援原因，畫面與鍵鼠仍可繼續使用。
 
 ## 編碼與品質
 
-設定頁「串流方式」並列「影像輸出編碼」與「聲音輸出編碼」。聲音輸出編碼可在遠端聲音關閉時先選好，預設仍為 Opus；實際播放開關保留於進階設定，改選編碼不會自行開啟聲音。
+設定頁「串流方式」並列「影像輸出編碼」與「聲音輸出編碼」。聲音輸出編碼可在遠端聲音關閉時先選好，預設仍為 Opus；實際播放開關可由進階設定或顯示區域標題列切換，改選編碼不會自行開啟聲音。
 
 聲音編碼選單分為「可用」與「不支援」，依本機實測的解碼能力分組，不支援的項目停用；遠端是否可編碼仍在連線時確認。AAC 硬體可回退軟體，不因本機沒有硬體加速就歸為不支援。尚未取得能力結果時顯示「聲音能力偵測中…」，暫停選取；偵測完成後更新分組，保留已保存的編碼，不自動改成其他格式。
 
@@ -57,3 +59,5 @@ Opus 使用 48 kHz 雙聲道、20 ms／960 取樣框，受限可變碼率、音�
 API 依據：[Opus 1.6.1 來源及雜湊](https://opus-codec.org/release/stable/2026/01/14/libopus-1_6_1.html)、[Opus Encoder API](https://opus-codec.org/docs/opus_api-1.6/group__opus__encoder.html)、[Apple ScreenCaptureKit](https://developer.apple.com/documentation/screencapturekit)、[Microsoft AAC Encoder](https://learn.microsoft.com/en-us/windows/win32/medfound/aac-encoder)、[Microsoft AAC Decoder](https://learn.microsoft.com/en-us/windows/win32/medfound/aac-decoder)。
 
 本輪自動編碼測試依序驗證 AAC 硬體、Opus、AAC 軟體、PCM 的能力回退，以及兩端無共同格式時明確拒絕；瀏覽器 Smoke 驗證選單順序、儲存 auto、分組、解碼摘要與分隔線等距。相關檔案傳輸／聲音測試、針對新增邏輯的 race 測試及 Mac arm64／Windows amd64 Client、顯示區域建置通過；未將編譯結果視為跨機音訊實測。
+
+設定視窗只儲存有變更的欄位，避免聲音快捷開關尚未同步時，被其他設定的儲存覆蓋。

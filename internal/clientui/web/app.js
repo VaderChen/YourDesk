@@ -95,6 +95,7 @@ function rememberGroup(id) {
 }
 
 let busy = false;
+let preferencesBaseline = {};
 let toastTimer;
 let confirmAction = null;
 let confirmCancelAction = null;
@@ -459,6 +460,11 @@ function connect(site,terminal=false,files=false) {
 
 async function updateRunning() {
   const latest = await api('state');
+  if(!busy && !$('#ui-remote-audio').disabled && typeof latest.preferences?.remoteAudio==='boolean'){
+   state.preferences.remoteAudio=latest.preferences.remoteAudio;
+   $('#ui-remote-audio').checked=latest.preferences.remoteAudio;
+   preferencesBaseline.remoteAudio=latest.preferences.remoteAudio;
+  }
   state.hardwareDetection = latest.hardwareDetection;
  state.audioCapabilities=latest.audioCapabilities;renderAudioSettings();
   if(!$('#settings-panel-hardware').hidden||deepHardwareState?.status==='running')deepHardwareState=await api('hardware-deep');
@@ -843,6 +849,7 @@ function applyPreferences(preferences) {
  $('#stream-codec-goal').value=values.codecGoal||'balanced';
   if (state) { renderDevice(); renderLibrary(); renderQuick();
  renderRelease(state.updates); }
+ preferencesBaseline=readPreferenceControls();
 }
 function refreshAudioCodecOptions(selected){
  const codecs=$('#ui-audio-codec'),capabilities=state?.audioCapabilities;
@@ -907,12 +914,17 @@ function refreshCodecOptions(selected) {
  refreshCodecGoalState();
 
 }
+function readPreferenceControls() {
+ return { remoteAudio:$('#ui-remote-audio').checked, audioCodec:$('#ui-audio-codec').value, tailcatEnabled:$('#tailcat-mode').checked, mcpOpenDisplay:$('#ui-mcp-open-display').checked, mcpWhitelistEnabled:$('#ui-mcp-whitelist-enabled').checked, mcpWhitelist:[...new Set($('#ui-mcp-whitelist').value.split(/\r?\n/).map(v=>v.trim()).filter(Boolean))], mcpEnabled:$('#ui-mcp-enabled').checked, fitWindow:$('#ui-fit-window').checked, autoReconnect:$('#ui-auto-reconnect').checked, closeWhenIdle:$('#ui-close-when-idle').checked, closeWindowOnDisconnect:$('#ui-close-on-disconnect').checked, sourceFPSLimit:Number($('#ui-source-fps').value), bitrateLimitMbps:Number($('#ui-bitrate-limit').value), keyframeInterval:Number($('#ui-gop').value), interpolation: $('#ui-interpolation').checked, interpolationMethod: $('#ui-interpolation-method').value, coreMLModel: $('#ui-coreml-model').value || 'quicksrnet-small', enhancementStrategy: $('#ui-enhancement-strategy').value, enhancementBitrateMbps: Number($('#ui-enhancement-budget').value), superResolution: $('#ui-super-resolution').value, imageEnhancement: $('#ui-enhancement').checked, language: $('#ui-language').value, theme: $('#ui-theme').value, codec: $('#stream-codec').value, codecGoal: $('#stream-codec-goal').value, disableHints: !$('#ui-hints').checked, disableKeyMapping:!$('#ui-key-mapping').checked, directListen: $('#direct-listen').checked };
+}
 async function savePreferences() {
   if (!state || busy) return;
  for(const id of ['#ui-source-fps','#ui-bitrate-limit','#ui-gop']){if(!$(id).checkValidity()){$(id).reportValidity();return}}
   const previous = state.preferences;
  if(!$('#ui-enhancement-budget').checkValidity()){$('#ui-enhancement-budget').reportValidity();return}
-	const preferences = { remoteAudio:$('#ui-remote-audio').checked, audioCodec:$('#ui-audio-codec').value, tailcatEnabled:$('#tailcat-mode').checked, mcpOpenDisplay:$('#ui-mcp-open-display').checked, mcpWhitelistEnabled:$('#ui-mcp-whitelist-enabled').checked, mcpWhitelist:[...new Set($('#ui-mcp-whitelist').value.split(/\r?\n/).map(v=>v.trim()).filter(Boolean))], mcpEnabled:$('#ui-mcp-enabled').checked, fitWindow:$('#ui-fit-window').checked, autoReconnect:$('#ui-auto-reconnect').checked, closeWhenIdle:$('#ui-close-when-idle').checked, closeWindowOnDisconnect:$('#ui-close-on-disconnect').checked, sourceFPSLimit:Number($('#ui-source-fps').value), bitrateLimitMbps:Number($('#ui-bitrate-limit').value), keyframeInterval:Number($('#ui-gop').value), interpolation: $('#ui-interpolation').checked, interpolationMethod: $('#ui-interpolation-method').value, coreMLModel: $('#ui-coreml-model').value || 'quicksrnet-small', enhancementStrategy: $('#ui-enhancement-strategy').value, enhancementBitrateMbps: Number($('#ui-enhancement-budget').value), superResolution: $('#ui-super-resolution').value, imageEnhancement: $('#ui-enhancement').checked, language: $('#ui-language').value, theme: $('#ui-theme').value, codec: $('#stream-codec').value, codecGoal: $('#stream-codec-goal').value, disableHints: !$('#ui-hints').checked, disableKeyMapping:!$('#ui-key-mapping').checked, directListen: $('#direct-listen').checked };
+  const values=readPreferenceControls();
+  const preferences=Object.fromEntries(Object.entries(values).filter(([key,value])=>JSON.stringify(value)!==JSON.stringify(preferencesBaseline[key])));
+  if(!Object.keys(preferences).length)return;
   $('#ui-mcp-whitelist-enabled').disabled=true;$('#ui-mcp-whitelist').disabled=true;
  $('#ui-mcp-enabled').disabled=true;
  $('#ui-language').disabled = true;

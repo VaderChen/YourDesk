@@ -242,6 +242,17 @@ async function main() {
     await filesPage.locator('#files-up').click();await filesPage.waitForFunction(()=>document.querySelector('#files-path').textContent==='/');
     assert(await filesPage.locator('#files-up').isDisabled());
     await filesPage.screenshot({path:path.join(output,'files-mac-root.png')});
+    filesystem.directories['']={entries:[{...entry('root',true),root:true,displayName:'/'},{...entry('volume-test',true),root:true,displayName:'My Code:工作'}],location:{display:'',parent:null,virtual:true}};
+    filesystem.directories['volume-test']={entries:[entry('作品.txt',false,'volume-test')],location:{display:'/Volumes/My Code:工作',parent:'',virtual:false}};
+    await filesPage.locator('#files-disks').click();await filesPage.getByRole('button',{name:'My Code:工作',exact:true}).waitFor();
+    await filesPage.getByRole('button',{name:'My Code:工作',exact:true}).click();assert(await filesPage.locator('#files-delete').isDisabled());
+    assert(await filesPage.locator('#files-input').isDisabled());
+    await filesPage.screenshot({path:path.join(output,'files-mac-disks.png')});
+    await filesPage.locator('#files-open').click();await filesPage.getByRole('button',{name:'作品.txt',exact:true}).waitFor();
+    assert.equal(await filesPage.locator('#files-path').textContent(),'/Volumes/My Code:工作');
+    assert(!(await filesPage.locator('#files-input').isDisabled()));
+    await filesPage.locator('#files-up').click();await filesPage.getByRole('button',{name:'My Code:工作',exact:true}).waitFor();
+
     assert.deepEqual(errors,[]); assert.deepEqual(unexpected,[]);
     console.log('PASS: Browser mock UI smoke, 4 languages, station icon / capability / connection, bounded upload, cancellation ACK loss, stale rebind reply, bounded close lifecycle, native binding mock, parent entry and local destination picker.');
     console.log('Screenshots:',path.relative(root,output));

@@ -14,7 +14,7 @@
   const state = {closed:false,closing:false,initializing:true,connected:true,reconnected:false,path:'',selected:new Set(),anchor:null,entries:[],next:-1,listing:false,generation:0,queue:[],batch:0,running:false,cancelPassInstance:'',scanning:false,mutating:false,deleteTarget:null,download:{state:'idle',pending:false,generation:0,path:'',received:0,total:0}};
   let statusTimer, checkingStatus = false, checkClose;
   const destination={path:'',parent:'',next:-1,loading:false,generation:0,remote:null,instance:''};
-  let parentPath=null,virtualDirectory=false;
+  let parentPath=null,virtualDirectory=false,filesystemAvailable=false;
   const selectedEntries=()=>state.entries.filter(entry=>state.selected.has(entry.path));
   const terminal = item => ['done','cancelled'].includes(item.state);
   const sizeText = bytes => {if (!Number.isFinite(bytes)) return '—'; const units=['B','KiB','MiB','GiB']; let i=0; while(bytes>=1024 && i<3){bytes/=1024;i++;} return bytes.toFixed(i?1:0)+' '+units[i];};
@@ -46,6 +46,7 @@
   function controls() {
     const unavailable=state.closed||state.closing||state.initializing||!state.connected||state.mutating;
     $('files-close').disabled=state.closing;
+    $('files-disks').hidden=!filesystemAvailable; $('files-disks').disabled=unavailable||state.listing||virtualDirectory;
     $('files-up').disabled=unavailable||state.listing||parentPath===null;
     $('files-refresh').disabled=unavailable||state.listing;
     $('files-more').disabled=unavailable||state.listing;
@@ -123,10 +124,11 @@
     parentButton.addEventListener('click',()=>{if(parentPath!==null)void list(parentPath);});
     parentCell.append(parentButton);parentRow.append(parentCell);body.append(parentRow);
     for(const entry of state.entries) {
+      const displayName=entry.root===true&&entry.displayName?entry.displayName:entry.name;
       const row=document.createElement('tr'), cell=document.createElement('td'), wrap=document.createElement('div'),check=document.createElement('input'), button=document.createElement('button'), icon=document.createElement('span'), label=document.createElement('bdi');
-      row.dataset.path=entry.path;wrap.className='entry-cell';check.type='checkbox';check.className='entry-check';check.checked=state.selected.has(entry.path);check.setAttribute('aria-label',t('selectEntry',{name:entry.name}));
-      button.type='button';button.className='entry-button';button.title=entry.name+(entry.directory?' · '+t('folderHint'):'');
-      icon.className='entry-icon '+(entry.directory?'entry-icon-folder':'entry-icon-file');icon.setAttribute('aria-hidden','true');label.className='entry-name';label.textContent=entry.name;
+      row.dataset.path=entry.path;wrap.className='entry-cell';check.type='checkbox';check.className='entry-check';check.checked=state.selected.has(entry.path);check.setAttribute('aria-label',t('selectEntry',{name:displayName}));
+      button.type='button';button.className='entry-button';button.title=displayName+(entry.directory?' · '+t('folderHint'):'');
+      icon.className='entry-icon '+(entry.directory?'entry-icon-folder':'entry-icon-file');icon.setAttribute('aria-hidden','true');label.className='entry-name';label.textContent=displayName;
       button.append(icon,label);wrap.append(check,button);cell.append(wrap);row.append(cell);
       const size=document.createElement('td'),modified=document.createElement('td'),date=new Date(entry.modified);
       size.textContent=entry.directory?t('folder'):sizeText(entry.size);
@@ -167,16 +169,18 @@
       if(F.relative(out.path)!==clean||!Array.isArray(out.entries)||out.entries.length>1000||!Number.isSafeInteger(out.nextOffset)||(out.nextOffset!==-1&&out.nextOffset<=offset))throw new F.FileError('invalidReply');
       const entries=out.entries.map(entry=>{
         if(F.join(clean,entry.name)!==F.relative(entry.path)||typeof entry.directory!=='boolean'||!Number.isSafeInteger(entry.size)||entry.size<0)throw new F.FileError('invalidReply');
+        if(entry.displayName!==undefined&&(entry.root!==true||typeof entry.displayName!=='string'||entry.displayName.length>1024))throw new F.FileError('invalidReply');
         return entry;
       });
       const location=out.location;
       if(location&&(typeof location.display!=='string'||typeof location.virtual!=='boolean'||(location.parent!==null&&typeof location.parent!=='string')))throw new F.FileError('invalidReply');
+      filesystemAvailable=!!location;
       parentPath=location?(location.parent===null?null:F.relative(location.parent)):(clean?clean.split('/').slice(0,-1).join('/'):null);
       virtualDirectory=location?.virtual===true;
       // 舊 Host 的分頁可能尚未排序；已載入的項目仍統一排序並隱藏點開頭名稱。
       state.path=clean;state.entries=(append?state.entries:[]).concat(entries).filter(entry=>!entry.name.startsWith('.')).sort((a,b)=>{
         if(a.directory!==b.directory)return a.directory?-1:1;
-        const left=a.name.toLowerCase(),right=b.name.toLowerCase();
+        const left=(a.displayName||a.name).toLowerCase(),right=(b.displayName||b.name).toLowerCase();
         return left<right?-1:left>right?1:a.name<b.name?-1:a.name>b.name?1:0;
       }).slice(0,1000);state.next=out.nextOffset;if(!append){state.selected.clear();state.anchor=null;}
       $('files-path').textContent=location?(virtualDirectory?t('computer'):location.display):t('home')+(clean?' / '+clean:'');status(t(state.entries.length>=1000&&state.next>=0?'listLimit':state.reconnected?'reconnected':'ready'));
@@ -277,6 +281,7 @@
   dropTarget.addEventListener('dragover',event=>{event.preventDefault();event.stopPropagation();const ready=state.connected&&!state.initializing&&!state.mutating&&!virtualDirectory&&!state.listing;if(event.dataTransfer)event.dataTransfer.dropEffect=ready?'copy':'none';if(ready)dropTarget.classList.add('drag-over');});
   dropTarget.addEventListener('dragleave',event=>{if(!dropTarget.contains(event.relatedTarget))dropTarget.classList.remove('drag-over');});
   dropTarget.addEventListener('drop',event=>{event.preventDefault();event.stopPropagation();dropTarget.classList.remove('drag-over');if(event.dataTransfer)void enqueue(event.dataTransfer.items,event.dataTransfer.files);});
+  $('files-disks').addEventListener('click',()=>void list(''));
   $('files-up').addEventListener('click',()=>{if(parentPath!==null)void list(parentPath);});
   $('files-refresh').addEventListener('click',()=>void list(state.path));
   $('files-more').addEventListener('click',()=>void list(state.path,true));

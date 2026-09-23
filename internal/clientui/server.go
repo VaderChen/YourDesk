@@ -970,6 +970,12 @@ func (s *server) start(kind, siteID, binary string, args []string) error {
 							}
 						case "clipboard-progress":
 							// 傳輸進度由各自的 遠端顯示 顯示，不喚起管理主畫面。
+						case "remote-audio-toggle":
+							if s.children[key] == p && (p.kind == "viewer" || p.kind == "quick") && !p.fileConnection && !p.terminalConnection && !p.diagnosticConnection {
+								if err := s.toggleRemoteAudio(); err != nil {
+									s.notice = "遠端聲音設定儲存失敗：" + err.Error()
+								}
+							}
 						case "input-error", "audio-error":
 							s.notice = event.Message
 						case "error":

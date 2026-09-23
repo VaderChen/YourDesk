@@ -334,7 +334,7 @@ static void ydUpdateTitlebar(void) {
     }
     if (action == 7) [titlebarWeb.window miniaturize:nil];
     else if (action >= 100 && action < 104 && action-100 < atomic_load(&displayCount) && !atomic_load(&displayPending)) atomic_store(&titlebarAction, action);
-    else if ((action >= 1 && action <= 6) || action==13 || action==14 || action==50 || action==51 || action==52 || action==53 || action==55 || action==56) atomic_store(&titlebarAction, action);
+    else if ((action >= 1 && action <= 6) || action==13 || action==14 || action==18 || action==50 || action==51 || action==52 || action==53 || action==55 || action==56) atomic_store(&titlebarAction, action);
     // 按下 HTML 按鈕後，鍵盤焦點交還遠端畫布。
     [titlebarWeb.window makeFirstResponder:titlebarWeb.window.contentView];
 }

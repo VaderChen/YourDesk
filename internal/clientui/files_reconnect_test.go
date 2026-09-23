@@ -62,9 +62,13 @@ func TestFilesWindowRebindsOnlyAuthenticatedSameTarget(t *testing.T) {
 		t.Fatal(w.Body.String())
 	}
 	select {
-	case <-pipe.messages:
-		t.Fatal("duplicate reconnect resets queue")
-	default:
+	case data := <-pipe.messages:
+		message, err := decodeFilesWindowMessage(data, false)
+		if err != nil || message.Event != "files-focus" {
+			t.Fatalf("重開只應喚起視窗：%s %v", data, err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("未喚起既有視窗")
 	}
 	for _, action := range []string{"resume", "remove", "write"} {
 		w = httptest.NewRecorder()
@@ -126,5 +130,20 @@ func TestFilesRebindQueueDoesNotBlockManager(t *testing.T) {
 	}
 	if window.fileOwner != remote {
 		t.Fatal("changed owner despite failed enqueue")
+	}
+}
+
+func TestFilesFocusProtocol(t *testing.T) {
+	valid := []byte(`{"event":"files-focus"}`)
+	if _, err := decodeFilesWindowMessage(valid, false); err != nil {
+		t.Fatal(err)
+	}
+	for _, input := range []string{`{"event":"files-focus","url":"http://localhost/"}`, `{"event":"files-focus","title":"unexpected"}`} {
+		if _, err := decodeFilesWindowMessage([]byte(input), false); err == nil {
+			t.Fatal("喚起訊息不可修改工作階段")
+		}
+	}
+	if _, err := decodeFilesWindowMessage(valid, true); err == nil {
+		t.Fatal("初始訊息仍須提供完整來源")
 	}
 }

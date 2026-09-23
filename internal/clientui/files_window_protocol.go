@@ -24,8 +24,14 @@ func decodeFilesWindowMessage(data []byte, initial bool) (filesWindowMessage, er
 	if err := decoder.Decode(&message); err != nil {
 		return message, err
 	}
-	if decoder.Decode(new(any)) != io.EOF || len(message.Title) > 1024 || (initial && message.Event != "") || (!initial && message.Event != "files-session") {
+	if decoder.Decode(new(any)) != io.EOF || len(message.Title) > 1024 || (initial && message.Event != "") || (!initial && message.Event != "files-session" && message.Event != "files-focus") {
 		return message, errors.New("檔案視窗管線訊息無效")
+	}
+	if message.Event == "files-focus" {
+		if message.URL != "" || message.Title != "" {
+			return message, errors.New("喚起視窗訊息不得包含其他資料")
+		}
+		return message, nil
 	}
 	if _, _, err := parseFilesAddress(message.URL); err != nil {
 		return message, err

@@ -5,7 +5,7 @@
   <header><h1 id="files-title">檔案傳輸</h1><button id="files-close" type="button" data-text="close">關閉</button></header>
   <main>
     <section class="remote-panel" aria-labelledby="remote-heading">
-      <div class="section-heading"><h2 id="remote-heading" data-text="remote">遠端檔案</h2><div class="actions"><button id="files-up" type="button" data-text="up" disabled>上一層</button><button id="files-refresh" type="button" data-text="refresh">重新整理</button><button id="files-new-folder" type="button" data-text="newFolder">新增資料夾</button></div></div>
+      <div class="section-heading"><h2 id="remote-heading" data-text="remote">遠端檔案</h2><div class="actions"><button id="files-disks" type="button" data-text="disks" hidden>磁碟</button><button id="files-up" type="button" data-text="up" disabled>上一層</button><button id="files-refresh" type="button" data-text="refresh">重新整理</button><button id="files-new-folder" type="button" data-text="newFolder">新增資料夾</button></div></div>
       <p class="location"><bdi id="files-path"></bdi></p>
       <p id="files-status" class="status" role="status" aria-live="polite"></p>
       <div class="listing"><table><thead><tr><th scope="col"><input id="files-select-all" type="checkbox" class="entry-check"> <span data-text="name">名稱</span></th><th scope="col" data-text="size">大小</th><th scope="col" data-text="modified">修改時間</th></tr></thead><tbody id="files-list"></tbody></table><p id="files-empty" data-text="empty" hidden>此資料夾沒有檔案。</p></div>

@@ -2,11 +2,11 @@
 const fs=require('fs'),path=require('path'),assert=require('assert'),{chromium}=require('playwright');
 const root=path.resolve(__dirname,'../internal/clientui/web'),origin='https://yourdesk-audio.test';
 (async()=>{const browser=await chromium.launch({headless:true});try{
- const page=await browser.newPage({viewport:{width:1000,height:800}}),errors=[],writes=[];
+ const page=await browser.newPage({viewport:{width:1000,height:800}}),errors=[],writes=[],patches=[];
  page.on('pageerror',e=>errors.push(e.message));
- const state={prelogin:{supported:true,enabled:true,room:'YD-SERVICE'},info:{room:'YD-DEMO',hostname:'Smoke',platform:'darwin',architecture:'arm64'},library:{groups:[],sites:[]},preferences:{language:'zh-Hant',theme:'light',selectedGroup:'*'},running:{host:true},sessions:{},updates:{},hardwareDetection:{status:'complete'},audioCapabilities:[{codec:'opus',encode:true,decode:true,hardwareEncode:false,hardwareDecode:false},{codec:'pcm',encode:true,decode:true},{codec:'aac',encode:true,decode:true,hardwareEncode:false,hardwareDecode:false}]};
+ const state={prelogin:{supported:true,enabled:true,room:'YD-SERVICE'},info:{room:'YD-DEMO',hostname:'Smoke',platform:'darwin',architecture:'arm64'},library:{groups:[],sites:[]},preferences:{language:'zh-Hant',theme:'light',selectedGroup:'*',audioCodec:'opus',remoteAudio:false},running:{host:true},sessions:{},updates:{},hardwareDetection:{status:'complete'},audioCapabilities:[{codec:'opus',encode:true,decode:true,hardwareEncode:false,hardwareDecode:false},{codec:'pcm',encode:true,decode:true},{codec:'aac',encode:true,decode:true,hardwareEncode:false,hardwareDecode:false}]};
  await page.route('**/*',route=>{const req=route.request(),url=new URL(req.url());if(url.origin!==origin)return route.abort();
-  if(url.pathname.startsWith('/api/')){let value={};if(url.pathname==='/api/state')value=state;else if(url.pathname==='/api/preferences'&&req.method()==='PUT'){value=req.postDataJSON();writes.push(value);state.preferences=value;}return route.fulfill({json:value})}
+  if(url.pathname.startsWith('/api/')){let value={};if(url.pathname==='/api/state')value=state;else if(url.pathname==='/api/preferences'&&req.method()==='PUT'){const patch=req.postDataJSON();patches.push(patch);value={...state.preferences,...patch};writes.push(value);state.preferences=value;}return route.fulfill({json:value})}
   const name=url.pathname==='/'?'index.html':url.pathname.slice(1),p=path.resolve(root,name);if(!p.startsWith(root+path.sep)||!fs.existsSync(p))return route.abort();return route.fulfill({body:fs.readFileSync(p),contentType:({'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json'})[path.extname(p)]||'application/octet-stream'})
  });
  await page.goto(origin+'/#smoke-token');await page.waitForFunction(()=>document.querySelector('#ui-language').value==='zh-Hant');
@@ -71,5 +71,9 @@ const root=path.resolve(__dirname,'../internal/clientui/web'),origin='https://yo
  assert.equal(await page.locator('#ui-audio-codec optgroup[disabled] option').count(),0);
  await page.selectOption('#ui-audio-codec','opus');await page.waitForFunction(()=>!document.querySelector('#ui-audio-codec').disabled);
  assert.equal(writes.at(-1).audioCodec,'opus');assert.deepEqual(errors,[]);
+ const before=writes.length;
+ for(const enabled of [false,true,false]){state.preferences.remoteAudio=enabled;await page.evaluate(()=>updateRunning());assert.equal(await page.locator('#ui-remote-audio').isChecked(),enabled);}
+ assert.equal(writes.length,before,'同步標題列開關不應回寫整份設定');
+ state.preferences.remoteAudio=true; await page.evaluate(()=>{document.querySelector('#ui-hints').checked=!document.querySelector('#ui-hints').checked;return savePreferences()}); assert.equal(state.preferences.remoteAudio,true); assert(!Object.hasOwn(patches.at(-1),'remoteAudio'),'其他設定不可覆寫尚未同步的聲音狀態'); await page.evaluate(()=>updateRunning()); assert(await page.locator('#ui-remote-audio').isChecked());
  console.log('PASS: 預設關閉、Opus 預設、設定持久化、可用／不支援分組、停用選項、偵測更新保留選擇、四語系、共用品質選單');
 }finally{await browser.close()}})().catch(e=>{console.error(e);process.exit(1)});
