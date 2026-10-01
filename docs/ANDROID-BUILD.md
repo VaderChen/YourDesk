@@ -63,22 +63,37 @@
 
 先設定 `JAVA_HOME`、`ANDROID_HOME` 與 `ANDROID_NDK_HOME`，並讓 Go、Python 可由 PATH 執行。可用 `YOURDESK_GO` 指定 Go。所有命令從 repository 根目錄執行；Windows 使用 `android/gradlew.bat`。
 
-本版的 compileSdk／targetSdk 為 36。程式已使用系統 Insets 與 AndroidX OnBackPressedDispatcher 統一返回操作；Android 16 的實際行為仍須在對應裝置驗收。此流程交付 APK，沒有執行 Play Console 上架。
+本版的 compileSdk／targetSdk 為 36。程式已使用系統 Insets 與 AndroidX OnBackPressedDispatcher 統一返回操作；Android 16 的實際行為仍須在對應裝置驗收。此流程交付內含 APK 的 ZIP，沒有執行 Play Console 上架。
 
 ## 一次完成 Release
 
 ```sh
 python3 scripts/android_release.py build
 python3 scripts/android_release.py verify --apk dist/android/YourDesk-1.26.1001-build-1524-android-arm64.apk
+python3 scripts/android_release.py verify-zip --zip dist/android/YourDesk-1.26.1001-build-1524-android-arm64.zip
 ```
 
-腳本依序驗證或重建 Go core／CameraX JNI，執行 Wrapper 的 `lintRelease`、`assembleRelease`，以 16 KB ZIP 對齊後簽章，再核對版本、非偵錯狀態、ABI、所有原生 ELF、ZIP 與 v2／v3 簽章。成品驗證成功才替換目標檔，旁附 SHA-256 與 JSON 建置紀錄。
+腳本依序驗證或重建 Go core／CameraX JNI，執行 Wrapper 的 `lintRelease`、`assembleRelease`，以 16 KB ZIP 對齊後簽章，再核對版本、非偵錯狀態、ABI、所有原生 ELF、ZIP 與 v2／v3 簽章。成品驗證成功才替換目標檔，再使用固定檔案清單與 Deflate 壓縮封裝 ZIP，內含原版簽章 APK、四語安裝說明、四語授權文件、BUILD.json 與 SHA256SUMS。每個檔案逐一核對 SHA-256；固定時間與權限使相同輸入產生相同 ZIP。封裝不重簽 APK。
 
 ```text
 dist/android/YourDesk-1.26.1001-build-1524-android-arm64.apk
 dist/android/YourDesk-1.26.1001-build-1524-android-arm64.sha256
 dist/android/YourDesk-1.26.1001-build-1524-android-arm64.json
+dist/android/YourDesk-1.26.1001-build-1524-android-arm64.zip
+dist/android/YourDesk-1.26.1001-build-1524-android-arm64.zip.sha256
+dist/android/YourDesk-1.26.1001-build-1524-android-arm64.zip.json
 ```
+
+GitHub Release 僅上傳 `.zip`、`.zip.sha256`、`.zip.json` 三個檔案。APK 與其原始建置紀錄保留在本機；ZIP 的 JSON 另記錄 `archive.sha256`、大小及逐檔雜湊，頂層 `sha256` 仍為 APK。
+
+已有通過驗證的正式 APK 時，可直接封裝並檢查：
+
+```sh
+python3 scripts/android_release.py pack --apk dist/android/YourDesk-1.26.1001-build-1524-android-arm64.apk
+python3 scripts/android_release.py verify-zip --zip dist/android/YourDesk-1.26.1001-build-1524-android-arm64.zip
+```
+
+`pack` 會重新驗證 APK 簽章並比對旁邊的 `.json` 建置紀錄；若發行時另有補上來源提交資訊的紀錄，可用 `--record <檔案>` 指定，仍須與 APK 的版本、ABI、雜湊及憑證一致。
 
 預設沿用本機 `android/cert/yourdesk-release.jks`、`android/cert/keystore-password.txt` 及 alias `yourdesk-release`。新 checkout 須由金鑰保管者提供既有金鑰，不應重新建立。也可指定：
 
@@ -142,6 +157,8 @@ android/gradlew -p android :app:connectedDebugAndroidTest \
 
 最終手機結果記錄於 `android/app/build/reports/androidTests/connected/debug/index.html`；Release lint 位於 `android/app/build/reports/lint-results-release.html`。兩者為本機建置產物，不隨 Git 追蹤。
 
-公開的 Android Release 使用 `android-<版本>` 標籤，附上 APK、SHA-256 與建置紀錄，並設定 `latest=false`。桌面更新程式使用 `/releases/latest`，因此該入口維持桌面版；Android 下載入口由 README 明確連至對應發行頁。本機站台、憑證、ADB 備份與使用者桌面截圖不列入提交或發行附件。
+公開的 Android Release 使用 `android-<版本>` 標籤，附上內含 APK 的 ZIP、ZIP SHA-256 與封裝紀錄，並設定 `latest=false`。桌面更新程式使用 `/releases/latest`，因此該入口維持桌面版；Android 下載入口由 README 明確連至對應發行頁。本機站台、憑證、ADB 備份與使用者桌面截圖不列入提交或發行附件。
+
+發行內文遵循[共同 Release 流程](RELEASE-WORKFLOW.md)，儲存於 `docs/RELEASE-<tag>.md`，從 `## 繁體中文` 開始，依序提供繁體中文、英文、日文、韓文。四語均須包含功能、安裝與升級注意事項、驗證範圍及已知限制；發布後讀回核對。本版來源為 [RELEASE-android-1.26.1001-build-1524.md](RELEASE-android-1.26.1001-build-1524.md)。修正既有發行的翻譯時，只更新內文，保留原 APK、標籤及發布狀態。
 
 16 KB 靜態檢查不能取代 [16 KB 裝置啟動與 JNI 驗證](https://developer.android.com/guide/practices/page-sizes)。Android 16 實機、HEVC／不同廠牌解碼器、平板／折疊螢幕、真實通話／耳機／藍牙切換、跨行動網路切換及長時間負載仍需對應環境驗收，不能由單一 Android 11 手機推論全部完成。音訊已驗證非靜音 PCM 與系統播放進度，沒有使用麥克風回錄喇叭輸出。

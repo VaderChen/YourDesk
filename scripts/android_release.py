@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""以固定 Wrapper 建置、簽署並驗證 Android APK；不會上傳或安裝到手機。"""
+"""建置並驗證 Android APK，封裝為附四語說明的發行 ZIP；不會上傳或安裝。"""
 import argparse
 from datetime import datetime, timezone
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -80,6 +81,76 @@ def verify_apk(apk, build_tools):
     return fingerprint.group(1).lower()
 
 
+def verify_archive(archive, manifest):
+    record = json.loads(manifest.read_text(encoding='utf-8'))
+    package = record['archive']
+    if (package['fileName'] != archive.name or package['sha256'] != core.digest(archive)
+            or package['size'] != archive.stat().st_size):
+        raise ValueError('發行 ZIP 與封裝紀錄不符')
+    with zipfile.ZipFile(archive) as zipped:
+        entries = package['entries']
+        if sorted(zipped.namelist()) != sorted([*entries, 'SHA256SUMS']):
+            raise ValueError('發行 ZIP 含有缺漏或非預期檔案')
+        for name, expected in entries.items():
+            if hashlib.sha256(zipped.read(name)).hexdigest() != expected:
+                raise ValueError('發行 ZIP 內容校驗失敗：' + name)
+        sums = ''.join(f'{entries[name]}  {name}\n' for name in sorted(entries))
+        if zipped.read('SHA256SUMS') != sums.encode('utf-8'):
+            raise ValueError('發行 ZIP 內部 SHA256SUMS 不符')
+        if entries.get(record['apkFile']) != record['sha256']:
+            raise ValueError('發行 ZIP 內的 APK 與建置紀錄不符')
+
+
+def pack(apk, build_tools, record_path=None):
+    """先驗證既有簽章 APK，再封裝；檔案白名單避免把金鑰或備份打包。"""
+    signer = verify_apk(apk, build_tools)
+    name, code = version()
+    expected_name = 'YourDesk-' + name.replace(' ', '-') + '-android-arm64.apk'
+    if apk.name != expected_name:
+        raise ValueError('APK 檔名與正式版本不符')
+    record_bytes = (record_path or apk.with_suffix('.json')).read_bytes()
+    record = json.loads(record_bytes)
+    expected = {'versionName': name, 'versionCode': code, 'applicationId': 'com.yourdesk.android',
+                'abi': 'arm64-v8a', 'sha256': core.digest(apk), 'signerSha256': signer}
+    if not isinstance(record, dict) or any(record.get(key) != value for key, value in expected.items()):
+        raise ValueError('APK 與建置紀錄不符，不能封裝')
+    files = {apk.name: apk.read_bytes(), 'BUILD.json': record_bytes,
+             'README.md': (ANDROID / 'RELEASE-README.md').read_bytes()}
+    for license_name in ('LICENSE.md', 'LICENSE.en.md', 'LICENSE.ja.md', 'LICENSE.ko.md'):
+        files[license_name] = (ROOT / license_name).read_bytes()
+    entries = {name: hashlib.sha256(data).hexdigest() for name, data in files.items()}
+    if entries[apk.name] != record['sha256']:
+        raise ValueError('讀取期間 APK 已變更，不能封裝')
+    files['SHA256SUMS'] = ''.join(f'{entries[name]}  {name}\n' for name in sorted(entries)).encode('utf-8')
+    target = apk.with_suffix('.zip')
+    manifest = target.with_suffix('.zip.json')
+    checksum = target.with_suffix('.zip.sha256')
+    with tempfile.TemporaryDirectory(prefix='.package-', dir=apk.parent) as temp:
+        temp = Path(temp)
+        candidate = temp / target.name
+        with zipfile.ZipFile(candidate, 'w') as zipped:
+            for filename in sorted(files):
+                # 固定時間及權限，使相同輸入產生相同 ZIP 雜湊。
+                info = zipfile.ZipInfo(filename, date_time=(1980, 1, 1, 0, 0, 0))
+                info.create_system = 3
+                info.external_attr = 0o100644 << 16
+                zipped.writestr(info, files[filename], compress_type=zipfile.ZIP_DEFLATED, compresslevel=9)
+        packaged = {**record, 'apkFile': apk.name,
+                    'archive': {'fileName': target.name, 'sha256': core.digest(candidate),
+                                'size': candidate.stat().st_size, 'entries': entries}}
+        staged = temp / manifest.name
+        staged.write_text(json.dumps(packaged, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+        verify_archive(candidate, staged)
+        core.publish(candidate, staged, target, manifest, lambda: verify_archive(target, manifest))
+        staged_checksum = temp / checksum.name
+        staged_checksum.write_text(core.digest(target) + '  ' + target.name + '\n', encoding='utf-8')
+        os.replace(staged_checksum, checksum)
+    print('發行 ZIP：' + str(target))
+    print('ZIP SHA-256：' + core.digest(target))
+    print('上傳附件：' + ', '.join(path.name for path in (target, checksum, manifest)))
+    return target
+
+
 def build(args):
     sdk, build_tools = sdk_tools()
     keystore = Path(args.keystore).expanduser().resolve()
@@ -124,12 +195,15 @@ def build(args):
     print('可安裝的簽章 APK：' + str(target))
     print('SHA-256：' + core.digest(target))
     print('簽章憑證 SHA-256：' + signer)
+    pack(target, build_tools)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=['build', 'verify'])
+    parser.add_argument('action', choices=['build', 'verify', 'pack', 'verify-zip'])
     parser.add_argument('--apk', type=Path)
+    parser.add_argument('--zip', dest='archive', type=Path)
+    parser.add_argument('--record', type=Path, help='pack 使用的既有 APK 建置紀錄；預設為 APK 旁的 .json')
     parser.add_argument('--keystore', default=os.environ.get('YOURDESK_ANDROID_KEYSTORE', str(ANDROID / 'cert/yourdesk-release.jks')))
     parser.add_argument('--password-file', default=os.environ.get('YOURDESK_ANDROID_PASSWORD_FILE', str(ANDROID / 'cert/keystore-password.txt')))
     parser.add_argument('--key-password-file', default=os.environ.get('YOURDESK_ANDROID_KEY_PASSWORD_FILE'))
@@ -137,12 +211,21 @@ def main():
     args = parser.parse_args()
     try:
         if args.action == 'build': build(args)
+        elif args.action == 'verify-zip':
+            if not args.archive: parser.error('verify-zip 需要 --zip')
+            archive = args.archive.resolve()
+            verify_archive(archive, archive.with_suffix('.zip.json'))
+            if archive.with_suffix('.zip.sha256').read_text(encoding='utf-8') != core.digest(archive) + '  ' + archive.name + '\n':
+                raise ValueError('發行 ZIP 外部 SHA-256 清單不符')
+            print('發行 ZIP、APK 位元組與內外校驗紀錄一致')
         else:
-            if not args.apk: parser.error('verify 需要 --apk')
+            if not args.apk: parser.error(args.action + ' 需要 --apk')
             _, selected = sdk_tools()
-            signer = verify_apk(args.apk.resolve(), selected)
-            print('APK 版本、非偵錯、16 KB ELF／ZIP、v2/v3 簽章通過；憑證 SHA-256：' + signer)
-    except (ValueError, OSError, subprocess.CalledProcessError, zipfile.BadZipFile) as error:
+            if args.action == 'pack': pack(args.apk.resolve(), selected, args.record)
+            else:
+                signer = verify_apk(args.apk.resolve(), selected)
+                print('APK 版本、非偵錯、16 KB ELF／ZIP、v2/v3 簽章通過；憑證 SHA-256：' + signer)
+    except (ValueError, OSError, KeyError, subprocess.CalledProcessError, zipfile.BadZipFile) as error:
         parser.exit(1, str(error) + '\n')
 
 

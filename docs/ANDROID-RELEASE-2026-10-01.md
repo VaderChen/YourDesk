@@ -2,7 +2,9 @@
 
 發行日期：2026-10-01。版本碼：`29847324`。適用 Android 8.0 以上、arm64 裝置；此 APK 是操作遠端電腦的 Viewer，不提供手機被控模式。
 
-[GitHub 發行頁](https://github.com/VaderChen/YourDesk/releases/tag/android-1.26.1001-build-1524) · [下載正式 APK](https://github.com/VaderChen/YourDesk/releases/download/android-1.26.1001-build-1524/YourDesk-1.26.1001-build-1524-android-arm64.apk) · [操作、建置與維護](ANDROID-BUILD.md)
+[GitHub 發行頁](https://github.com/VaderChen/YourDesk/releases/tag/android-1.26.1001-build-1524) · [下載 Android ZIP](https://github.com/VaderChen/YourDesk/releases/download/android-1.26.1001-build-1524/YourDesk-1.26.1001-build-1524-android-arm64.zip) · [操作、建置與維護](ANDROID-BUILD.md)
+
+GitHub Release 的[四語發行內文](RELEASE-android-1.26.1001-build-1524.md)提供繁體中文、英文、日文與韓文；本文件保留完整操作、成品校驗與分階段驗證紀錄。
 
 ## 功能與修正
 
@@ -15,7 +17,7 @@
 
 ## 安裝與升級
 
-1. 下載 APK；若 Android 詢問安裝來源權限，允許此次使用的瀏覽器或檔案管理器安裝。
+1. 下載 ZIP 並解壓縮，再開啟其中的 APK；若 Android 詢問安裝來源權限，允許此次使用的檔案管理器安裝。
 2. 在被控電腦啟動 YourDesk Host，於手機輸入遠端 ID／IP，或選擇已儲存的站台。
 3. 輸入連線密碼後開始桌面或 Shell 連線。遠端聲音、多螢幕與中文輸入等能力依 Host 版本及系統權限而定。
 
@@ -39,7 +41,13 @@ SHA-256：
 11275dacd8da32f3492a63fe3e95c5d928563210a1a41f76aea9ad085225c29e
 ```
 
-發行附件另提供 `.sha256` 與 `.json` 建置紀錄。成品為非 Debug APK，已驗證 arm64 ABI、v2／v3 簽章及全部原生 ELF／ZIP 的 16 KB 對齊。
+公開下載為 `YourDesk-1.26.1001-build-1524-android-arm64.zip`，包含上述 APK、四語安裝說明、四語授權文件、`BUILD.json` 與內部 `SHA256SUMS`。發行附件另提供 `.zip.sha256` 與 `.zip.json`；外部清單校驗 ZIP，內部清單校驗解壓縮後的檔案，JSON 的 `archive.sha256` 為 ZIP 雜湊、頂層 `sha256` 為 APK 雜湊。成品為非 Debug APK，已驗證 arm64 ABI、v2／v3 簽章及全部原生 ELF／ZIP 的 16 KB 對齊。
+
+ZIP SHA-256：
+
+```text
+2a7b2951daf3d1c396fa6dbeaa29f8df2ab7ae61f2639c246c2ba3d63e6cc9e8
+```
 
 ## 驗證範圍
 
@@ -53,6 +61,7 @@ SHA-256：
 | 正式版安裝 | 保留原 App 資料完成簽章遷移；原站台與記憶密碼可正常連線，手機 APK 與本頁成品雜湊一致 |
 | 真實遠端連線 | 正式 APK 成功開始桌面串流，ADB 截圖與 UI 邊界確認關閉按鈕位於右上角且未遮住螢幕選單 |
 | Release 檢查 | Gradle 建置、簽章及 16 KB 靜態檢查通過；lint 為 0 error／fatal、30 項 warning |
+| ZIP 封裝更新 | 4 項封裝測試與既有 16 項 Android 建置測試通過；ZIP CRC、內外校驗清單及解壓縮 Smoke 通過，解出的 APK 與手機已安裝版的 SHA-256 相同 |
 
 音訊測試包含 Opus／AAC／PCM 解碼、非靜音內容及 AudioTrack 播放進度；Wi-Fi 測試涵蓋協商、備援、靜音、背景與焦點暫停、斷線及重連。縮放／輸入測試涵蓋 JPEG、H.264、右鍵、雙向滾輪及合成多螢幕；長按取消與螢幕切換等待期間不得誤送遠端操作。
 
@@ -61,4 +70,4 @@ SHA-256：
 - 尚未提供剪貼簿同步、獨立檔案傳輸、AV1 或手機端音訊擷取。
 - Android 16、16 KB pagesize 裝置、不同廠牌解碼器與 HEVC、平板／折疊螢幕仍需對應裝置驗收；靜態對齊檢查不等於實機驗證。
 - 真實通話、耳機／藍牙切換、跨行動網路切換及長時間負載仍需進一步驗收。音訊測試未使用麥克風回錄喇叭輸出。
-- 此次提供 GitHub APK 下載，未提交 Google Play。
+- 此次提供內含 APK 的 GitHub ZIP 下載，未提交 Google Play。

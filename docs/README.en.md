@@ -41,7 +41,7 @@ Local endpoint: `http://127.0.0.1:12345/mcp`. Remote windows are hidden by defau
 
 ## Download and start
 
-Download the latest package from [GitHub Releases](https://github.com/VaderChen/YourDesk/releases/latest).
+Download desktop packages from [GitHub Releases](https://github.com/VaderChen/YourDesk/releases/latest). For the phone Viewer, use the [Android release](https://github.com/VaderChen/YourDesk/releases/tag/android-1.26.1001-build-1524).
 
 | Platform | Package |
 | --- | --- |
@@ -49,10 +49,13 @@ Download the latest package from [GitHub Releases](https://github.com/VaderChen/
 | Windows x64 | x64 installer / portable ZIP (extract all files and run YourDesk.exe) |
 | Windows on ARM | ARM64 installer |
 | Linux x64 / arm64 | CLI Host ZIP (no desktop / REMOTE) |
+| Android 8.0+ / arm64 | [Android ZIP](https://github.com/VaderChen/YourDesk/releases/download/android-1.26.1001-build-1524/YourDesk-1.26.1001-build-1524-android-arm64.zip) — extract it, then install the signed APK (phone Viewer) |
 
 1. Install and open YourDesk on both computers.
 2. Enter the remote ID or select a saved connection.
 3. Enter the connection password to start.
+
+For Android, extract the ZIP and install the included APK on your phone. Run YourDesk Host on the remote computer. See the [Android release notes](RELEASE-android-1.26.1001-build-1524.md#english) for features, upgrade instructions and validation limits.
 
 For remote desktop control on macOS, allow Screen Recording and Accessibility permissions. Dedicated file transfer does not start screen capture or keyboard/mouse control; normal filesystem permissions still apply. When receiving remote files via the clipboard, allow Network Volumes access if prompted. If previously denied, enable it for YourDesk under System Settings → Privacy & Security → Files and Folders, then copy the files again. Windows requires WebView2 Runtime. Intel Macs and Linux desktop packages are currently unsupported. Direct IP connections are also available after enabling them in the remote computer's security settings. Connections are encrypted and require networks that permit direct connectivity.
 

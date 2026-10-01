@@ -199,7 +199,7 @@ Windows 桌面 Client／顯示區域 正式建置使用 `turbojpeg,ffmpeg` tags�
 
 Android 使用獨立的 `android/core` Go module，不會自動取得桌面 core 的變更；Java APP 依賴 `android/libs/androidcore.aar`。目前加入的 Go API 必須先重建 AAR 才能進入 APK，不能只執行 `assembleRelease` 沿用舊核心。
 
-以 `python3 scripts/android_release.py build` 產生正式簽章 APK，版本由 `android/version.properties` 管理。流程驗證或重建 Go AAR／CameraX JNI，執行 Release lint，並檢查 APK 的版本、非 Debug 狀態、16 KB ELF／ZIP 對齊及 v2／v3 簽章；正式憑證須由維護者提供。完整環境與個別回歸命令見 [Android 建置與測試](ANDROID-BUILD.md)。
+以 `python3 scripts/android_release.py build` 產生正式簽章 APK 並封裝為發行 ZIP，版本由 `android/version.properties` 管理。流程驗證或重建 Go AAR／CameraX JNI，執行 Release lint，並檢查 APK 的版本、非 Debug 狀態、16 KB ELF／ZIP 對齊及 v2／v3 簽章；正式憑證須由維護者提供。ZIP 內含原版 APK、四語安裝說明、授權與校驗清單，GitHub 上傳 `.zip`、`.zip.sha256`、`.zip.json`。既有 APK 可用 `pack --apk <路徑>` 驗證後封裝。完整環境與個別回歸命令見 [Android 建置與測試](ANDROID-BUILD.md)。
 
 build 1524 已於 Android 11 手機安裝並實際連線，確認站台與記憶密碼保留、串流後關閉按鈕位置正確。Android 16、16 KB pagesize 裝置及跨廠解碼器仍須另行驗收。Android 使用 MediaCodec／JPEG，不封裝 FFmpeg；桌面既有 FFmpeg 產物保留。
 
