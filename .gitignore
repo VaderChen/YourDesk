@@ -58,3 +58,9 @@ sites.json
 /client
 # Release 附加更新重點：只在本機封裝時提供，不提交原始碼。
 /release_*.note
+
+# Android 發行簽章與來源驗證記錄屬於本機產物。
+/android/cert/
+/android/signing.properties
+/android/libs/*.manifest.json
+/android/libs/maven/

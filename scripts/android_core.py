@@ -253,19 +253,32 @@ def build(force=False):
     subprocess.run(["javac", "-version"], env=env, check=True)
     original_digest = source_digest()
     AAR.parent.mkdir(parents=True, exist_ok=True)
-    # Same-filesystem staging permits atomic replacement only after all checks pass.
-    with tempfile.TemporaryDirectory(prefix=".core-build-", dir=AAR.parent) as directory:
+    # gomobile 會把 local replace 的絕對路徑寫入 Go build info，-trimpath 不會移除它。
+    # 在不含個人目錄的暫存位置編譯來源快照；輸出仍放同磁碟 staging，以原子方式發布。
+    build_root = Path(os.environ.get("YOURDESK_ANDROID_BUILD_ROOT", tempfile.gettempdir())).resolve()
+    if PERSONAL_PATH.search(str(build_root).encode()):
+        if os.name == "posix":
+            build_root = Path("/tmp").resolve()
+        else:
+            raise ValueError("請以 YOURDESK_ANDROID_BUILD_ROOT 指定不含個人路徑的暫存建置目錄。")
+    if PERSONAL_PATH.search(str(build_root).encode()):
+        raise ValueError("暫存建置目錄包含個人路徑，拒絕發布。")
+    with tempfile.TemporaryDirectory(prefix="yourdesk-android-", dir=build_root) as work, \
+            tempfile.TemporaryDirectory(prefix=".core-build-", dir=AAR.parent) as directory:
         stage = Path(directory)
+        source = Path(work) / "core"
+        shutil.copytree(CORE, source, ignore=shutil.ignore_patterns(".*", "*.bak", "*_test.go", "__pycache__"))
+        env = private_build_environment(env, root=source, temporary=work)
         extension = ".exe" if os.name == "nt" else ""
         for tool in ("gomobile", "gobind"):
             subprocess.run([go, "build", "-mod=readonly", "-o", str(stage / (tool + extension)),
-                            "golang.org/x/mobile/cmd/" + tool], cwd=CORE, env=env, check=True)
+                            "golang.org/x/mobile/cmd/" + tool], cwd=source, env=env, check=True)
         env["PATH"] = str(stage) + os.pathsep + env["PATH"]
         candidate = stage / "androidcore.aar"
         subprocess.run([str(stage / ("gomobile" + extension)), "bind", "-target=android/arm64", "-androidapi=26",
                         "-javapkg=com.yourdesk.androidcore", "-trimpath",
                         "-ldflags=-extldflags=-Wl,-z,max-page-size=16384,-z,common-page-size=16384",
-                        "-o", str(candidate), "."], cwd=CORE, env=env, check=True)
+                        "-o", str(candidate), "."], cwd=source, env=env, check=True)
         verify_native(candidate)
         verify_private_paths(candidate)
         if source_digest() != original_digest:

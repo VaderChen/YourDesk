@@ -36,14 +36,12 @@ import androidx.camera.core.CameraSelector;
 import androidx.camera.core.ImageAnalysis;
 import androidx.camera.core.ImageProxy;
 import androidx.camera.core.Preview;
-import androidx.camera.view.PreviewView;
 import androidx.camera.lifecycle.ProcessCameraProvider;
 import androidx.core.content.ContextCompat;
 import com.google.mlkit.vision.barcode.BarcodeScanning;
 import com.google.mlkit.vision.barcode.BarcodeScanner;
 import com.google.mlkit.vision.common.InputImage;
 import android.widget.FrameLayout;
-import android.widget.ImageView;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.PopupWindow;
@@ -62,8 +60,9 @@ import com.yourdesk.androidcore.core.TerminalSession;
 import com.yourdesk.androidcore.core.Viewer;
 import com.yourdesk.android.video.DecoderSupport;
 import com.yourdesk.android.video.EncodedVideoFrame;
-import com.yourdesk.android.video.FfmpegRuntime;
 import com.yourdesk.android.video.MediaCodecVideoDecoder;
+import com.yourdesk.android.audio.RemoteAudioPlayer;
+import com.yourdesk.android.audio.RemoteAudioSession;
 
 /** Android Viewer：WebView 負責介面，原生畫面元件負責合成 JPEG 差分影格。 */
 public final class MainActivity extends ComponentActivity {
@@ -91,6 +90,33 @@ public final class MainActivity extends ComponentActivity {
   private Button scaleButton;
   private Button fullscreenButton;
   private Button keyboardButton;
+  private Button viewportButton;
+  private Button audioButton;
+  private RemoteAudioSession remoteAudio;
+  private android.media.AudioManager audioManager;
+  private android.media.AudioFocusRequest audioFocus;
+  private boolean audioEnabled, audioFocusGranted, audioFocusInterrupted;
+  private String audioStatus = "聲音已關閉";
+  private final android.content.BroadcastReceiver audioNoisyReceiver = new android.content.BroadcastReceiver() {
+    @Override public void onReceive(Context context, android.content.Intent intent) {
+      if (android.media.AudioManager.ACTION_AUDIO_BECOMING_NOISY.equals(intent.getAction()) && audioEnabled) {
+        setRemoteAudioEnabled(false);
+        android.widget.Toast.makeText(MainActivity.this, "音訊裝置已中斷，聲音已關閉", android.widget.Toast.LENGTH_SHORT).show();
+      }
+    }
+  };
+  private final DesktopViewport desktopViewport = new DesktopViewport();
+  private ViewportGesture viewportGesture;
+  private View desktopGestureView;
+  private boolean viewportPanMode;
+  private boolean remoteScrollMode;
+  private int viewportDisplay = Integer.MIN_VALUE;
+  private boolean displayKnown, displayPending;
+  private boolean displayFrameReady;
+  private int displayCount, hostDisplay = -1;
+  private volatile boolean displayInputBlocked;
+  private volatile int inputDisplay = -1;
+  private String lastDisplayState = "", displayError = "";
   private boolean keyboardVisible;
   private int keyboardRequestGeneration;
   private boolean desktopFullscreen;
@@ -99,14 +125,17 @@ public final class MainActivity extends ComponentActivity {
   private int normalVisibleBars;
   private int normalBarsBehavior;
   private FullscreenExitGesture fullscreenExitGesture;
-  private android.window.OnBackInvokedCallback systemBackCallback;
+  private androidx.activity.OnBackPressedCallback backCallback;
   private android.graphics.Typeface faTypeface;
   private String selectedScale = "1/1", selectedQuality = "標準";
   private String appliedScale = "1/1", appliedQuality = "標準";
   private long streamRequestStartedMs;
   private final android.os.Handler uiHandler = new android.os.Handler(android.os.Looper.getMainLooper());
   private volatile Viewer viewer = new Viewer();
-  private TerminalSession terminal;
+  private volatile TerminalSession terminal;
+  private SiteStore siteStore;
+  private boolean foreground;
+  private String homeMessage = "";
   private boolean inTerminal;
   private boolean inDesktop;
   private ProcessCameraProvider qrCameraProvider;
@@ -116,25 +145,50 @@ public final class MainActivity extends ComponentActivity {
   private int qrGeneration;
   private boolean cameraPermissionPending;
   private long lastCameraJpegMs;
-  private PreviewView qrPreview;
   private boolean desktopPageReady;
   // 返回鍵位於所有 WebView/影像層之上；記住按下狀態，避免子 View 在 DOWN/UP
   // 之間切換時吞掉事件，造成需要連按多次才返回。
   private boolean backGesture;
   private boolean backDragging;
   private float backDownX, backDownY, backStartX, backStartY;
+  private boolean backPositionDragged;
+  private float backRelativeX, backRelativeY;
 
   private int dp(float value) {
     return Math.round(value * getResources().getDisplayMetrics().density);
   }
 
-  private void clampBackPosition() {
-    if (nativeBack == null || nativeBack.getWidth() == 0) return;
+  private void layoutBackPosition() {
+    if (nativeBack == null || !nativeBack.isShown() || nativeBack.getWidth() == 0) return;
+    // 預設位置交給 FrameLayout 錨定；隱藏或旋轉期間不可把舊邊界換成 translation。
+    if (!backPositionDragged) {
+      nativeBack.setTranslationX(0);
+      nativeBack.setTranslationY(0);
+      return;
+    }
     View parent = (View) nativeBack.getParent();
-    nativeBack.setX(Math.max(parent.getPaddingLeft(), Math.min(nativeBack.getX(),
-        parent.getWidth() - parent.getPaddingRight() - nativeBack.getWidth())));
-    nativeBack.setY(Math.max(parent.getPaddingTop(), Math.min(nativeBack.getY(),
-        parent.getHeight() - parent.getPaddingBottom() - nativeBack.getHeight())));
+    float width = Math.max(0, parent.getWidth() - parent.getPaddingLeft() - parent.getPaddingRight() - nativeBack.getWidth());
+    float height = Math.max(0, parent.getHeight() - parent.getPaddingTop() - parent.getPaddingBottom() - nativeBack.getHeight());
+    nativeBack.setX(parent.getPaddingLeft() + backRelativeX * width);
+    nativeBack.setY(parent.getPaddingTop() + backRelativeY * height);
+  }
+
+  private void moveBackPosition(float x, float y) {
+    View parent = (View) nativeBack.getParent();
+    float width = parent.getWidth() - parent.getPaddingLeft() - parent.getPaddingRight() - nativeBack.getWidth();
+    float height = parent.getHeight() - parent.getPaddingTop() - parent.getPaddingBottom() - nativeBack.getHeight();
+    // 只在使用者拖曳時記錄安全區內的比例，重排不會累積偏移或捨入誤差。
+    backPositionDragged = true;
+    if (width > 0) backRelativeX = Math.max(0, Math.min(1, (x - parent.getPaddingLeft()) / width));
+    if (height > 0) backRelativeY = Math.max(0, Math.min(1, (y - parent.getPaddingTop()) / height));
+    layoutBackPosition();
+  }
+
+  private void resetBackPosition() {
+    backGesture = backDragging = backPositionDragged = false;
+    nativeBack.setPressed(false);
+    nativeBack.setTranslationX(0);
+    nativeBack.setTranslationY(0);
   }
 
   // 只在 UI thread 存取；每個非 keyframe JPEG 會貼回這張完整畫面。
@@ -160,19 +214,43 @@ public final class MainActivity extends ComponentActivity {
   public void onCreate(Bundle b) {
     setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR);
     super.onCreate(b);
+    siteStore = new SiteStore(getPreferences(0));
+    audioEnabled = getPreferences(0).getBoolean("remoteAudioEnabled", false);
+    audioManager = (android.media.AudioManager) getSystemService(Context.AUDIO_SERVICE);
+    setVolumeControlStream(android.media.AudioManager.STREAM_MUSIC);
+    audioFocus = new android.media.AudioFocusRequest.Builder(android.media.AudioManager.AUDIOFOCUS_GAIN)
+        .setAudioAttributes(RemoteAudioPlayer.attributes()).setWillPauseWhenDucked(true)
+        .setOnAudioFocusChangeListener(this::onAudioFocusChanged, uiHandler).build();
+    remoteAudio = new RemoteAudioSession(status -> uiHandler.post(() -> {
+      if (!isDestroyed()) {
+        audioStatus = remoteAudio.status();
+        if (audioEnabled && remoteAudio.unavailable()) {
+          abandonAudioFocus(); audioFocusInterrupted = true;
+          android.widget.Toast.makeText(this, audioStatus, android.widget.Toast.LENGTH_LONG).show();
+        }
+        updateAudioButton();
+      }
+    }));
+    ContextCompat.registerReceiver(this, audioNoisyReceiver,
+        new android.content.IntentFilter(android.media.AudioManager.ACTION_AUDIO_BECOMING_NOISY), ContextCompat.RECEIVER_NOT_EXPORTED);
+    viewportGesture = new ViewportGesture(new ViewportGesture.Listener() {
+      @Override public void onBegin() { releaseDesktopTouch(); }
+      @Override public void onTransform(float factor, float fromX, float fromY, float toX, float toY) {
+        transformViewport(desktopGestureView, factor, fromX, fromY, toX, toY);
+      }
+    });
     desktopHeaderMargin = dp(44);
     fullscreenExitGesture = new FullscreenExitGesture(this, this::dispatchContentTouchEvent,
         () -> setDesktopFullscreen(false));
-    if (android.os.Build.VERSION.SDK_INT >= 33) {
-      // 系統手勢導覽會先攔截最左緣；沿用同一個返回入口，優先退出全螢幕。
-      systemBackCallback = this::onBackPressed;
-      getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
-          android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT, systemBackCallback);
-    }
-    FfmpegRuntime.probeAsync();
+    // AndroidX 統一舊版按鍵與 Android 16 預測返回手勢，生命週期結束會自動解除。
+    backCallback = new androidx.activity.OnBackPressedCallback(true) {
+      @Override public void handleOnBackPressed() { handleBackNavigation(); }
+    };
+    getOnBackPressedDispatcher().addCallback(this, backCallback);
     Log.i("YourDeskVideo", "Android 解碼器候選=" + DecoderSupport.probe());
 
     FrameLayout root = new FrameLayout(this);
+    root.setMotionEventSplittingEnabled(false);
     contentRoot = root;
     // 所有圖層共用系統安全區，避免狀態列、瀏海與導覽列覆蓋內容。
     ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
@@ -180,14 +258,14 @@ public final class MainActivity extends ComponentActivity {
       Insets bars = insets.getInsets((desktopFullscreen ? 0 : WindowInsetsCompat.Type.systemBars())
           | WindowInsetsCompat.Type.displayCutout());
       // Shell 必須讓出鍵盤空間；GUI 維持影像尺寸，讓鍵盤覆蓋。
-      int bottom = inTerminal
+      int bottom = !inDesktop
           ? Math.max(bars.bottom, insets.getInsets(WindowInsetsCompat.Type.ime()).bottom)
           : bars.bottom;
       root.setPadding(bars.left, bars.top, bars.right, bottom);
-      root.post(this::clampBackPosition);
       return insets;
     });
-    root.addOnLayoutChangeListener((v, l, t, r, btm, ol, ot, or, ob) -> clampBackPosition());
+    // 等所有子 View 完成配置再定位，也涵蓋只有 padding／標題列改變的重排。
+    root.getViewTreeObserver().addOnGlobalLayoutListener(this::layoutBackPosition);
     SurfaceView surface = new SurfaceView(this);
     surface.setBackgroundColor(Color.BLACK);
     root.addView(surface, new FrameLayout.LayoutParams(-1, -1));
@@ -211,24 +289,45 @@ public final class MainActivity extends ComponentActivity {
         .build();
     web.setWebViewClient(new WebViewClient() {
       @Override public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest r) {
-        return !"appassets.androidplatform.net".equals(r.getUrl().getHost());
+        return !isLocalAsset(r.getUrl());
       }
       @Override public android.webkit.WebResourceResponse shouldInterceptRequest(WebView v, WebResourceRequest r) {
-        return loader.shouldInterceptRequest(r.getUrl());
+        if (isLocalAsset(r.getUrl())) return loader.shouldInterceptRequest(r.getUrl());
+        return new android.webkit.WebResourceResponse("text/plain", "UTF-8", 403, "Forbidden",
+            java.util.Collections.emptyMap(), new java.io.ByteArrayInputStream(new byte[0]));
+      }
+      @Override public void onPageFinished(WebView view, String url) {
+        if (url.endsWith("/index.html") && !homeMessage.isEmpty()) {
+          String message = homeMessage; homeMessage = "";
+          view.evaluateJavascript("window.showNotice&&window.showNotice(" + org.json.JSONObject.quote(message) + ")", null);
+        }
+      }
+      @Override public boolean onRenderProcessGone(WebView view, android.webkit.RenderProcessGoneDetail detail) {
+        // 系統已終止 renderer；由 Activity 重建所有本地頁面與 native session。
+        generation++;
+        inDesktop = false;
+        inTerminal = false;
+        desktopPageReady = false;
+        stopQrScannerOnMain();
+        uiHandler.removeCallbacksAndMessages(null);
+        new Thread(viewer::close).start();
+        view.removeJavascriptInterface("YourDesk");
+        if (view.getParent() instanceof android.view.ViewGroup) ((android.view.ViewGroup) view.getParent()).removeView(view);
+        view.destroy(); web = null;
+        recreate();
+        return true;
       }
     });
     web.setWebChromeClient(new WebChromeClient() {
       @Override public void onPermissionRequest(PermissionRequest request) {
-        runOnUiThread(() -> { for (String resource : request.getResources()) if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(resource)) { request.grant(new String[]{resource}); return; } request.deny(); });
+        runOnUiThread(request::deny);
       }
     });
     root.addView(web, new FrameLayout.LayoutParams(-1, -1));
-    qrPreview = new PreviewView(this); qrPreview.setVisibility(View.GONE);
-    qrPreview.setBackgroundColor(Color.BLACK);
-    FrameLayout.LayoutParams qrLp = new FrameLayout.LayoutParams(-1, dp(220)); qrLp.gravity = Gravity.CENTER; root.addView(qrPreview, qrLp);
 
     nativeVideo = new TextureView(this);
-    nativeVideo.setOpaque(true);
+    // 等比例顯示可能留下黑邊，TextureView 不可宣告整個區域皆為不透明。
+    nativeVideo.setOpaque(false);
     nativeVideo.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
       @Override public void onSurfaceTextureAvailable(android.graphics.SurfaceTexture texture, int width, int height) {
         if (videoSurface != null) videoSurface.release();
@@ -243,6 +342,7 @@ public final class MainActivity extends ComponentActivity {
 
       @Override public boolean onSurfaceTextureDestroyed(android.graphics.SurfaceTexture texture) {
         videoDecoder.reset();
+        if (videoMode) { displayFrameReady = false; updateDisplayInputGate(); }
         videoKeyframeRequested = false;
         lastKeyframeRequestMs = 0;
         if (videoSurface != null) {
@@ -255,6 +355,7 @@ public final class MainActivity extends ComponentActivity {
       @Override public void onSurfaceTextureUpdated(android.graphics.SurfaceTexture texture) { }
     });
     nativeVideo.setOnTouchListener(this::handleDesktopTouch);
+    nativeVideo.setOnGenericMotionListener(this::handleDesktopMouse);
     nativeVideo.setClickable(true);
     nativeVideo.setVisibility(View.GONE);
     FrameLayout.LayoutParams videoLp = new FrameLayout.LayoutParams(-1, -1);
@@ -263,11 +364,11 @@ public final class MainActivity extends ComponentActivity {
     videoLp.bottomMargin = 0;
     root.addView(nativeVideo, videoLp);
 
-    nativeScreen = new DeltaImageView(this);
+    nativeScreen = new DeltaImageView(this, desktopViewport);
     nativeScreen.setBackgroundColor(Color.BLACK);
     // DeltaImageView 自行以等比例矩形繪製；不能使用 FIT_XY，否則來源畫面會被拉伸。
-    nativeScreen.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
     nativeScreen.setOnTouchListener(this::handleDesktopTouch);
+    nativeScreen.setOnGenericMotionListener(this::handleDesktopMouse);
     nativeScreen.setClickable(true);
     nativeScreen.setVisibility(View.GONE);
     // 保留 WebView 上方的標題列與返回鍵；內容區才由原生畫面覆蓋。
@@ -297,9 +398,9 @@ public final class MainActivity extends ComponentActivity {
     nativeBack.setStateListAnimator(null);
     nativeBack.setOnClickListener(v -> leaveShell());
     nativeBack.setVisibility(View.GONE);
-    FrameLayout.LayoutParams backLp = new FrameLayout.LayoutParams(dp(36), dp(36), Gravity.TOP | Gravity.END);
-    // 圓形 X 保留在狀態列下方；WindowInsets 會在不同裝置上修正上邊距。
-    backLp.topMargin = dp(8);
+    FrameLayout.LayoutParams backLp = new FrameLayout.LayoutParams(dp(36), dp(36), Gravity.TOP | Gravity.RIGHT);
+    // 與 WebView 標題列共用高度，在系統安全區內置中。
+    backLp.topMargin = Math.max(0, (desktopHeaderMargin - backLp.height) / 2);
     backLp.rightMargin = dp(6);
     root.addView(nativeBack, backLp);
 
@@ -319,16 +420,67 @@ public final class MainActivity extends ComponentActivity {
     quality.setOnClickListener(this::showQualityMenu);
     keyboardButton = toolButton("\uf11c", "鍵盤");
     keyboardButton.setOnClickListener(v -> toggleDesktopKeyboard());
+    viewportButton = toolButton("100%", "檢視縮放與拖移");
+    viewportButton.setTypeface(android.graphics.Typeface.DEFAULT);
+    viewportButton.setTextSize(10);
+    viewportButton.setOnClickListener(this::showViewportMenu);
+    audioButton = toolButton("\uf6a9", "開啟遠端聲音");
+    audioButton.setOnClickListener(v -> setRemoteAudioEnabled(!audioEnabled));
+    audioButton.setOnLongClickListener(v -> {
+      android.widget.Toast.makeText(this, audioStatus, android.widget.Toast.LENGTH_LONG).show(); return true;
+    });
     desktopTools.addView(fullscreenButton); desktopTools.addView(scaleButton);
-    desktopTools.addView(quality); desktopTools.addView(keyboardButton);
+    desktopTools.addView(quality); desktopTools.addView(viewportButton); desktopTools.addView(audioButton); desktopTools.addView(keyboardButton);
     desktopTools.setVisibility(View.GONE);
-    FrameLayout.LayoutParams toolsLp = new FrameLayout.LayoutParams(dp(46), dp(198), Gravity.START | Gravity.CENTER_VERTICAL);
+    FrameLayout.LayoutParams toolsLp = new FrameLayout.LayoutParams(dp(46), dp(294), Gravity.START | Gravity.CENTER_VERTICAL);
     toolsLp.leftMargin = dp(8);
     root.addView(desktopTools, toolsLp);
 
     setContentView(root);
     ViewCompat.requestApplyInsets(contentRoot);
     web.loadUrl("https://appassets.androidplatform.net/assets/index.html");
+  }
+
+  private void setRemoteAudioEnabled(boolean enabled) {
+    audioEnabled = enabled;
+    audioFocusInterrupted = false;
+    getPreferences(0).edit().putBoolean("remoteAudioEnabled", enabled).apply();
+    refreshRemoteAudio();
+  }
+
+  private void onAudioFocusChanged(int change) {
+    audioFocusGranted = change == android.media.AudioManager.AUDIOFOCUS_GAIN;
+    audioFocusInterrupted = !audioFocusGranted;
+    refreshRemoteAudio();
+  }
+
+  private void refreshRemoteAudio() {
+    if (remoteAudio == null) return;
+    boolean wanted = audioEnabled && foreground && inDesktop && desktopPageReady;
+    if (wanted && !audioFocusGranted && !audioFocusInterrupted) {
+      audioFocusGranted = audioManager.requestAudioFocus(audioFocus) == android.media.AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
+      if (!audioFocusGranted) audioFocusInterrupted = true;
+    }
+    if (!wanted) abandonAudioFocus();
+    String profile = "低畫質".equals(selectedQuality) ? "fast" : "高畫質".equals(selectedQuality) ? "high" : "standard";
+    remoteAudio.setPlayback(inDesktop ? viewer : null, wanted && audioFocusGranted, profile);
+    updateAudioButton();
+  }
+
+  private void abandonAudioFocus() {
+    if (audioManager != null && audioFocus != null) audioManager.abandonAudioFocusRequest(audioFocus);
+    audioFocusGranted = false; audioFocusInterrupted = false;
+  }
+
+  private void updateAudioButton() {
+    if (audioButton == null) return;
+    String status = !audioEnabled ? "聲音已關閉" : remoteAudio.unavailable() ? audioStatus
+        : !foreground || !audioFocusGranted ? "聲音已暫停" : audioStatus;
+    audioButton.setText(audioEnabled ? "\uf028" : "\uf6a9");
+    audioButton.setSelected(audioEnabled);
+    audioButton.setTextColor(audioEnabled ? (status.contains("播放中") ? Color.rgb(102, 220, 170) : Color.rgb(255, 195, 80)) : Color.WHITE);
+    audioButton.setContentDescription((audioEnabled ? "關閉" : "開啟") + "遠端聲音；" + status);
+    audioButton.setTooltipText(status + "；點一下切換，使用手機音量鍵調整音量");
   }
 
   private Button toolButton(String text, String description) {
@@ -386,6 +538,7 @@ public final class MainActivity extends ComponentActivity {
 
   private void setDesktopFullscreen(boolean fullscreen) {
     if (desktopFullscreen == fullscreen || (fullscreen && (!inDesktop || !desktopPageReady))) return;
+    cancelDesktopGesture();
     if (fullscreen) hideDesktopKeyboard();
     View decor = getWindow().getDecorView();
     WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(getWindow(), decor);
@@ -444,6 +597,14 @@ public final class MainActivity extends ComponentActivity {
         screen.setLayoutParams(lp);
       }
     }
+    if (nativeBack != null) {
+      FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) nativeBack.getLayoutParams();
+      int margin = Math.max(0, (desktopHeaderMargin - lp.height) / 2);
+      if (lp.topMargin != margin) {
+        lp.topMargin = margin;
+        nativeBack.setLayoutParams(lp);
+      }
+    }
   }
   private boolean sendStreamPreference(String scale, String quality) {
     String actualQuality = quality == null ? selectedQuality : quality;
@@ -456,6 +617,7 @@ public final class MainActivity extends ComponentActivity {
       selectedQuality = actualQuality;
       streamRequestStartedMs = android.os.SystemClock.uptimeMillis();
       scaleButton.setText("\uf390  " + selectedScale + " …");
+      refreshRemoteAudio();
       return true;
     }
     catch (Exception error) {
@@ -475,6 +637,112 @@ public final class MainActivity extends ComponentActivity {
     for (String value : new String[]{"低畫質", "標準", "高畫質"}) { android.view.MenuItem i = menu.getMenu().add(value); i.setCheckable(true).setChecked(value.equals(selectedQuality)); }
     menu.setOnMenuItemClickListener(item -> { sendStreamPreference(null, item.getTitle().toString()); return true; });
     menu.show();
+  }
+
+  private void showViewportMenu(View anchor) {
+    PopupMenu menu = new PopupMenu(this, anchor);
+    menu.getMenu().add(0, 1, 0, "放大 ＋").setEnabled(desktopViewport.zoom() < DesktopViewport.MAX_ZOOM);
+    menu.getMenu().add(0, 2, 1, "縮小 −").setEnabled(desktopViewport.zoom() > 1f);
+    menu.getMenu().add(0, 3, 2, "適合畫面（100%）");
+    menu.getMenu().add(0, 4, 3, "單指拖移可視區").setCheckable(true).setChecked(viewportPanMode);
+    menu.getMenu().add(0, 6, 4, "單指捲動遠端內容").setCheckable(true).setChecked(remoteScrollMode);
+    menu.setOnMenuItemClickListener(item -> {
+      cancelDesktopGesture();
+      if (item.getItemId() == 3) { desktopViewport.reset(); refreshViewport(); }
+      else if (item.getItemId() == 4) { viewportPanMode = !viewportPanMode; remoteScrollMode = false; refreshViewport(); }
+      else if (item.getItemId() == 6) { remoteScrollMode = !remoteScrollMode; viewportPanMode = false; refreshViewport(); }
+      else {
+        View view = videoMode ? nativeVideo : nativeScreen;
+        transformViewport(view, item.getItemId() == 1 ? 1.25f : .8f,
+            view.getWidth() * .5f, view.getHeight() * .5f, view.getWidth() * .5f, view.getHeight() * .5f);
+      }
+      return true;
+    });
+    menu.show();
+  }
+
+  private void transformViewport(View view, float factor, float fromX, float fromY, float toX, float toY) {
+    if (view == null) return;
+    int width = view == nativeVideo ? videoWidth : composedWidth;
+    int height = view == nativeVideo ? videoHeight : composedHeight;
+    desktopViewport.transform(width, height, view.getWidth(), view.getHeight(), factor, fromX, fromY, toX, toY);
+    refreshViewport();
+  }
+
+  private void refreshViewport() {
+    if (nativeScreen != null) nativeScreen.invalidate();
+    updateVideoTransform();
+    if (viewportButton != null) {
+      String value = Math.round(desktopViewport.zoom() * 100) + "%";
+      String mode = viewportPanMode ? "單指拖移可視區" : remoteScrollMode ? "單指捲動遠端內容" : "單指操作遠端，長按右鍵";
+      viewportButton.setText(viewportPanMode ? value + "\n拖移" : remoteScrollMode ? value + "\n捲動" : value);
+      viewportButton.setContentDescription("檢視縮放 " + value + "，" + mode);
+      viewportButton.setTooltipText("檢視與操作模式：" + mode);
+    }
+  }
+
+  private void updateViewportDisplay(int display) {
+    if (viewportDisplay != Integer.MIN_VALUE && viewportDisplay != display) {
+      cancelDesktopGesture();
+      desktopViewport.reset();
+      refreshViewport();
+    }
+    viewportDisplay = display;
+    inputDisplay = display;
+    updateDisplayInputGate();
+  }
+
+  private void updateDisplayInputGate() {
+    displayInputBlocked = displayPending || (displayKnown && (hostDisplay < 0 || viewportDisplay != hostDisplay || !displayFrameReady));
+  }
+
+  private void markDisplayFramePresented() {
+    if (!displayPending && (!displayKnown || viewportDisplay == hostDisplay)) displayFrameReady = true;
+    updateDisplayInputGate();
+  }
+
+  private int drainVideoFrames() {
+    int rendered = videoDecoder.drainOutput();
+    if (rendered > 0) markDisplayFramePresented();
+    return rendered;
+  }
+
+  private void updateDisplayState(Viewer session) {
+    try {
+      String json = session.displayStateJSON();
+      org.json.JSONObject state = new org.json.JSONObject(json);
+      boolean known = state.optBoolean("known"), pending = state.optBoolean("pending");
+      int current = state.optInt("current", -1);
+      if (pending != displayPending || (known && current != hostDisplay)) {
+        cancelDesktopGesture();
+        if (pending || current != hostDisplay) displayFrameReady = false;
+      }
+      displayKnown = known; displayPending = pending;
+      hostDisplay = current; displayCount = state.optInt("count");
+      updateDisplayInputGate();
+      state.put("waitingFrame", known && !pending && current >= 0 && displayInputBlocked);
+      json = state.toString();
+      String error = state.optString("error");
+      if (!error.isEmpty() && !error.equals(displayError))
+        android.widget.Toast.makeText(this, error, android.widget.Toast.LENGTH_LONG).show();
+      displayError = error;
+      if (!json.equals(lastDisplayState)) {
+        lastDisplayState = json;
+        web.evaluateJavascript("window.desktopDisplays&&window.desktopDisplays(" + json + ")", null);
+      }
+    } catch (Exception ignored) { }
+  }
+
+  private void selectRemoteDisplay(int display) {
+    if (!inDesktop || !desktopPageReady || !displayKnown || display < 0 || display >= displayCount) return;
+    cancelDesktopGesture();
+    web.evaluateJavascript("typeof releaseKeys==='function'&&releaseKeys()", null);
+    try {
+      viewer.selectDisplay(display);
+      updateDisplayState(viewer);
+    } catch (Exception error) {
+      android.widget.Toast.makeText(this, "無法切換螢幕，請稍後重試", android.widget.Toast.LENGTH_SHORT).show();
+    }
   }
 
   /**
@@ -515,9 +783,7 @@ public final class MainActivity extends ComponentActivity {
             int slop = android.view.ViewConfiguration.get(this).getScaledTouchSlop();
             backDragging |= dx * dx + dy * dy > slop * slop;
             if (backDragging) {
-              nativeBack.setX(backStartX + dx);
-              nativeBack.setY(backStartY + dy);
-              clampBackPosition();
+              moveBackPosition(backStartX + dx, backStartY + dy);
             }
             nativeBack.setPressed(!backDragging && inside);
             return true;
@@ -542,44 +808,135 @@ public final class MainActivity extends ComponentActivity {
   private View desktopTouchOwner;
   private int desktopPointerId = -1;
   private float desktopTouchX, desktopTouchY;
+  private float desktopDownX, desktopDownY;
+  private boolean desktopPointerPressed;
+  private boolean desktopRightClick, desktopScrolling;
+  private float desktopScrollY, scrollRemainder, mouseScrollRemainder;
+  private Runnable desktopLongPress;
+  private int mouseButtons;
+  private boolean mouseGestureCancelled;
+  private float mouseX, mouseY;
+
+  private void cancelDesktopGesture() {
+    releaseDesktopTouch();
+    releaseMouseButtons();
+    if (viewportGesture != null) viewportGesture.reset();
+    desktopGestureView = null;
+  }
 
   private void releaseDesktopTouch() {
+    cancelDesktopLongPress();
     if (desktopTouchOwner == null) return;
     desktopTouchOwner = null;
     desktopPointerId = -1;
-    sendDesktopPointer("button", false, desktopTouchX, desktopTouchY);
+    if (desktopPointerPressed) sendDesktopPointer("button", false, desktopTouchX, desktopTouchY);
+    desktopPointerPressed = false;
+    desktopRightClick = desktopScrolling = false;
+    scrollRemainder = 0;
+  }
+
+  private void cancelDesktopLongPress() {
+    if (desktopLongPress != null) uiHandler.removeCallbacks(desktopLongPress);
+    desktopLongPress = null;
   }
 
   private void sendDesktopPointer(String type, boolean down, float x, float y) {
+    sendDesktopPointer(type, 1, down, x, y, 0);
+  }
+
+  private void sendDesktopPointer(String type, int button, boolean down, float x, float y, int delta) {
     try {
       org.json.JSONObject c = new org.json.JSONObject().put("type", type).put("x", x).put("y", y);
-      if (type.equals("button")) c.put("button", 1).put("down", down);
+      if (inputDisplay >= 0) c.put("display", inputDisplay);
+      if (type.equals("button")) c.put("button", button).put("down", down);
+      if (type.equals("wheel")) c.put("delta", delta);
       viewer.sendControlJSON(c.toString());
     } catch (Exception ignored) {
       // 連線中止時不讓 UI thread 崩潰。
     }
   }
 
-  private boolean handleDesktopTouch(View v, MotionEvent e) {
-    int action = e.getActionMasked();
-    if (action == MotionEvent.ACTION_DOWN) releaseDesktopTouch();
-    int index = action == MotionEvent.ACTION_DOWN ? e.getActionIndex() : e.findPointerIndex(desktopPointerId);
-    boolean allowed = inDesktop && v.isShown() && hasWindowFocus() && index >= 0;
+  private float[] desktopPoint(View view, float x, float y) {
+    if (!inDesktop || !view.isShown() || !hasWindowFocus() || displayInputBlocked) return null;
     Rect bounds = new Rect();
-    if (allowed) {
-      float x = e.getX(index), y = e.getY(index);
-      allowed = v.getLocalVisibleRect(bounds) && x >= bounds.left && x < bounds.right
-          && y >= bounds.top && y < bounds.bottom;
-    }
+    if (!view.getLocalVisibleRect(bounds) || x < bounds.left || x >= bounds.right || y < bounds.top || y >= bounds.bottom) return null;
+    int[] origin = new int[2]; view.getLocationOnScreen(origin);
     for (View overlay : new View[]{desktopTools, nativeBack}) {
       if (overlay != null && overlay.isShown() && overlay.getGlobalVisibleRect(bounds)
-          && bounds.contains((int) e.getRawX(), (int) e.getRawY())) allowed = false;
+          && bounds.contains(Math.round(origin[0] + x), Math.round(origin[1] + y))) return null;
     }
-    float[] point = null;
-    if (allowed) {
-      if (v instanceof DeltaImageView) point = ((DeltaImageView) v).mapTouch(e.getX(index), e.getY(index));
-      else if (v == nativeVideo) point = mapVideoTouch(e.getX(index), e.getY(index));
+    if (view instanceof DeltaImageView) return ((DeltaImageView) view).mapTouch(x, y);
+    return view == nativeVideo ? mapVideoTouch(x, y) : null;
+  }
+
+  private void sendDesktopWheel(float x, float y, int delta) {
+    if (delta == 0) return;
+    // Host 的 wheel 作用於游標所在視窗，先定位到手勢起點再捲動。
+    sendDesktopPointer("move", false, x, y);
+    sendDesktopPointer("wheel", 0, false, x, y, Math.max(-12, Math.min(12, delta)));
+  }
+
+  private void syncMouseButtons(int buttons, float x, float y) {
+    buttons &= MotionEvent.BUTTON_PRIMARY | MotionEvent.BUTTON_SECONDARY | MotionEvent.BUTTON_TERTIARY;
+    int changed = mouseButtons ^ buttons;
+    int[] masks = {MotionEvent.BUTTON_PRIMARY, MotionEvent.BUTTON_SECONDARY, MotionEvent.BUTTON_TERTIARY};
+    for (int i = 0; i < masks.length; i++) if ((changed & masks[i]) != 0)
+      sendDesktopPointer("button", i + 1, (buttons & masks[i]) != 0, x, y, 0);
+    mouseButtons = buttons; mouseX = x; mouseY = y;
+  }
+
+  private void releaseMouseButtons() {
+    if (mouseButtons != 0) { mouseGestureCancelled = true; syncMouseButtons(0, mouseX, mouseY); }
+    mouseScrollRemainder = 0;
+  }
+
+  private boolean handleDesktopMouse(View view, MotionEvent event) {
+    if (!event.isFromSource(android.view.InputDevice.SOURCE_MOUSE)) return false;
+    int action = event.getActionMasked();
+    float[] point = desktopPoint(view, event.getX(), event.getY());
+    if (point == null || action == MotionEvent.ACTION_CANCEL) {
+      releaseMouseButtons();
+      mouseGestureCancelled |= event.getButtonState() != 0;
+      return true;
     }
+    if (action == MotionEvent.ACTION_DOWN) mouseGestureCancelled = false;
+    if (mouseGestureCancelled) {
+      if (event.getButtonState() == 0) mouseGestureCancelled = false;
+      return true;
+    }
+    if (action == MotionEvent.ACTION_BUTTON_PRESS || action == MotionEvent.ACTION_BUTTON_RELEASE
+        || action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_MOVE) {
+      int buttons = action == MotionEvent.ACTION_UP ? 0 : event.getButtonState();
+      if (action == MotionEvent.ACTION_DOWN && buttons == 0) buttons = MotionEvent.BUTTON_PRIMARY;
+      syncMouseButtons(buttons, point[0], point[1]);
+    }
+    if (action == MotionEvent.ACTION_MOVE || action == MotionEvent.ACTION_HOVER_MOVE)
+      sendDesktopPointer("move", false, point[0], point[1]);
+    if (action == MotionEvent.ACTION_SCROLL) {
+      float delta = event.getAxisValue(MotionEvent.AXIS_VSCROLL);
+      if (Float.isFinite(delta)) {
+        mouseScrollRemainder += Math.max(-12, Math.min(12, delta));
+        int steps = (int) mouseScrollRemainder; mouseScrollRemainder -= steps;
+        sendDesktopWheel(point[0], point[1], steps);
+      }
+    }
+    return true;
+  }
+
+  private boolean handleDesktopTouch(View v, MotionEvent e) {
+    if (e.isFromSource(android.view.InputDevice.SOURCE_MOUSE)) return handleDesktopMouse(v, e);
+    int action = e.getActionMasked();
+    if (action == MotionEvent.ACTION_DOWN) { cancelDesktopGesture(); desktopGestureView = v; }
+    if (!inDesktop || !v.isShown() || !hasWindowFocus() || desktopGestureView != v) {
+      cancelDesktopGesture(); return true;
+    }
+    if (viewportGesture.onTouch(e, viewportPanMode)) {
+      if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) desktopGestureView = null;
+      return true;
+    }
+    int index = action == MotionEvent.ACTION_DOWN ? e.getActionIndex() : e.findPointerIndex(desktopPointerId);
+    // 觸控、滑鼠與滾輪共用來源座標、遮罩邊界及螢幕切換檢查。
+    float[] point = index >= 0 ? desktopPoint(v, e.getX(index), e.getY(index)) : null;
     if (point == null || action == MotionEvent.ACTION_CANCEL) {
       // 越界只在最後有效位置釋放；再次進入必須重新按下。
       releaseDesktopTouch();
@@ -589,30 +946,75 @@ public final class MainActivity extends ComponentActivity {
       desktopTouchOwner = v;
       desktopPointerId = e.getPointerId(index);
       desktopTouchX = point[0]; desktopTouchY = point[1];
-      sendDesktopPointer("button", true, desktopTouchX, desktopTouchY);
+      desktopDownX = e.getX(index); desktopDownY = e.getY(index);
+      desktopScrollY = desktopDownY;
+      if (!remoteScrollMode) {
+        final int epoch = generation;
+        desktopLongPress = () -> {
+          desktopLongPress = null;
+          if (epoch != generation || desktopTouchOwner != v || desktopPointerPressed || displayInputBlocked
+              || !hasWindowFocus() || !v.isShown()) return;
+          desktopRightClick = true;
+          sendDesktopPointer("button", 2, true, desktopTouchX, desktopTouchY, 0);
+          sendDesktopPointer("button", 2, false, desktopTouchX, desktopTouchY, 0);
+          v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+        };
+        uiHandler.postDelayed(desktopLongPress, android.view.ViewConfiguration.getLongPressTimeout());
+      }
     } else if (desktopTouchOwner == v) {
-      desktopTouchX = point[0]; desktopTouchY = point[1];
-      if (action == MotionEvent.ACTION_UP || (action == MotionEvent.ACTION_POINTER_UP
-          && e.getPointerId(e.getActionIndex()) == desktopPointerId)) releaseDesktopTouch();
-      else if (action == MotionEvent.ACTION_MOVE) sendDesktopPointer("move", false, desktopTouchX, desktopTouchY);
+      float distance = (float) Math.hypot(e.getX(index) - desktopDownX, e.getY(index) - desktopDownY);
+      if (distance > android.view.ViewConfiguration.get(this).getScaledTouchSlop()) cancelDesktopLongPress();
+      if (desktopRightClick) {
+        if (action == MotionEvent.ACTION_UP) releaseDesktopTouch();
+        return true;
+      }
+      if (remoteScrollMode) {
+        desktopScrolling |= distance > android.view.ViewConfiguration.get(this).getScaledTouchSlop();
+        if (desktopScrolling && action == MotionEvent.ACTION_MOVE) {
+          scrollRemainder += (e.getY(index) - desktopScrollY) / dp(24);
+          int steps = (int) scrollRemainder; scrollRemainder -= steps;
+          sendDesktopWheel(desktopTouchX, desktopTouchY, steps);
+        }
+        desktopScrollY = e.getY(index);
+        if (action == MotionEvent.ACTION_UP) releaseDesktopTouch();
+        return true;
+      }
+      if (!desktopPointerPressed && (action == MotionEvent.ACTION_UP
+          || distance > android.view.ViewConfiguration.get(this).getScaledTouchSlop())) {
+        desktopPointerPressed = true;
+        sendDesktopPointer("button", true, desktopTouchX, desktopTouchY);
+      }
+      if (desktopPointerPressed) {
+        desktopTouchX = point[0]; desktopTouchY = point[1];
+        if (action == MotionEvent.ACTION_UP) releaseDesktopTouch();
+        else if (action == MotionEvent.ACTION_MOVE) sendDesktopPointer("move", false, desktopTouchX, desktopTouchY);
+      }
     }
     return true;
   }
 
   @Override public void onWindowFocusChanged(boolean hasFocus) {
     super.onWindowFocusChanged(hasFocus);
-    if (!hasFocus) releaseDesktopTouch();
-  }
-
-  private static float clamp(float value) {
-    return Math.max(0f, Math.min(1f, value));
+    if (!hasFocus) cancelDesktopGesture();
   }
 
   private final java.util.concurrent.ExecutorService io = java.util.concurrent.Executors.newSingleThreadExecutor();
   private volatile int generation;
 
   private void clearComposedFrame() {
-    releaseDesktopTouch();
+    if (remoteAudio != null) remoteAudio.setPlayback(null, false, "standard");
+    abandonAudioFocus();
+    cancelDesktopGesture();
+    desktopViewport.reset();
+    viewportPanMode = false;
+    remoteScrollMode = false;
+    viewportDisplay = Integer.MIN_VALUE;
+    inputDisplay = -1;
+    displayKnown = displayPending = displayInputBlocked = false;
+    displayFrameReady = false;
+    displayCount = 0; hostDisplay = -1;
+    lastDisplayState = displayError = "";
+    refreshViewport();
     if (composedFrame != null && !composedFrame.isRecycled()) composedFrame.recycle();
     composedFrame = null;
     composedWidth = composedHeight = 0;
@@ -641,31 +1043,25 @@ public final class MainActivity extends ComponentActivity {
     if (nativeVideo != null) nativeVideo.setVisibility(View.GONE);
   }
 
-  /** 讓 TextureView 以與 JPEG 相同的 contain 規則顯示影片，絕不拉伸來源。 */
+  /** TextureView 與 JPEG 使用相同可視區，影片與觸控共用縮放／平移轉換。 */
   private void updateVideoTransform() {
     if (nativeVideo == null || videoWidth <= 0 || videoHeight <= 0) return;
     int viewWidth = nativeVideo.getWidth();
     int viewHeight = nativeVideo.getHeight();
     if (viewWidth <= 0 || viewHeight <= 0) return;
-    float scale = Math.min(viewWidth / (float) videoWidth, viewHeight / (float) videoHeight);
+    DesktopViewport.Geometry area = desktopViewport.geometry(videoWidth, videoHeight, viewWidth, viewHeight);
     Matrix matrix = new Matrix();
-    matrix.setScale(videoWidth * scale / viewWidth, videoHeight * scale / viewHeight,
-        viewWidth * 0.5f, viewHeight * 0.5f);
+    matrix.setScale(area.width / viewWidth, area.height / viewHeight);
+    matrix.postTranslate(area.left, area.top);
     nativeVideo.setTransform(matrix);
+    // 靜止桌面可能沒有下一張解碼影格，仍須立即重繪新的可視區。
+    nativeVideo.invalidate();
   }
 
   private float[] mapVideoTouch(float x, float y) {
     if (videoWidth <= 0 || videoHeight <= 0 || nativeVideo == null
         || nativeVideo.getWidth() <= 0 || nativeVideo.getHeight() <= 0) return null;
-    float scale = Math.min(nativeVideo.getWidth() / (float) videoWidth,
-        nativeVideo.getHeight() / (float) videoHeight);
-    float drawnWidth = videoWidth * scale;
-    float drawnHeight = videoHeight * scale;
-    float left = (nativeVideo.getWidth() - drawnWidth) * 0.5f;
-    float top = (nativeVideo.getHeight() - drawnHeight) * 0.5f;
-    if (x < left || x >= left + drawnWidth || y < top || y >= top + drawnHeight) return null;
-    return new float[]{clamp((x - left) / Math.max(1f, drawnWidth)),
-        clamp((y - top) / Math.max(1f, drawnHeight))};
+    return desktopViewport.geometry(videoWidth, videoHeight, nativeVideo.getWidth(), nativeVideo.getHeight()).mapTouch(x, y);
   }
 
   private boolean presentVideoFrame(EncodedVideoFrame frame) {
@@ -686,9 +1082,9 @@ public final class MainActivity extends ComponentActivity {
     pumpRenderedFrames += rendered;
     if (rendered > 0 && web != null) {
       String label = frame.codec == 1 ? "H.264" : "HEVC";
-      web.evaluateJavascript("window.desktopFrameStatus&&window.desktopFrameStatus(" + frame.width + "," + frame.height + ",false,'" + label + "'," + 0 + ")", null);
+      web.evaluateJavascript("window.desktopFrameStatus&&window.desktopFrameStatus(" + frame.width + "," + frame.height + ",false,'" + label + "'," + viewportDisplay + ")", null);
     }
-    if (rendered > 0) videoKeyframeRequested = false;
+    if (rendered > 0) { videoKeyframeRequested = false; markDisplayFramePresented(); }
     return rendered > 0;
   }
 
@@ -781,14 +1177,27 @@ public final class MainActivity extends ComponentActivity {
     terminal = null;
     new Thread(previous::close).start();
     setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR);
+    getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
     web.loadUrl("https://appassets.androidplatform.net/assets/index.html");
   }
 
+  private void endSession(String message) {
+    homeMessage = message;
+    leaveShell();
+  }
+
   private void startNativeFramePump(Viewer session, int epoch) {
+    final long started = android.os.SystemClock.uptimeMillis();
     uiHandler.post(new Runnable() {
       @Override public void run() {
-        if (epoch != generation || !inDesktop || session != viewer) return;
+        if (epoch != generation || !inDesktop || session != viewer || isDestroyed()) return;
+        if (!foreground) { uiHandler.postDelayed(this, 250); return; }
+        if (!session.isConnected()) { endSession("遠端已斷線，請重新連線。"); return; }
+        if (!desktopPageReady && android.os.SystemClock.uptimeMillis() - started > 30000) {
+          endSession("連線已建立，但未收到桌面影像。請確認 Host 的螢幕擷取權限後重試。"); return;
+        }
         pumpRenderedFrames = 0;
+        updateDisplayState(session);
         sendPendingVideoCapabilities();
         if (session.consumeFrameRecoveryRequest()) {
           jpegPolicy.invalidate();
@@ -796,7 +1205,7 @@ public final class MainActivity extends ComponentActivity {
           requestVideoKeyframe();
         }
         if (videoMode) {
-          int drained = videoDecoder.drainOutput();
+          int drained = drainVideoFrames();
           if (drained < 0) { withdrawFailedVideoCodec(); requestVideoKeyframe(); }
           else pumpRenderedFrames += drained;
           if (videoDecoder.needsKeyframe()) requestVideoKeyframe();
@@ -827,8 +1236,10 @@ public final class MainActivity extends ComponentActivity {
     nativeScreen.setVisibility(videoMode ? View.GONE : View.VISIBLE);
     nativeVideo.setVisibility(videoMode ? View.VISIBLE : View.GONE);
     updateVideoTransform();
+    resetBackPosition();
     nativeBack.setVisibility(View.VISIBLE);
     desktopTools.setVisibility(View.VISIBLE);
+    refreshRemoteAudio();
     setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
     web.loadUrl("https://appassets.androidplatform.net/assets/desktop.html");
     // 影格已先在原生基底合成；頁面載入完成後補上尺寸提示與目前統計。
@@ -916,6 +1327,7 @@ public final class MainActivity extends ComponentActivity {
           scaleButton.setContentDescription("來源解析度 " + effective.optInt("width") + " × " + effective.optInt("height"));
       }
       scaleButton.setText("\uf390  " + selectedScale);
+      refreshRemoteAudio();
     } catch (Exception ignored) { }
   }
 
@@ -926,6 +1338,7 @@ public final class MainActivity extends ComponentActivity {
       int codec = o.optInt("codec", -1);
       long sequence = o.optLong("sequence", 0);
       int display = o.optInt("display", -1);
+      if (displayPending || (displayKnown && (hostDisplay < 0 || display != hostDisplay))) return false;
       int fullWidth = o.optInt("width", 0);
       int fullHeight = o.optInt("height", 0);
       int x = o.optInt("x", 0);
@@ -943,6 +1356,11 @@ public final class MainActivity extends ComponentActivity {
         // H.264／HEVC 影格由 MediaCodec 直接輸出到 TextureView；這類影格不參與
         // JPEG 差分基底，避免兩種 renderer 互相覆蓋。
         if (x != 0 || y != 0) return false;
+        if (viewportDisplay != display) {
+          if (!keyframe) { requestVideoKeyframe(); return false; }
+          videoDecoder.reset();
+          pendingVideoFrame = null;
+        }
         if (videoSequence > 0 && sequence <= videoSequence) return false;
         if ((disabledVideoCodecs & (1 << codec)) != 0) return false;
         byte[] payload = Base64.decode(encoded, Base64.DEFAULT);
@@ -963,6 +1381,7 @@ public final class MainActivity extends ComponentActivity {
           requestVideoKeyframe();
         }
         videoSequence = sequence;
+        updateViewportDisplay(display);
         boolean rendered = presentVideoFrame(frame);
         if (desktopPageReady) {
           nativeScreen.setVisibility(View.GONE);
@@ -992,6 +1411,7 @@ public final class MainActivity extends ComponentActivity {
         requestVideoKeyframe();
         return false;
       }
+      updateViewportDisplay(display);
 
       boolean replace = keyframe || composedFrame == null || composedWidth != fullWidth || composedHeight != fullHeight
           || composedDisplay != display;
@@ -1016,8 +1436,9 @@ public final class MainActivity extends ComponentActivity {
       pumpRenderedFrames++;
       Rect dirty = new Rect(x, y, x + patchWidth, y + patchHeight);
       nativeScreen.setFrame(composedFrame, dirty, replace);
+      markDisplayFramePresented();
       if (keyframe) {
-        web.evaluateJavascript("window.desktopFrameStatus&&window.desktopFrameStatus(" + fullWidth + "," + fullHeight + ",true)", null);
+        web.evaluateJavascript("window.desktopFrameStatus&&window.desktopFrameStatus(" + fullWidth + "," + fullHeight + ",true,'JPEG'," + display + ")", null);
       }
       return true;
     } catch (Exception ignored) {
@@ -1055,14 +1476,16 @@ public final class MainActivity extends ComponentActivity {
   }
 
   /** 原生 View 只 invalidate 變動區域；合成資料仍保留完整桌面基底。 */
-  private static final class DeltaImageView extends ImageView {
+  private static final class DeltaImageView extends View {
     private final Paint paint = new Paint();
     private final Rect source = new Rect();
     private final RectF destination = new RectF();
+    private final DesktopViewport viewport;
     private Bitmap frame;
 
-    DeltaImageView(Context context) {
+    DeltaImageView(Context context, DesktopViewport viewport) {
       super(context);
+      this.viewport = viewport;
       paint.setFilterBitmap(false);
       setWillNotDraw(false);
     }
@@ -1099,10 +1522,7 @@ public final class MainActivity extends ComponentActivity {
       if (bitmap == null || bitmap.isRecycled() || getWidth() <= 0 || getHeight() <= 0) {
         return null;
       }
-      computeDestination(bitmap, destination);
-      if (!destination.contains(x, y)) return null;
-      return new float[]{clamp((x - destination.left) / Math.max(1f, destination.width())),
-          clamp((y - destination.top) / Math.max(1f, destination.height()))};
+      return viewport.geometry(bitmap.getWidth(), bitmap.getHeight(), getWidth(), getHeight()).mapTouch(x, y);
     }
 
     @Override protected void onSizeChanged(int w, int h, int oldw, int oldh) {
@@ -1122,12 +1542,8 @@ public final class MainActivity extends ComponentActivity {
 
     /** 將來源完整畫面以統一縮放係數置中，剩餘區域保留黑邊。 */
     private void computeDestination(Bitmap bitmap, RectF out) {
-      float scale = Math.min(getWidth() / (float) bitmap.getWidth(),
-          getHeight() / (float) bitmap.getHeight());
-      float width = bitmap.getWidth() * scale;
-      float height = bitmap.getHeight() * scale;
-      out.set((getWidth() - width) * 0.5f, (getHeight() - height) * 0.5f,
-          (getWidth() + width) * 0.5f, (getHeight() + height) * 0.5f);
+      DesktopViewport.Geometry area = viewport.geometry(bitmap.getWidth(), bitmap.getHeight(), getWidth(), getHeight());
+      out.set(area.left, area.top, area.left + area.width, area.top + area.height);
     }
   }
 
@@ -1145,7 +1561,7 @@ public final class MainActivity extends ComponentActivity {
     if (!qrScanning || isDestroyed()) return;
     if (grantResults.length > 0 && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED)
       startQrScannerOnMain();
-    else stopQrScannerOnMain();
+    else { stopQrScannerOnMain(); cameraStatus("未取得相機權限，可改用貼上 QR 連結或手動輸入。"); }
   }
 
   private void startQrScannerOnMain() {
@@ -1170,17 +1586,23 @@ public final class MainActivity extends ComponentActivity {
         } catch (Exception error) {
           Log.w("YourDeskCamera", "相機初始化失敗", error);
           stopQrScannerOnMain();
+          cameraStatus("相機無法啟動，可改用貼上 QR 連結或手動輸入。");
         }
       }, ContextCompat.getMainExecutor(this));
     } catch (Exception error) {
       stopQrScannerOnMain();
+      cameraStatus("相機無法啟動，可改用貼上 QR 連結或手動輸入。");
     }
+  }
+
+  private void cameraStatus(String message) {
+    if (web != null && !isDestroyed()) web.evaluateJavascript("window.cameraStatus&&window.cameraStatus("
+        + org.json.JSONObject.quote(message) + ")", null);
   }
 
   private void stopQrScannerOnMain() {
     qrScanning = false;
     qrGeneration++;
-    if (qrPreview != null) qrPreview.setVisibility(View.GONE);
     if (qrAnalysis != null) {
       qrAnalysis.clearAnalyzer();
       if (qrCameraProvider != null) qrCameraProvider.unbind(qrAnalysis);
@@ -1190,6 +1612,7 @@ public final class MainActivity extends ComponentActivity {
     if (qrScanner != null) { qrScanner.close(); qrScanner = null; }
   }
 
+  @androidx.annotation.OptIn(markerClass = androidx.camera.core.ExperimentalGetImage.class)
   private void analyzeQr(ImageProxy proxy, int epoch) {
     final BarcodeScanner scanner = qrScanner;
     if (!qrScanning || epoch != qrGeneration || scanner == null || proxy.getImage() == null || isDestroyed()) {
@@ -1234,27 +1657,24 @@ public final class MainActivity extends ComponentActivity {
   }
 
   final class Bridge {
-    @JavascriptInterface public String loadSites() {
-      return getPreferences(0).getString("siteLibrary", "[]");
+    @JavascriptInterface public String loadSites() { return siteStore.loadSites(); }
+    @JavascriptInterface public boolean saveSites(String json) { return siteStore.saveSites(json); }
+    @JavascriptInterface public String saveSite(String json, String original, String secret, boolean forget) {
+      return siteStore.saveSite(json, original, secret, forget);
     }
-    @JavascriptInterface public boolean saveSites(String json) {
-      try {
-        org.json.JSONArray input = new org.json.JSONArray(json);
-        if (input.length() > 2000) return false;
-        org.json.JSONArray clean = new org.json.JSONArray();
-        java.util.HashSet<String> ids = new java.util.HashSet<>();
-        for (int i = 0; i < input.length(); i++) {
-          org.json.JSONObject site = input.getJSONObject(i);
-          String id = site.getString("id").trim();
-          String name = site.getString("name").trim();
-          if (id.isEmpty() || name.isEmpty() || !ids.add(id)) return false;
-          clean.put(new org.json.JSONObject().put("id", id).put("name", name)
-              .put("note", site.optString("note", "")).put("signal", site.optString("signal", ""))
-              .put("online", false).put("terminal", site.optBoolean("terminal", true))
-              .put("desktop", site.optBoolean("desktop", true)));
-        }
-        return getPreferences(0).edit().putString("siteLibrary", clean.toString()).commit();
-      } catch (Exception e) { return false; }
+    @JavascriptInterface public boolean deleteSite(String key) { return siteStore.deleteSite(key); }
+    @JavascriptInterface public String rememberedSecret(String room, String signal) {
+      return siteStore.rememberedSecret(room, signal);
+    }
+    @JavascriptInterface public boolean rememberCredentialsFor(String room, String signal, String secret) {
+      return siteStore.remember(room, signal, secret);
+    }
+    @JavascriptInterface public boolean rememberCredentials(String room, String secret) {
+      return siteStore.remember(room, "", secret);
+    }
+    @JavascriptInterface public String appVersion() {
+      try { return getPackageManager().getPackageInfo(getPackageName(), 0).versionName; }
+      catch (Exception error) { return ""; }
     }
 
     @JavascriptInterface public void startQrScanner() {
@@ -1270,65 +1690,6 @@ public final class MainActivity extends ComponentActivity {
     @JavascriptInterface public void requestCameraPermission() {
       runOnUiThread(MainActivity.this::requestCameraPermissionOnMain);
     }
-    private final Object credentialLock = new Object();
-
-    private javax.crypto.SecretKey key() throws Exception {
-      java.security.KeyStore ks = java.security.KeyStore.getInstance("AndroidKeyStore");
-      ks.load(null);
-      if (!ks.containsAlias("shell")) {
-        javax.crypto.KeyGenerator g = javax.crypto.KeyGenerator.getInstance("AES", "AndroidKeyStore");
-        g.init(new android.security.keystore.KeyGenParameterSpec.Builder("shell", android.security.keystore.KeyProperties.PURPOSE_ENCRYPT | android.security.keystore.KeyProperties.PURPOSE_DECRYPT)
-            .setBlockModes(android.security.keystore.KeyProperties.BLOCK_MODE_GCM).setEncryptionPaddings(android.security.keystore.KeyProperties.ENCRYPTION_PADDING_NONE).build());
-        g.generateKey();
-      }
-      return (javax.crypto.SecretKey) ks.getKey("shell", null);
-    }
-
-    @JavascriptInterface public String remembered() {
-      synchronized (credentialLock) {
-        try {
-          String value = getPreferences(0).getString("credentials", "");
-          if (value.isEmpty()) return "{}";
-          String[] parts = value.split(":", -1);
-          if (parts.length != 2) return "{}";
-          javax.crypto.Cipher c = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding");
-          c.init(2, key(), new javax.crypto.spec.GCMParameterSpec(128, Base64.decode(parts[0], Base64.NO_WRAP)));
-          return new String(c.doFinal(Base64.decode(parts[1], Base64.NO_WRAP)), java.nio.charset.StandardCharsets.UTF_8);
-        } catch (Exception e) { return "{}"; }
-      }
-    }
-
-    /**
-     * 以同步 commit 確保使用者按下連接後，即使頁面立即切換或程序被回收，
-     * 加密憑證也已落盤。回傳值讓 JS 可在清除輸入框前確認寫入成功。
-     */
-    @JavascriptInterface public boolean rememberCredentials(String room, String secret) {
-      synchronized (credentialLock) {
-        try {
-          if (room == null || room.trim().isEmpty()) return false;
-          String normalized = room.trim();
-          org.json.JSONObject stored = new org.json.JSONObject(remembered());
-          org.json.JSONObject sites = stored.optJSONObject("sites");
-          if (sites == null) {
-            sites = new org.json.JSONObject();
-            if (stored.optString("room", "").equals(normalized)) sites.put(normalized, stored.optString("secret", ""));
-          }
-          if (secret == null || secret.isEmpty()) sites.remove(normalized); else sites.put(normalized, secret);
-          if (sites.length() == 0) return getPreferences(0).edit().remove("credentials").commit();
-          javax.crypto.Cipher c = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding");
-          c.init(1, key());
-          String json = new org.json.JSONObject().put("sites", sites).toString();
-          String encrypted = Base64.encodeToString(c.getIV(), Base64.NO_WRAP) + ":" + Base64.encodeToString(
-              c.doFinal(json.getBytes(java.nio.charset.StandardCharsets.UTF_8)), Base64.NO_WRAP);
-          boolean committed = getPreferences(0).edit().remove("room").putString("credentials", encrypted).commit();
-          return committed && getPreferences(0).contains("credentials");
-        } catch (Exception e) {
-          runOnUiThread(() -> android.widget.Toast.makeText(MainActivity.this, "密碼保存失敗", android.widget.Toast.LENGTH_SHORT).show());
-          return false;
-        }
-      }
-    }
-
     // 使用 WebView 實際比例換算 CSS 座標，旋轉與密度變更共用同一配置。
     @JavascriptInterface public void desktopLayout(double top, double viewportWidth) {
       if (!Double.isFinite(top) || !Double.isFinite(viewportWidth) || top < 0 || viewportWidth <= 0) return;
@@ -1359,13 +1720,25 @@ public final class MainActivity extends ComponentActivity {
 
     @JavascriptInterface public String sendControlJSON(String payload) {
       try {
-        String type = new org.json.JSONObject(payload).optString("type");
+        org.json.JSONObject control = new org.json.JSONObject(payload);
+        String type = control.optString("type");
         // WebView 僅處理鍵盤；指標事件必須由原生影像邊界檢查後送出。
         if (type.equals("move") || type.equals("button") || type.equals("wheel")) return "native pointer only";
-        viewer.sendControlJSON(payload);
+        if (type.equals("display-select") || type.equals("display-next")) return "native display selection only";
+        if (displayInputBlocked) return "螢幕切換中，請等待新畫面";
+        if (inputDisplay >= 0) control.put("display", inputDisplay);
+        viewer.sendControlJSON(control.toString());
         return "ok";
       }
       catch (Exception e) { return e.getMessage() == null ? "send failed" : e.getMessage(); }
+    }
+
+    @JavascriptInterface public String displayStateJSON() {
+      return viewer.displayStateJSON();
+    }
+
+    @JavascriptInterface public void selectDisplay(int display) {
+      runOnUiThread(() -> selectRemoteDisplay(display));
     }
 
     @JavascriptInterface public boolean supportsTextInput() {
@@ -1410,6 +1783,8 @@ public final class MainActivity extends ComponentActivity {
     // 主畫面完成認證與通道開啟後才切頁；憑證不放入 URL。
     @JavascriptInterface public void connectSession(String payload) {
       runOnUiThread(() -> {
+        if (isDestroyed() || io.isShutdown()) return;
+        stopQrScannerOnMain();
         final int epoch = ++generation;
         final Viewer previous = viewer;
         final Viewer session = new Viewer();
@@ -1438,6 +1813,7 @@ public final class MainActivity extends ComponentActivity {
               inTerminal = mode.equals("shell");
               inDesktop = mode.equals("desktop");
               updateKeyboardLayout();
+              getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
               if (inDesktop) {
                 clearComposedFrame();
                 desktopPageReady = false;
@@ -1463,9 +1839,14 @@ public final class MainActivity extends ComponentActivity {
     }
 
     @JavascriptInterface public void closeTerminal() { runOnUiThread(MainActivity.this::leaveShell); }
+    @JavascriptInterface public void sessionFailed() {
+      runOnUiThread(() -> { if (inTerminal || inDesktop) endSession("遠端工作階段已結束，請重新連線。"); });
+    }
 
     @JavascriptInterface public void request(String payload) {
       final int epoch = generation;
+      final TerminalSession requested = terminal;
+      if (io.isShutdown()) return;
       io.execute(() -> {
         if (epoch != generation) return;
         org.json.JSONObject reply = new org.json.JSONObject();
@@ -1473,11 +1854,11 @@ public final class MainActivity extends ComponentActivity {
           org.json.JSONObject in = new org.json.JSONObject(payload);
           reply.put("id", in.getInt("id"));
           String method = in.getString("method");
-          if (terminal == null) throw new Exception("尚未建立 Shell 連線");
+          if (requested == null) throw new Exception("尚未建立 Shell 連線");
           switch (method) {
-            case "read": reply.put("result", new org.json.JSONObject(terminal.readJSON(in.getLong("ack")))); break;
-            case "write": terminal.write(Base64.decode(in.getString("data"), Base64.DEFAULT)); break;
-            case "resize": terminal.resize(in.getInt("columns"), in.getInt("rows")); break;
+            case "read": reply.put("result", new org.json.JSONObject(requested.readJSON(in.getLong("ack")))); break;
+            case "write": requested.write(Base64.decode(in.getString("data"), Base64.DEFAULT)); break;
+            case "resize": requested.resize(in.getInt("columns"), in.getInt("rows")); break;
             default: throw new Exception("不支援的操作");
           }
         } catch (Exception e) {
@@ -1490,24 +1871,68 @@ public final class MainActivity extends ComponentActivity {
     }
   }
 
+  private static boolean isLocalAsset(android.net.Uri uri) {
+    return "https".equals(uri.getScheme()) && "appassets.androidplatform.net".equals(uri.getHost())
+        && uri.getPort() == -1 && uri.getUserInfo() == null && uri.getPath() != null
+        && uri.getPath().startsWith("/assets/");
+  }
+
+  @Override protected void onResume() {
+    super.onResume();
+    foreground = true;
+    if (web != null) web.onResume();
+    if (inDesktop) {
+      jpegPolicy.invalidate();
+      videoKeyframeRequested = false;
+      lastKeyframeRequestMs = 0;
+      requestVideoKeyframe();
+    }
+    refreshRemoteAudio();
+  }
+
+  @Override protected void onPause() {
+    foreground = false;
+    refreshRemoteAudio();
+    cancelDesktopGesture();
+    videoDecoder.reset();
+    if (web != null) web.onPause();
+    super.onPause();
+  }
+
+  @Override protected void onStop() {
+    if (qrScanning && !cameraPermissionPending) {
+      stopQrScannerOnMain();
+      cameraStatus("掃描已暫停，請按重新掃描。");
+    }
+    super.onStop();
+  }
+
   @Override protected void onDestroy() {
     stopQrScannerOnMain();
     uiHandler.removeCallbacksAndMessages(null);
     if (fullscreenExitGesture != null) fullscreenExitGesture.reset();
-    if (android.os.Build.VERSION.SDK_INT >= 33 && systemBackCallback != null) {
-      getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(systemBackCallback);
-    }
     generation++;
     clearComposedFrame();
+    remoteAudio.close();
+    unregisterReceiver(audioNoisyReceiver);
     new Thread(viewer::close).start();
     io.shutdown();
     if (web != null) { web.removeJavascriptInterface("YourDesk"); web.destroy(); }
     super.onDestroy();
   }
 
-  @Override public void onBackPressed() {
+  private void handleBackNavigation() {
     if (desktopFullscreen) setDesktopFullscreen(false);
     else if (inTerminal || inDesktop) leaveShell();
-    else super.onBackPressed();
+    else if (web != null) web.evaluateJavascript("window.dismissOverlay ? window.dismissOverlay() : false", result -> {
+      if (!"true".equals(result) && !isDestroyed()) dispatchDefaultBack();
+    });
+    else dispatchDefaultBack();
+  }
+
+  private void dispatchDefaultBack() {
+    backCallback.setEnabled(false);
+    try { getOnBackPressedDispatcher().onBackPressed(); }
+    finally { backCallback.setEnabled(true); }
   }
 }

@@ -4,13 +4,14 @@
 
 > **防毒偵測說明：目前部分防毒軟體會對 YourDesk 發出告警。我們測試的空 Go 專案也出現告警，Go 官方 FAQ 亦說明 Go 程式可能遭誤判；但目前尚未確認正式版的所有告警都是誤報。作者會持續調查與改善，朝消除這些告警的方向努力。請自行評估後下載使用，勿為此關閉防毒保護。**
 
-YourDesk 是支援 macOS 與 Windows 的遠端桌面工具。從連線、站台管理到跨平台複製貼上，讓你在熟悉的操作方式中使用另一台電腦。
+YourDesk 提供 macOS／Windows 遠端桌面工具與 Android 手機 Viewer，可從電腦或手機連線至遠端電腦。桌面版另支援跨平台複製貼上與獨立檔案傳輸。
 
 ![YourDesk 操作示範：群組、搜尋、新增站台、外觀與快速連線](images/yourdesk-demo.gif)
 
 ## 特色與功能
 
 - **遠端桌面與命令列**：支援 GUI 與互動 CMD，可依工作選擇模式；命令列使用獨立視窗，亦可連入 Linux CLI Host。
+- **Android 手機操作**：支援雙指縮放與拖移、長按右鍵、遠端捲動、多螢幕切換、遠端聲音及 Shell；可手動新增站台或掃描 QR Code 匯入。[功能、操作與限制](docs/ANDROID-BUILD.md)。
 - **獨立檔案傳輸**：macOS／Windows 以專用視窗瀏覽遠端磁碟、複選上傳與下載、建立目錄及確認後永久刪除；資料夾優先、隱藏項目不顯示，支援暫停、手動重連續傳及進度顯示。下載直接選擇本機目的資料夾，不需開啟遠端桌面或同步剪貼簿；[操作與限制](docs/FILE-TRANSFER.md)。
 - **MCP AI Agent 遠端操控**：AI Agent 可透過 MCP 連線遠端、操作桌面或命令列、查詢站台能力，完成工作後斷線。
 - **硬體編解碼加速**：支援 macOS H.264／HEVC 與 Windows H.264／AV1 正式硬體編碼路徑，Windows 另提供 H.264／HEVC／AV1 軟解；依兩端裝置能力自動選擇，無法使用時切換備援路徑，工具列可查看實際編解碼狀態。
@@ -42,7 +43,7 @@ IP 白名單預設開啟且只允許 `127.0.0.1`；名單內免 Token、名單�
 
 ## 下載與開始使用
 
-從 [GitHub Releases](https://github.com/VaderChen/YourDesk/releases/latest) 下載最新版。
+桌面版從 [GitHub Releases](https://github.com/VaderChen/YourDesk/releases/latest) 下載；手機版請使用 [Android 1.26.1001 build 1524 發行頁](https://github.com/VaderChen/YourDesk/releases/tag/android-1.26.1001-build-1524)。
 
 本文件介紹原始碼提供的功能；已發布安裝包實際包含的功能，請以對應發行說明為準。
 
@@ -52,10 +53,13 @@ IP 白名單預設開啟且只允許 `127.0.0.1`；名單內免 Token、名單�
 | Windows x64 | Windows x64 安裝程式／免安裝 ZIP（完整解壓縮後執行 YourDesk.exe） |
 | Windows on ARM（WOA） | Windows ARM64 安裝程式 |
 | Linux x64／arm64 | CLI Host ZIP（無桌面／REMOTE） |
+| Android 8.0 以上／arm64 | [正式簽章 APK](https://github.com/VaderChen/YourDesk/releases/download/android-1.26.1001-build-1524/YourDesk-1.26.1001-build-1524-android-arm64.apk)（手機 Viewer） |
 
 1. 在兩台電腦安裝並開啟 YourDesk。
 2. 在快速連線輸入遠端 ID，或選擇已儲存的站台。
 3. 輸入連線密碼後，即可開始操作遠端桌面。
+
+Android 請在手機安裝 APK，並在被控電腦執行 YourDesk Host。雙指開合／拖移調整可視區，長按為右鍵；工具列百分比選單可切換遠端捲動，頂端選單切換螢幕，喇叭按鈕開啟聲音。手機版尚未提供剪貼簿同步、獨立檔案傳輸或手機被控模式；[本版功能、安裝注意事項與驗證結果](docs/ANDROID-RELEASE-2026-10-01.md)。
 
 macOS 使用遠端桌面時需允許「螢幕錄製」與「輔助使用」權限。透過剪貼簿接收遠端檔案時，若詢問「網路卷宗」存取，請允許；曾拒絕時可到「系統設定 → 隱私權與安全性 → 檔案與檔案夾」開啟 YourDesk 的網路卷宗權限，再重新複製檔案。Windows 需要 WebView2 Runtime。目前不支援 Intel Mac，亦未提供 Linux 桌面版。
 
@@ -82,7 +86,7 @@ macOS 使用遠端桌面時需允許「螢幕錄製」與「輔助使用」權�
 - [連線測速與分析](docs/CONNECTION-DIAGNOSTICS.md) · [串流設定與相容性](docs/STREAMING-CONTROLS.md)
 - [桌面檔案傳輸](docs/FILE-TRANSFER.md) · [遠端命令列](docs/TERMINAL.md)
 - [建置與打包](docs/BUILD.md) · [架構說明](docs/ARCHITECTURE.md)
-- [Android Viewer 建置與測試（開發中）](docs/ANDROID-BUILD.md) · [記憶體最佳化紀錄](docs/MEMORY-OPTIMIZATION-2026-09-19.md)
+- [Android Viewer 發行、簽章與測試](docs/ANDROID-BUILD.md) · [記憶體最佳化紀錄](docs/MEMORY-OPTIMIZATION-2026-09-19.md)
 - [畫面增強模型](docs/QUICKSRNET.md) · [實驗性補幀](docs/FRAME-INTERPOLATION.md)
 
 畫面處理使用 FSR、QuickSRNet／SESR 與 RIFE。感謝原作者提供相關技術；[FSR](docs/FSR-LICENSE.txt)、[超解析度模型](internal/superres/MODEL_LICENSE.txt)及 [RIFE](internal/frameinterp/MODEL_LICENSE.txt) 的完整授權亦隨套件附上。

@@ -1,0 +1,6 @@
+CameraX camera-core 1.6.2
+Copyright 2024 The Android Open Source Project
+
+YourDesk 僅從官方來源重新連結 arm64 surface_util_jni，以符合 16 KB PT_LOAD／GNU_RELRO 對齊；Java API 與其他原生庫維持上游內容。
+來源：https://android.googlesource.com/platform/frameworks/support/+/988ac9734e8223273eb7f186ee1639ee68deb025/camera/camera-core/src/main/cpp/surface_util_jni.cc?format=TEXT
+建置配方與來源雜湊位於專案 scripts/android_native.py 及 android/third_party/camera-core/provenance.json。

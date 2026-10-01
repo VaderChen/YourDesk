@@ -24,6 +24,10 @@ func (v *Viewer) receiveStreamControl(c p2p.Control, generation uint64) {
 	if v.generation != generation {
 		return
 	}
+	if c.Type == "displays" {
+		v.receiveDisplaysLocked(c)
+		return
+	}
 	// Current desktop Hosts piggyback this on keyboard-capabilities; accept
 	// the dedicated envelope too for forward/backward compatibility.
 	if (c.Type == "stream-capabilities" || c.Type == "keyboard-capabilities") && c.StreamCapabilities != nil {

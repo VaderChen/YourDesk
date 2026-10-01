@@ -26,7 +26,8 @@ Opus 使用 48 kHz 雙聲道、20 ms／960 取樣框，受限可變碼率、音�
 
 - macOS 13 以上：ScreenCaptureKit 擷取系統聲音、libopus／AudioToolbox 編解碼、AudioQueue 播放。沿用系統螢幕／音訊錄製授權；權限不足時回報錯誤，不修改 TCC。擷取排除擷取程序自己的聲音。
 - Windows：WASAPI loopback 擷取預設輸出裝置、libopus／Media Foundation AAC 編解碼、WASAPI 播放；以共用模式轉換成統一 PCM 格式。先列舉硬體 MFT 並實測，再使用軟體 MFT。原生資源的建立、操作和釋放固定在同一 OS 執行緒。
-- 其他平台目前不提供原生音訊。擷取與播放使用作業系統元件；Opus 靜態連結，不增加外部音訊執行檔或編解碼 DLL。
+- Android 8.0 以上的 arm64 Viewer：沿用 `audio-v1`，以系統 MediaCodec 解碼 Opus／AAC，AudioTrack 播放雙聲道 PCM；也可直接接收 PCM。不提供手機端音訊擷取，沒有錄音權限。喇叭按鈕預設關閉，採共同格式自動協商與失敗備援；[Android 操作與驗證](ANDROID-BUILD.md#遠端聲音)。
+- 其他平台目前不提供原生音訊。桌面擷取與播放使用作業系統元件，Opus 靜態連結；Android 使用系統解碼器，皆不增加外部音訊執行檔或編解碼 DLL。
 
 播放／擷取裝置在開啟時選擇預設裝置；若作業系統切換裝置使原資源失效，會停止聲音並顯示錯誤，可關閉再開啟此開關以重新選擇。安全桌面、未登入工作階段及個別裝置驅動的收音能力仍由作業系統決定。
 
@@ -49,6 +50,8 @@ Opus 使用 48 kHz 雙聲道、20 ms／960 取樣框，受限可變碼率、音�
 - Mac Client／顯示區域完整影音建置、Windows x64 Client／顯示區域，以及 Windows ARM64 原生音訊測試程式交叉編譯通過。Windows 實際 WASAPI／Opus／AAC／播放、Mac ↔ Windows 音訊互通及長時間裝置切換尚待實機驗證。
 
 可執行 `python3 scripts/opus.py darwin/arm64 go test ./internal/remoteaudio ./internal/p2p ./internal/hostsession ./cmd/remote` 及 `scripts/smoke-audio-settings.cjs`。`YOURDESK_AUDIO_SMOKE=1` 才會開啟原生裝置測試；Mac 裝置 Smoke 必須由已簽署且具系統錄製權限的 APP 執行，未授權的臨時 Go test 執行檔會被 TCC 拒絕。
+
+2026-10-01 Android 補充：ASUS_I01WD／Android 11 的 Opus、AAC、PCM 實際解碼與 AudioTrack 播放，以及 Wi-Fi 協商、備援、靜音、焦點／背景暫停、耳機拔除回呼、斷線與重連均通過；完整批次與後續驗證結果見 [Android 發行說明](ANDROID-RELEASE-2026-10-01.md#驗證範圍)。測試使用合成音訊，驗證解碼內容不是靜音且播放游標前進，沒有錄製麥克風；實際藍牙／耳機插拔、通話及 Android 16 仍需對應環境驗收。
 
 ## 建置
 

@@ -42,9 +42,13 @@ type Viewer struct {
 	streamRequest      *streamconfig.Request
 	streamResult       *streamconfig.Result
 	streamError        string
+	displaySendMu      sync.Mutex
+	displays           displayState
 }
 
-func NewViewer() *Viewer                            { return &Viewer{awaitingKeyframe: true} }
+func NewViewer() *Viewer {
+	return &Viewer{awaitingKeyframe: true, displays: displayState{Current: -1, Requested: -1}}
+}
 func (v *Viewer) SetFrameHandler(h func(FrameInfo)) { v.mu.Lock(); v.onFrame = h; v.mu.Unlock() }
 func (v *Viewer) SetStateHandler(h func(string))    { v.mu.Lock(); v.onState = h; v.mu.Unlock() }
 func (v *Viewer) state(s string) {
@@ -133,6 +137,7 @@ func (v *Viewer) beginConnect() (context.Context, context.CancelFunc, uint64) {
 	generation := v.generation
 	v.peer, v.cancel = nil, cancel
 	v.resetStreamLocked()
+	v.resetDisplaysLocked()
 	v.frameMu.Lock()
 	v.resetFramesLocked(generation)
 	v.frameMu.Unlock()
@@ -154,6 +159,7 @@ func (v *Viewer) Close() {
 	v.peer = nil
 	v.cancel = nil
 	v.resetStreamLocked()
+	v.resetDisplaysLocked()
 	v.frameMu.Lock()
 	v.resetFramesLocked(v.generation)
 	v.frameMu.Unlock()
@@ -286,6 +292,22 @@ func (v *Viewer) TrafficJSON() string {
 		Received uint64 `json:"receivedBytes"`
 	}{sent, received})
 	return string(b)
+}
+
+// IsConnected 回報已認證且仍存活的工作階段，供手機顯示斷線狀態。
+func (v *Viewer) IsConnected() bool {
+	v.mu.Lock()
+	p := v.peer
+	v.mu.Unlock()
+	if p == nil {
+		return false
+	}
+	select {
+	case <-p.Done():
+		return false
+	default:
+		return true
+	}
 }
 
 // SupportsCommand 與 CallCommand 供 Android 在硬體解碼器重建後要求 Host

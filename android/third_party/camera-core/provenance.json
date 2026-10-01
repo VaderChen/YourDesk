@@ -1,0 +1,22 @@
+{
+  "upstreamVersion": "1.6.2",
+  "sourceCommit": "988ac9734e8223273eb7f186ee1639ee68deb025",
+  "files": {
+    "surface_util_jni.cc": {
+      "url": "https://android.googlesource.com/platform/frameworks/support/+/988ac9734e8223273eb7f186ee1639ee68deb025/camera/camera-core/src/main/cpp/surface_util_jni.cc?format=TEXT",
+      "sha256": "dd3f02712e359fa0b987bfef17661686fa130666674fca2d91405b50ab309779"
+    },
+    "jni.lds": {
+      "url": "https://android.googlesource.com/platform/frameworks/support/+/988ac9734e8223273eb7f186ee1639ee68deb025/camera/camera-core/src/main/cpp/jni.lds?format=TEXT",
+      "sha256": "b578ca06967ba7ff8d732eeb99a8e91917335d00f19fe2d44e7cb805946ee45c"
+    }
+  },
+  "aar": {
+    "url": "https://dl.google.com/dl/android/maven2/androidx/camera/camera-core/1.6.2/camera-core-1.6.2.aar",
+    "sha256": "ebd66f090414f4c12f23a55b5023aeee1b096da8a06c02a0b6fb3520c4ddadf6"
+  },
+  "pom": {
+    "url": "https://dl.google.com/dl/android/maven2/androidx/camera/camera-core/1.6.2/camera-core-1.6.2.pom",
+    "sha256": "cddb5bb0653654d8b7c2833484f4684d881dc7509411132e73a5fb4b167fd13c"
+  }
+}

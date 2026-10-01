@@ -18,6 +18,26 @@ const send=c=>{
   if(result!=='ok')desktopStatus.textContent='控制傳送失敗';
   return result==='ok';
 };
+const displaySelect=document.getElementById('display-select'),displayState=document.getElementById('display-state');
+let displayOptions='';
+window.desktopDisplays=state=>{
+  if(!state||!displaySelect)return;
+  const known=state.known===true,count=Number.isInteger(state.count)&&state.count>=0&&state.count<=64?state.count:0;
+  const signature=known+':'+count;
+  if(displayOptions!==signature){
+    displayOptions=signature;displaySelect.replaceChildren();
+    if(!known||!count){const option=document.createElement('option');option.textContent=known?'沒有可用螢幕':'等待螢幕資訊';displaySelect.append(option);}
+    else for(let i=0;i<count;i++){const option=document.createElement('option');option.value=String(i);option.textContent=`螢幕 ${i+1} / ${count}`;displaySelect.append(option);}
+  }
+  displaySelect.disabled=!known||count<2||state.pending===true;
+  if(known&&count)displaySelect.value=String(state.pending?state.requested:state.current);
+  displayState.textContent=state.pending?'切換中…':state.waitingFrame?'等待影像…':state.error?'切換未完成':'';
+  displayState.title=state.error||'';
+};
+displaySelect.addEventListener('change',()=>{
+  releaseKeys();window.YourDesk.selectDisplay(Number(displaySelect.value));
+});
+try{window.desktopDisplays(JSON.parse(window.YourDesk.displayStateJSON()));}catch{}
 // 滑鼠與觸控僅由實際繪製影像的原生 View 處理，背景 WebView 不轉送。
 const keyboardProxy=document.getElementById('keyboard-proxy');
 const pressedKeys=new Map();
@@ -78,7 +98,7 @@ keyboardProxy.addEventListener('beforeinput',e=>{
   if(key){e.preventDefault();tapKey(key);}
 });
 window.addEventListener('keydown',e=>{
-  if(stopped||isComposition(e))return;
+  if(stopped||e.target===displaySelect||isComposition(e))return;
   const printable=[...e.key].length===1;
   if(printable&&!e.ctrlKey&&!e.metaKey&&!e.altKey){
     if(canSendText()){

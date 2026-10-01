@@ -4,6 +4,7 @@ import static org.junit.Assert.*;
 
 import android.app.Instrumentation;
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -55,6 +56,7 @@ public class FullscreenEdgeSwipeTest {
   private Object originalFrame;
   private Rect originalBounds;
   private int originalBars;
+  private String localFrame;
 
   @Test public void nativePointerRejectsOutsideAndReentry() throws Exception {
     ui(() -> {
@@ -101,12 +103,12 @@ public class FullscreenEdgeSwipeTest {
     ByteArrayOutputStream bytes = new ByteArrayOutputStream();
     bitmap.compress(Bitmap.CompressFormat.JPEG, 90, bytes);
     bitmap.recycle();
-    String frame = new JSONObject().put("sequence", 1).put("display", 0)
+    localFrame = new JSONObject().put("sequence", 1).put("display", 0)
         .put("codec", 0).put("width", 1920).put("height", 1080).put("keyframe", true)
         .put("data", Base64.encodeToString(bytes.toByteArray(), Base64.NO_WRAP)).toString();
     ui(() -> {
       setField("inDesktop", true);
-      assertEquals(true, invoke("applyFrameJSON", new Class[]{String.class}, frame));
+      assertEquals(true, invoke("applyFrameJSON", new Class[]{String.class}, localFrame));
       originalViewer = field("viewer");
       originalFrame = field("composedFrame");
       invoke("showDesktopPage", new Class[]{originalViewer.getClass(), int.class},
@@ -209,14 +211,136 @@ public class FullscreenEdgeSwipeTest {
         && !(boolean) field("desktopFullscreen") && visibleBars() == originalBars));
   }
 
-  @Test public void jpegFullscreenFillsViewportAndIgnoresLateHeaderReports() throws Exception {
+  @Test public void closeButtonReturnsToHeaderAfterReconnect() throws Exception {
+    rotateDesktop(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+    // 返回首頁時按鈕已隱藏，但仍保有上一輪的 View 尺寸；此時轉直向再重連。
+    ui(() -> { invoke("leaveShell", new Class[]{}); return null; });
+    rotateDesktop(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+    await("首頁完成載入", () -> ui(() -> ((WebView) field("web")).getProgress() == 100
+        && ((WebView) field("web")).getUrl().endsWith("/index.html")));
+    ui(() -> {
+      setField("inDesktop", true);
+      assertEquals(true, invoke("applyFrameJSON", new Class[]{String.class}, localFrame));
+      invoke("showDesktopPage", new Class[]{originalViewer.getClass(), int.class}, field("viewer"), field("generation"));
+      return null;
+    });
+    rotateDesktop(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+    await("重連桌面完成載入", () -> ui(() -> ((WebView) field("web")).getProgress() == 100
+        && ((WebView) field("web")).getUrl().endsWith("/desktop.html")));
+    assertCloseInHeader();
+    await("旋轉動畫結束，關閉按鈕實際繪製到標題列", this::closeButtonIsRendered);
+    screenshot("07-close-reconnected.png");
+  }
+
+  @Test public void closeButtonFollowsHeaderInsetsAndFullscreen() {
+    rotateDesktop(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+    assertCloseInHeader();
+    // 模擬不同安全區與標題列高度；不能只使用某款手機的固定座標。
+    ui(() -> {
+      View root = (View) field("contentRoot");
+      root.setPadding(Math.round(dp(24)), Math.round(dp(30)), Math.round(dp(48)), Math.round(dp(22)));
+      return null;
+    });
+    instrumentation.waitForIdleSync();
+    assertCloseInHeader();
+    activity.new Bridge().desktopLayout(60, ui(() -> ((WebView) field("web")).getWidth() / (double) dp(1)));
+    await("標題列高度更新", () -> ui(() -> Math.abs((int) field("desktopHeaderMargin") - dp(60)) <= 1));
+    assertCloseInHeader();
+    enterFullscreen();
+    ui(() -> { invoke("setDesktopFullscreen", new Class[]{boolean.class}, false); return null; });
+    await("退出全螢幕還原關閉按鈕", () -> ui(() -> ((View) field("nativeBack")).isShown()
+        && visibleBars() == originalBars));
+    assertCloseInHeader();
+  }
+
+  @Test public void draggedCloseButtonSurvivesRotationAndClosesOnTap() {
+    rotateDesktop(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+    Rect start = closeBounds();
+    directGesture(start.exactCenterX(), start.exactCenterY(), dp(240), dp(140), MotionEvent.ACTION_UP);
+    assertTrue("拖曳不可關閉桌面", ui(() -> (boolean) field("inDesktop")));
+    Rect dragged = closeBounds();
+    assertTrue("關閉按鈕可移到使用者選擇的位置", Math.abs(dragged.centerX() - start.centerX()) > dp(40));
+    rotateDesktop(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+    assertCloseWithinSafeArea();
+    rotateDesktop(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+    assertCloseWithinSafeArea();
+    Rect restored = closeBounds();
+    assertEquals("往返旋轉仍保留拖曳位置", dragged.centerX(), restored.centerX(), 2);
+    assertEquals("往返旋轉仍保留拖曳位置", dragged.centerY(), restored.centerY(), 2);
+    long down = SystemClock.uptimeMillis();
+    // 與原生選單 Smoke 相同，經 Instrumentation 同步系統輸入視窗後點擊。
+    for (int action : new int[]{MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP}) {
+      MotionEvent event = MotionEvent.obtain(down, SystemClock.uptimeMillis(), action,
+          restored.exactCenterX(), restored.exactCenterY(), 0);
+      event.setSource(InputDevice.SOURCE_TOUCHSCREEN);
+      try { instrumentation.sendPointerSync(event); } finally { event.recycle(); }
+    }
+    await("點擊關閉按鈕返回首頁", () -> ui(() -> !(boolean) field("inDesktop")));
+    assertTrue("拖曳及關閉按鈕不得送出遠端觸控", remoteEvents.isEmpty());
+  }
+
+  private void rotateDesktop(int orientation) {
+    ui(() -> { activity.setRequestedOrientation(orientation); return null; });
+    await("畫面旋轉完成", () -> ui(() -> {
+      View root = (View) field("contentRoot");
+      return activity.hasWindowFocus() && !root.isLayoutRequested()
+          && ((root.getWidth() > root.getHeight()) == (orientation == ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE));
+    }));
+    try { instrumentation.getUiAutomation().waitForIdle(150, 3000); }
+    catch (java.util.concurrent.TimeoutException e) { throw new AssertionError("旋轉後介面未穩定", e); }
+  }
+
+  private Rect closeBounds() {
+    return ui(() -> { Rect rect = new Rect(); assertTrue(((View) field("nativeBack")).getGlobalVisibleRect(rect)); return rect; });
+  }
+
+  private boolean closeButtonIsRendered() {
+    Rect bounds = closeBounds();
+    Bitmap shot = instrumentation.getUiAutomation().takeScreenshot();
+    if (shot == null) return false;
+    try {
+      for (int x : new int[]{bounds.left + bounds.width() / 4, bounds.right - bounds.width() / 4}) {
+        if (x < 0 || x >= shot.getWidth() || bounds.centerY() < 0 || bounds.centerY() >= shot.getHeight()) return false;
+        int color = shot.getPixel(x, bounds.centerY());
+        if (Math.abs(Color.red(color) - 46) > 8 || Math.abs(Color.green(color) - 125) > 8
+            || Math.abs(Color.blue(color) - 91) > 8) return false;
+      }
+      return true;
+    } finally { shot.recycle(); }
+  }
+
+  private void assertCloseWithinSafeArea() {
+    ui(() -> {
+      View root = (View) field("contentRoot"), button = (View) field("nativeBack");
+      assertTrue("關閉按鈕不能超出左側安全區", button.getX() >= root.getPaddingLeft());
+      assertTrue("關閉按鈕不能超出頂端安全區", button.getY() >= root.getPaddingTop());
+      assertTrue("關閉按鈕不能超出右側安全區", button.getX() + button.getWidth() <= root.getWidth() - root.getPaddingRight() + 1);
+      assertTrue("關閉按鈕不能超出底端安全區", button.getY() + button.getHeight() <= root.getHeight() - root.getPaddingBottom() + 1);
+      return null;
+    });
+  }
+
+  private void assertCloseInHeader() {
+    instrumentation.waitForIdleSync();
+    assertCloseWithinSafeArea();
+    ui(() -> {
+      View root = (View) field("contentRoot"), button = (View) field("nativeBack");
+      assertEquals("關閉按鈕應位於標題列右端", root.getWidth() - root.getPaddingRight() - dp(6),
+          button.getX() + button.getWidth(), 1);
+      assertEquals("關閉按鈕應在標題列垂直置中", root.getPaddingTop() + (int) field("desktopHeaderMargin") / 2f,
+          button.getY() + button.getHeight() / 2f, 1);
+      return null;
+    });
+  }
+
+  @Test public void jpegFullscreenPreservesAspectAndIgnoresLateHeaderReports() throws Exception {
     enterFullscreen();
     // 模擬隱藏 WebView 前已排入佇列的配置回報，不能把標題列高度加回全螢幕。
     double cssWidth = ui(() -> ((WebView) field("web")).getWidth() / (double) dp(1));
     activity.new Bridge().desktopLayout(44, cssWidth);
     instrumentation.waitForIdleSync();
     ui(() -> { assertFullscreenViewport(); return null; });
-    await("JPEG 四邊完整貼合顯示區", this::screenshotHasGreenBorder);
+    await("JPEG 保持比例且完整呈現四邊", this::screenshotHasGreenBorder);
     assertTouchCorners(false);
     screenshot("04-jpeg-fullscreen.png");
     directGesture(dp(12), dp(180), dp(110), dp(180), MotionEvent.ACTION_UP);
@@ -231,7 +355,7 @@ public class FullscreenEdgeSwipeTest {
     });
   }
 
-  @Test public void decodedH264FullscreenFillsViewport() throws Exception {
+  @Test public void decodedH264FullscreenPreservesAspect() throws Exception {
     byte[] payload;
     try (InputStream stream = instrumentation.getContext().getAssets().open("fullscreen-h264-1080.bin")) {
       ByteArrayOutputStream output = new ByteArrayOutputStream();
@@ -250,7 +374,7 @@ public class FullscreenEdgeSwipeTest {
     await("MediaCodec 實際輸出 H.264 測試影格", () -> ui(() -> (boolean)
         invoke("presentVideoFrame", new Class[]{EncodedVideoFrame.class}, frame)));
     enterFullscreen();
-    await("H.264 四邊完整貼合顯示區", this::screenshotHasGreenBorder);
+    await("H.264 保持比例且完整呈現四邊", this::screenshotHasGreenBorder);
     assertTouchCorners(true);
     screenshot("05-h264-fullscreen.png");
     directGesture(dp(12), dp(180), dp(110), dp(180), MotionEvent.ACTION_UP);
@@ -265,11 +389,218 @@ public class FullscreenEdgeSwipeTest {
     await("鍵盤實際隱藏", () -> ui(() -> !(boolean) field("keyboardVisible") && !imeVisible()));
   }
 
+  @Test public void jpegPinchAndPanMatchRenderedPixelsAndRemoteCoordinates() throws Exception {
+    showQuadrants();
+    ui(() -> {
+      View screen = (View) field("nativeScreen");
+      float cx = screen.getWidth() * .5f, cy = screen.getHeight() * .5f;
+      float gap = screen.getWidth() / 12f;
+      DesktopViewport viewport = (DesktopViewport) field("desktopViewport");
+      float fit = Math.min(screen.getWidth() / 800f, screen.getHeight() / 400f);
+      touch(screen, MotionEvent.ACTION_DOWN, new int[]{3}, cx - gap, cy);
+      assertFalse("第一指待判斷，不可提前在遠端按下", (boolean) field("desktopPointerPressed"));
+      touch(screen, MotionEvent.ACTION_POINTER_DOWN | (1 << MotionEvent.ACTION_POINTER_INDEX_SHIFT),
+          new int[]{3, 7}, cx - gap, cy, cx + gap, cy);
+      touch(screen, MotionEvent.ACTION_MOVE, new int[]{3, 7}, cx - 2 * gap, cy, cx + 2 * gap, cy);
+      assertEquals(2f, viewport.zoom(), .01f);
+      float dx = 800 * fit * 2 * .125f, dy = 400 * fit * 2 * .125f;
+      touch(screen, MotionEvent.ACTION_MOVE, new int[]{3, 7}, cx - 2 * gap + dx, cy + dy, cx + 2 * gap + dx, cy + dy);
+      touch(screen, MotionEvent.ACTION_POINTER_UP | (1 << MotionEvent.ACTION_POINTER_INDEX_SHIFT),
+          new int[]{3, 7}, cx - 2 * gap + dx, cy + dy, cx + 2 * gap + dx, cy + dy);
+      touch(screen, MotionEvent.ACTION_MOVE, new int[]{3}, cx - gap, cy);
+      touch(screen, MotionEvent.ACTION_UP, new int[]{3}, cx - gap, cy);
+      assertNull("多指手勢與剩餘單指不可取得遠端滑鼠", field("desktopTouchOwner"));
+      assertFalse((boolean) field("desktopPointerPressed"));
+      float[] point = jpegPoint(screen, cx, cy);
+      assertEquals(.375f, point[0], .001f); assertEquals(.375f, point[1], .001f);
+      Bitmap rendered = Bitmap.createBitmap(screen.getWidth(), screen.getHeight(), Bitmap.Config.ARGB_8888);
+      screen.draw(new Canvas(rendered));
+      try {
+        int color = rendered.getPixel((int) cx, (int) cy);
+        assertTrue("JPEG 繪製的中心應移到左上紅色象限", Color.red(color) > 180 && Color.green(color) < 80);
+      } finally { rendered.recycle(); }
+      // 放大後仍可正常點選遠端，按下座標必須對應目前可視區。
+      touch(screen, MotionEvent.ACTION_DOWN, new int[]{3}, cx, cy);
+      assertEquals(.375f, (float) field("desktopTouchX"), .001f);
+      touch(screen, MotionEvent.ACTION_UP, new int[]{3}, cx, cy);
+      assertFalse((boolean) field("desktopPointerPressed"));
+      return null;
+    });
+  }
+
+  @Test public void singleFingerPanAndResetDoNotMoveRemotePointer() throws Exception {
+    showQuadrants();
+    ui(() -> {
+      View screen = (View) field("nativeScreen");
+      DesktopViewport viewport = (DesktopViewport) field("desktopViewport");
+      float cx = screen.getWidth() * .5f, cy = screen.getHeight() * .5f;
+      invoke("transformViewport", new Class[]{View.class, float.class, float.class, float.class, float.class, float.class},
+          screen, 2f, cx, cy, cx, cy);
+      setField("viewportPanMode", true);
+      touch(screen, MotionEvent.ACTION_DOWN, new int[]{0}, cx, cy);
+      touch(screen, MotionEvent.ACTION_MOVE, new int[]{0}, cx + 100, cy + 50);
+      touch(screen, MotionEvent.ACTION_UP, new int[]{0}, cx + 100, cy + 50);
+      assertNull(field("desktopTouchOwner")); assertFalse((boolean) field("desktopPointerPressed"));
+      assertTrue(jpegPoint(screen, cx, cy)[0] < .5f);
+      // 回復遠端模式後，單指拖曳仍有完整按下／釋放配對。
+      setField("viewportPanMode", false);
+      touch(screen, MotionEvent.ACTION_DOWN, new int[]{0}, cx, cy);
+      touch(screen, MotionEvent.ACTION_MOVE, new int[]{0}, cx + 100, cy);
+      assertTrue((boolean) field("desktopPointerPressed"));
+      touch(screen, MotionEvent.ACTION_CANCEL, new int[]{0}, cx + 100, cy);
+      assertFalse((boolean) field("desktopPointerPressed"));
+      viewport.reset(); invoke("refreshViewport", new Class[]{});
+      assertEquals(1f, viewport.zoom(), 0);
+      assertEquals(.5f, jpegPoint(screen, cx, cy)[0], .001f);
+      assertEquals("100%", ((Button) field("viewportButton")).getText().toString());
+      return null;
+    });
+  }
+
+  @Test public void h264ZoomAndPanUseSameTouchAndDisplayTransform() throws Exception {
+    byte[] payload;
+    try (InputStream stream = instrumentation.getContext().getAssets().open("fullscreen-h264-1080.bin")) {
+      ByteArrayOutputStream output = new ByteArrayOutputStream();
+      byte[] bytes = new byte[4096];
+      for (int n; (n = stream.read(bytes)) != -1;) output.write(bytes, 0, n);
+      payload = output.toByteArray();
+    }
+    EncodedVideoFrame frame = EncodedVideoFrame.parse(1, 1920, 1080, payload, true);
+    assertNotNull(frame);
+    ui(() -> {
+      ((View) field("nativeScreen")).setVisibility(View.GONE);
+      ((View) field("nativeVideo")).setVisibility(View.VISIBLE);
+      return null;
+    });
+    await("影片 Surface 就緒", () -> ui(() -> field("videoSurface") != null));
+    await("H.264 實際解碼", () -> ui(() -> (boolean) invoke("presentVideoFrame", new Class[]{EncodedVideoFrame.class}, frame)));
+    enterFullscreen();
+    ui(() -> {
+      View screen = (View) field("nativeVideo");
+      float cx = screen.getWidth() * .5f, cy = screen.getHeight() * .5f, gap = screen.getWidth() / 12f;
+      touch(screen, MotionEvent.ACTION_DOWN, new int[]{3}, cx - gap, cy);
+      touch(screen, MotionEvent.ACTION_POINTER_DOWN | (1 << MotionEvent.ACTION_POINTER_INDEX_SHIFT), new int[]{3, 7}, cx - gap, cy, cx + gap, cy);
+      touch(screen, MotionEvent.ACTION_MOVE, new int[]{3, 7}, cx - 2 * gap, cy, cx + 2 * gap, cy);
+      touch(screen, MotionEvent.ACTION_MOVE, new int[]{3, 7}, cx - 2 * gap + 10000, cy + 10000, cx + 2 * gap + 10000, cy + 10000);
+      touch(screen, MotionEvent.ACTION_CANCEL, new int[]{3, 7}, cx, cy, cx + gap, cy);
+      assertEquals(2f, ((DesktopViewport) field("desktopViewport")).zoom(), .01f);
+      assertNull(field("desktopTouchOwner"));
+      float scale = Math.min(screen.getWidth() / 1920f, screen.getHeight() / 1080f) * 2;
+      float[] point = (float[]) invoke("mapVideoTouch", new Class[]{float.class, float.class}, 8 * scale, 8 * scale);
+      assertEquals(8 / 1920f, point[0], .001f); assertEquals(8 / 1080f, point[1], .001f);
+      return null;
+    });
+    try { await("放大平移後 H.264 綠色左上邊框應貼齊可視區", () -> {
+      Bitmap shot = instrumentation.getUiAutomation().takeScreenshot();
+      if (shot == null) return false;
+      int[] location = ui(() -> {
+        View video = (View) field("nativeVideo"); int[] p = new int[2]; video.getLocationOnScreen(p);
+        float scale = Math.min(video.getWidth() / 1920f, video.getHeight() / 1080f) * 2;
+        p[0] += Math.round(8 * scale); p[1] += Math.round(8 * scale); return p;
+      });
+      try {
+        int color = shot.getPixel(location[0], location[1]);
+        return Color.green(color) > 160 && Color.green(color) > Color.red(color) + 40;
+      } finally { shot.recycle(); }
+    });
+    } finally { screenshot("06-h264-zoom-pan.png"); }
+    ui(() -> { invoke("clearComposedFrame", new Class[]{}); assertEquals(1f, ((DesktopViewport) field("desktopViewport")).zoom(), 0); return null; });
+  }
+
+  @Test public void viewportMenuOffersZoomPanAndFit() throws Exception {
+    chooseViewportItem("放大 ＋");
+    await("工具列可放大", () -> ui(() -> ((DesktopViewport) field("desktopViewport")).zoom() > 1f));
+    chooseViewportItem("縮小 −");
+    await("工具列可縮小", () -> ui(() -> ((DesktopViewport) field("desktopViewport")).zoom() == 1f));
+    chooseViewportItem("放大 ＋");
+    chooseViewportItem("單指拖移可視區");
+    await("工具列啟用單指拖移", () -> ui(() -> (boolean) field("viewportPanMode")));
+    assertTrue(ui(() -> ((Button)field("viewportButton")).getText().toString().contains("拖移")));
+    chooseViewportItem("適合畫面（100%）");
+    await("恢復完整畫面", () -> ui(() -> ((DesktopViewport) field("desktopViewport")).zoom() == 1f));
+    chooseViewportItem("單指拖移可視區");
+    await("切回單指操作遠端", () -> ui(() -> !(boolean) field("viewportPanMode")));
+  }
+
+  @Test public void h264DisplaySwitchRequiresNewKeyframeAndResetsViewport() throws Exception {
+    byte[] payload;
+    try(InputStream stream=instrumentation.getContext().getAssets().open("fullscreen-h264-1080.bin")) {
+      ByteArrayOutputStream bytes=new ByteArrayOutputStream();byte[] buffer=new byte[4096];
+      for(int n;(n=stream.read(buffer))!=-1;)bytes.write(buffer,0,n);
+      payload=bytes.toByteArray();
+    }
+    String data=Base64.encodeToString(payload,Base64.NO_WRAP);
+    ui(()->{
+      View screen=(View)field("nativeScreen");float cx=screen.getWidth()*.5f,cy=screen.getHeight()*.5f;
+      invoke("transformViewport",new Class[]{View.class,float.class,float.class,float.class,float.class,float.class},screen,2f,cx,cy,cx,cy);
+      assertEquals(2f,((DesktopViewport)field("desktopViewport")).zoom(),0);
+      setField("pumpRenderedFrames",0);
+      setField("displayKnown",true);setField("hostDisplay",1);
+      invoke("updateDisplayInputGate",new Class[]{});
+      assertTrue((boolean)field("displayInputBlocked"));
+      ((View)field("nativeVideo")).setVisibility(View.VISIBLE);
+      return null;
+    });
+    await("切換影片 Surface 就緒",()->ui(()->field("videoSurface")!=null));
+    JSONObject frame=new JSONObject().put("sequence",2).put("display",0).put("codec",1).put("width",1920).put("height",1080).put("keyframe",true).put("data",data);
+    String old=frame.toString();
+    ui(()->{assertEquals(false,invoke("applyFrameJSON",new Class[]{String.class},old));assertEquals(0,field("viewportDisplay"));return null;});
+    String delta=frame.put("display",1).put("keyframe",false).toString();
+    ui(()->{assertEquals(false,invoke("applyFrameJSON",new Class[]{String.class},delta));assertTrue((boolean)field("displayInputBlocked"));return null;});
+    String keyframe=frame.put("keyframe",true).toString();
+    ui(()->{invoke("applyFrameJSON",new Class[]{String.class},keyframe);return null;});
+    await("新螢幕 H.264 實際解碼",()->ui(()->{
+      return (int)invoke("drainVideoFrames",new Class[]{})>0 || (int)field("pumpRenderedFrames")>0;
+    }));
+    ui(()->{assertEquals(1,field("viewportDisplay"));assertFalse((boolean)field("displayInputBlocked"));assertEquals(1f,((DesktopViewport)field("desktopViewport")).zoom(),0);return null;});
+  }
+
+  private void chooseViewportItem(String title) throws Exception {
+    NativeMenuTestHelper.choose(instrumentation,activity,ui(()->(View)field("viewportButton")),title);
+  }
+
+  private void showQuadrants() throws Exception {
+    Bitmap bitmap = Bitmap.createBitmap(800, 400, Bitmap.Config.ARGB_8888);
+    Canvas canvas = new Canvas(bitmap); Paint paint = new Paint();
+    for (int i = 0; i < 4; i++) {
+      paint.setColor(new int[]{Color.RED, Color.GREEN, Color.BLUE, Color.YELLOW}[i]);
+      canvas.drawRect((i % 2) * 400, (i / 2) * 200, (i % 2 + 1) * 400, (i / 2 + 1) * 200, paint);
+    }
+    ByteArrayOutputStream output = new ByteArrayOutputStream(); bitmap.compress(Bitmap.CompressFormat.JPEG, 95, output); bitmap.recycle();
+    String json = new JSONObject().put("sequence", 2).put("display", 0).put("codec", 0).put("width", 800).put("height", 400)
+        .put("keyframe", true).put("data", Base64.encodeToString(output.toByteArray(), Base64.NO_WRAP)).toString();
+    ui(() -> { assertEquals(true, invoke("applyFrameJSON", new Class[]{String.class}, json)); return null; });
+  }
+
+  private float[] jpegPoint(View screen, float x, float y) {
+    try {
+      Method method = screen.getClass().getDeclaredMethod("mapTouch", float.class, float.class); method.setAccessible(true);
+      return (float[]) method.invoke(screen, x, y);
+    } catch (ReflectiveOperationException error) { throw new AssertionError(error); }
+  }
+
+  private void touch(View screen, int action, int[] ids, float... xy) {
+    MotionEvent.PointerProperties[] properties = new MotionEvent.PointerProperties[ids.length];
+    MotionEvent.PointerCoords[] coordinates = new MotionEvent.PointerCoords[ids.length];
+    for (int i = 0; i < ids.length; i++) {
+      properties[i] = new MotionEvent.PointerProperties(); properties[i].id = ids[i]; properties[i].toolType = MotionEvent.TOOL_TYPE_FINGER;
+      coordinates[i] = new MotionEvent.PointerCoords(); coordinates[i].x = xy[i * 2]; coordinates[i].y = xy[i * 2 + 1]; coordinates[i].pressure = 1;
+    }
+    long now = SystemClock.uptimeMillis();
+    MotionEvent event = MotionEvent.obtain(now, now, action, ids.length, properties, coordinates, 0, 0, 1, 1, 0, 0, InputDevice.SOURCE_TOUCHSCREEN, 0);
+    try { invoke("handleDesktopTouch", new Class[]{View.class, MotionEvent.class}, screen, event); }
+    finally { event.recycle(); }
+  }
+
   private void assertTouchCorners(boolean video) {
     ui(() -> {
       View screen = (View) field(video ? "nativeVideo" : "nativeScreen");
-      float[][] corners = {{0, 0}, {screen.getWidth(), 0},
-          {0, screen.getHeight()}, {screen.getWidth(), screen.getHeight()}};
+      float scale = Math.min(screen.getWidth() / 1920f, screen.getHeight() / 1080f);
+      float left = (screen.getWidth() - 1920 * scale) / 2, top = (screen.getHeight() - 1080 * scale) / 2;
+      float right = left + 1920 * scale, bottom = top + 1080 * scale;
+      // contains 的右／下界不包含在影像內；黑邊不可被誤算成遠端四角。
+      float[][] corners = {{left + .1f, top + .1f}, {right - .1f, top + .1f},
+          {left + .1f, bottom - .1f}, {right - .1f, bottom - .1f}};
       for (int i = 0; i < corners.length; i++) {
         float[] point;
         if (video) point = (float[]) invoke("mapVideoTouch", new Class[]{float.class, float.class}, corners[i][0], corners[i][1]);
@@ -291,12 +622,30 @@ public class FullscreenEdgeSwipeTest {
     Bitmap shot = instrumentation.getUiAutomation().takeScreenshot();
     if (shot == null) return false;
     try {
-      int w = shot.getWidth(), h = shot.getHeight();
-      for (int[] point : new int[][]{{8, 8}, {w/2, 8}, {w-9, 8}, {8, h/2},
-          {w-9, h/2}, {8, h-9}, {w/2, h-9}, {w-9, h-9}}) {
-        int color = shot.getPixel(point[0], point[1]);
+      Rect screen = ui(() -> {
+        View view = (View) field(((View) field("nativeVideo")).isShown() ? "nativeVideo" : "nativeScreen");
+        int[] position = new int[2]; view.getLocationOnScreen(position);
+        return new Rect(position[0], position[1], position[0] + view.getWidth(), position[1] + view.getHeight());
+      });
+      float scale = Math.min(screen.width() / 1920f, screen.height() / 1080f);
+      float left = screen.left + (screen.width() - 1920 * scale) / 2;
+      float top = screen.top + (screen.height() - 1080 * scale) / 2;
+      for (int[] point : new int[][]{{8, 8}, {960, 8}, {1911, 8}, {8, 540},
+          {1911, 540}, {8, 1071}, {960, 1071}, {1911, 1071}}) {
+        int x = Math.round(left + point[0] * scale), y = Math.round(top + point[1] * scale);
+        if (x < 0 || y < 0 || x >= shot.getWidth() || y >= shot.getHeight()) return false;
+        int color = shot.getPixel(x, y);
         if (Color.green(color) < 160 || Color.green(color) < Color.red(color) + 40
             || Color.green(color) < Color.blue(color) + 20) return false;
+      }
+      // 不同比例手機應保留黑邊；不能為了滿版拉伸或裁掉來源桌面。
+      if (left - screen.left > 4) {
+        int color = shot.getPixel(screen.left + 2, screen.centerY());
+        if (Color.red(color) > 30 || Color.green(color) > 30 || Color.blue(color) > 30) return false;
+      }
+      if (top - screen.top > 4) {
+        int color = shot.getPixel(screen.centerX(), screen.top + 2);
+        if (Color.red(color) > 30 || Color.green(color) > 30 || Color.blue(color) > 30) return false;
       }
       return true;
     } finally { shot.recycle(); }

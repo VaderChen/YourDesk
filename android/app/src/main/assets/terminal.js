@@ -14,7 +14,7 @@ let attempt=0,timer;let next=0,ack=0,active=false,closed=false;const pending=new
 function call(method,args={}){return new Promise((resolve,reject)=>{const id=++next;pending.set(id,{resolve,reject});window.YourDesk.request(JSON.stringify({id,method,...args}));});}
 window.shellReply=out=>{const p=pending.get(out.id);if(!p)return;pending.delete(out.id);out.error?p.reject(new Error(out.error)):p.resolve(out.result);};
 const size=()=>({columns:Math.max(20,Math.min(500,term.cols)),rows:Math.max(5,Math.min(300,term.rows))});
-function fail(e){active=false;closed=true;status.textContent=e.message;window.YourDesk.closeTerminal();}
+function fail(e){if(closed)return;active=false;closed=true;status.textContent=e.message;if(window.YourDesk.sessionFailed)window.YourDesk.sessionFailed();else window.YourDesk.closeTerminal();}
 document.getElementById('back').onclick=()=>{closed=true;active=false;window.YourDesk.closeTerminal();};
 async function startShell(){
  try{
@@ -37,3 +37,5 @@ window.visualViewport?.addEventListener('resize',resizeViewport);
 let resizeTimer;window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(resizeViewport,150);});requestAnimationFrame(resizeViewport);
 
 requestAnimationFrame(startShell);
+
+window.addEventListener('pagehide',()=>{closed=true;active=false;clearTimeout(resizeTimer);pending.clear();});

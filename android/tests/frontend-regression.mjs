@@ -84,15 +84,20 @@ try {
   await call('Page.enable');
   await call('Runtime.enable');
   await call('Page.addScriptToEvaluateOnNewDocument', {source: `
-    window.sent=[];window.controls=[];window.connections=[];window.textSupported=true;
+    window.sent=[];window.controls=[];window.connections=[];window.textSupported=true;window.saveFails=false;window.scanStopped=0;
+    window.fixtureSites=[{id:'fixture-peer',name:'Fixture',note:'',signal:'wss://custom.example/ws',terminal:true,desktop:true}];
+    window.displaySelections=[];
     window.YourDesk={showKeyboard(){},toggleKeyboard(){},closeTerminal(){},desktopLayout(){},
+      displayStateJSON(){return JSON.stringify({known:false,count:0,current:-1});},selectDisplay(index){window.displaySelections.push(index);},
       request(raw){const message=JSON.parse(raw);if(message.method==='write')sent.push(message.data);
         setTimeout(()=>window.shellReply?.({id:message.id,result:message.method==='read'?{}:null}),0);},
       sendControlJSON(raw){controls.push(JSON.parse(raw));return 'ok';},
       supportsTextInput(){return window.textSupported;},
       remembered(){return '{}';},rememberCredentials(){return true;},connectSession(raw){connections.push(JSON.parse(raw));},
-      loadSites(){return JSON.stringify([{id:'fixture-peer',name:'Fixture',note:'',signal:'wss://custom.example/ws',terminal:true,desktop:true}]);},
-      saveSites(){return true;},stopQrScanner(){},startQrScanner(){},requestCameraPermission(){},setSiteDialogVisible(){},abortConnection(){}
+      loadSites(){return JSON.stringify(window.fixtureSites);},
+      saveSite(raw,original){if(window.saveFails)return '儲存失敗';const site=JSON.parse(raw);window.fixtureSites=[site,...window.fixtureSites.filter(item=>SiteModel.identity(item)!==original)];return '';},
+      deleteSite(key){if(window.saveFails)return false;window.fixtureSites=window.fixtureSites.filter(item=>SiteModel.identity(item)!==key);return true;},
+      saveSites(){return true;},stopQrScanner(){window.scanStopped++;},startQrScanner(){},requestCameraPermission(){},setSiteDialogVisible(){},abortConnection(){}
     };`});
 
   await navigate('terminal.html', "document.activeElement?.id==='input-proxy' && document.getElementById('status')?.textContent==='Shell 已連線'");
@@ -122,6 +127,23 @@ try {
   pass('Shell large UTF-8 paste preserves all bytes with bounded writes');
 
   await navigate('desktop.html', "typeof window.desktopFrameStatus==='function'");
+  assert.equal(await evaluate("displaySelect.disabled && displaySelect.options[0].textContent==='等待螢幕資訊'"),true);
+  await evaluate("desktopDisplays({known:true,count:3,current:1,pending:false});displaySelect.value='2';displaySelect.dispatchEvent(new Event('change'))");
+  assert.deepEqual(await evaluate('displaySelections'),[2]);
+  assert.equal(await evaluate('displaySelect.options.length'),3);
+  await evaluate("desktopDisplays({known:true,count:3,current:1,requested:2,pending:true})");
+  assert.equal(await evaluate("displaySelect.disabled && displaySelect.value==='2' && displayState.textContent==='切換中…'"),true);
+  await evaluate("desktopDisplays({known:true,count:3,current:2,pending:false,waitingFrame:true})");
+  assert.equal(await evaluate("displayState.textContent==='等待影像…'"),true);
+  await evaluate("desktopDisplays({known:true,count:1,current:0,pending:false})");
+  assert.equal(await evaluate("displaySelect.disabled && displaySelect.value==='0' && displaySelect.options.length===1"),true);
+  await evaluate("desktopDisplays({known:true,count:0,current:-1,pending:false})");
+  assert.equal(await evaluate("displaySelect.disabled && displaySelect.options[0].textContent==='沒有可用螢幕'"),true);
+  pass('Desktop display list handles selection, acknowledgement, image wait and monitor removal');
+  await evaluate("desktopDisplays({known:true,count:3,current:1,pending:false});displaySelect.focus();controls=[]");
+  await key('ArrowDown','ArrowDown',40);
+  assert.deepEqual(await evaluate('controls'),[]);
+  pass('Display selector keyboard navigation is not sent to the remote desktop');
   await evaluate("document.getElementById('keyboard-proxy').focus()");
   await call('Input.insertText', {text: '中文😀'});
   assert.deepEqual(await evaluate('controls'), [{type: 'text', text: '中文😀'}]);
@@ -215,6 +237,48 @@ try {
   await evaluate(`window.connectionFailed();openConnection('quick-peer','desktop');document.getElementById('connect-secret').value='fixture-only';document.getElementById('connection-form').dispatchEvent(new Event('submit',{cancelable:true,bubbles:true}));`);
   assert.equal((await evaluate('connections[2]')).signal, '');
   pass('Quick connection uses the native default signaling');
+
+  await evaluate("window.connectionFailed();document.getElementById('connect-cancel').click();document.getElementById('add').click();document.getElementById('site-name').value='手機測試';document.getElementById('site-room').value='new-peer';document.getElementById('site-signal').value='wss://private.example/ws';document.getElementById('site-note').value='繁體中文備註';document.getElementById('site-form').dispatchEvent(new Event('submit',{cancelable:true}));");
+  assert.equal(await evaluate('fixtureSites.length'),2);
+  assert.equal(await evaluate("document.querySelector('#sites .name').textContent"),'手機測試');
+  assert.equal(await evaluate('fixtureSites[0].signal'),'wss://private.example/ws');
+  pass('Site creation persists a custom server and note through the native storage boundary');
+
+  await evaluate("document.querySelector('#sites .edit').click();document.getElementById('site-name').value='已改名';document.getElementById('site-form').dispatchEvent(new Event('submit',{cancelable:true}));");
+  assert.equal(await evaluate('fixtureSites.length'),2);
+  assert.equal(await evaluate('fixtureSites[0].name'),'已改名');
+  pass('Site editing replaces the original entry without duplication');
+
+  await evaluate("document.querySelector('#sites .edit').click();document.getElementById('site-name').value='不得儲存';saveFails=true;document.getElementById('site-form').dispatchEvent(new Event('submit',{cancelable:true}));");
+  assert.equal(await evaluate('fixtureSites[0].name'),'已改名');
+  assert.equal(await evaluate("document.getElementById('site-dialog').hidden"),false);
+  await evaluate("saveFails=false;document.getElementById('site-cancel').click();document.querySelector('#sites .delete').click();document.getElementById('delete-cancel').click();");
+  assert.equal(await evaluate('fixtureSites.length'),2);
+  await evaluate("document.querySelector('#sites .delete').click();document.getElementById('delete-confirm').click();");
+  assert.equal(await evaluate('fixtureSites.length'),1);
+  pass('Storage failure retains form and data; delete requires the explicit confirm action');
+
+  const qr='yourdesk://site?v=1&name='+encodeURIComponent('辦公室 <測試>')+'&room=qr-peer&signal='+encodeURIComponent('wss://private.example/ws');
+  await evaluate("document.getElementById('add').click();document.querySelector('[data-tab=qrcode]').click();window.qrCodeDetected("+JSON.stringify(qr)+");");
+  assert.equal(await evaluate("document.getElementById('site-name').value"),'辦公室 <測試>');
+  assert.equal(await evaluate('fixtureSites.length'),1);
+  await evaluate("document.getElementById('site-form').dispatchEvent(new Event('submit',{cancelable:true}));");
+  assert.equal(await evaluate('fixtureSites[0].id'),'qr-peer');
+  assert.equal(await evaluate("document.querySelector('#sites .name').textContent"),'辦公室 <測試>');
+  pass('QR v1 imports Unicode as text and waits for user save');
+
+  for(const invalid of [qr.replace('yourdesk:','https:'),qr.replace('v=1','v=2'),qr+'&v=1',qr+'&secret=hidden',qr.replace('site?','other?'),qr.replace('wss%3A','ws%3A')]){
+    assert.equal(await evaluate('(()=>{try{SiteModel.qr('+JSON.stringify(invalid)+');return false;}catch{return true;}})()'),true);
+  }
+  pass('QR rejects foreign schemes, unknown versions, duplicate fields, secrets and insecure servers');
+  await evaluate("document.getElementById('add').click();document.querySelector('[data-tab=qrcode]').click();");
+  assert.equal(await evaluate('window.dismissOverlay()'),true);
+  assert.equal(await evaluate("document.getElementById('site-dialog').hidden"),true);
+  assert.ok(await evaluate('scanStopped')>0);
+  pass('Back dismisses the site dialog and stops scanning');
+  await evaluate("openConnection('fixture-peer','shell','wss://custom.example/ws');document.getElementById('connect-secret').value='cached';document.getElementById('connect-room').value='changed-peer';document.getElementById('connect-room').dispatchEvent(new Event('input'));");
+  assert.equal(await evaluate("document.getElementById('connect-secret').value"),'');
+  pass('Changing the connection target clears the previous endpoint password');
   assert.deepEqual(errors, []);
   console.log(`${passed} browser regression cases passed; real Android IMEs and native injection still require device validation.`);
 } finally {

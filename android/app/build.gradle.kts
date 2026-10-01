@@ -1,7 +1,31 @@
+import java.util.Properties
+
 plugins { id("com.android.application") }
 
-// Source changes must not silently ship the old prebuilt Go core.
-val verifyAndroidCore by tasks.registering(Exec::class) {
+// 本機重新連結的衍生 AAR 保留 upstream POM，不繞過傳遞依賴或原生庫檢查。
+configurations.configureEach {
+    resolutionStrategy.dependencySubstitution {
+        substitute(module("androidx.camera:camera-core"))
+            .using(module("com.yourdesk.thirdparty:camera-core:1.6.2-arm64-16k1"))
+            .because("固定官方 JNI 來源重新連結 16 KB RELRO")
+    }
+}
+val verifyAndroidNative = tasks.register<Exec>("verifyAndroidNative") {
+    workingDir(rootProject.projectDir.parentFile)
+    commandLine(providers.gradleProperty("python").getOrElse("python3"), "scripts/android_native.py", "verify")
+}
+tasks.named("preBuild") { dependsOn(verifyAndroidNative) }
+
+val releaseVersion = Properties().apply {
+    rootProject.file("version.properties").inputStream().use { load(it) }
+}
+val productVersion = releaseVersion.getProperty("versionName")
+val productCode = releaseVersion.getProperty("versionCode").toInt()
+require(productCode > 0 && productVersion.matches(Regex("[0-9]+\\.[0-9]{2}\\.[0-9]{4} build [0-9]{4}"))) {
+    "Android 發行版本格式無效"
+}
+
+val verifyAndroidCore = tasks.register<Exec>("verifyAndroidCore") {
     workingDir(rootProject.projectDir.parentFile)
     commandLine(providers.gradleProperty("python").getOrElse("python3"), "scripts/android_core.py", "verify")
 }
@@ -12,44 +36,59 @@ tasks.register<Exec>("buildAndroidCore") {
 verifyAndroidCore.configure { mustRunAfter("buildAndroidCore") }
 tasks.named("preBuild") { dependsOn(verifyAndroidCore) }
 
-android { namespace = "com.yourdesk.android"; compileSdk = 35
-    compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
+android {
+    namespace = "com.yourdesk.android"
+    compileSdk = 36
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
     defaultConfig {
         applicationId = "com.yourdesk.android"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 29824441
-        versionName = "0.26.0915 build 1801"
+        targetSdk = 36
+        versionCode = productCode
+        versionName = productVersion
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        // 目前產品只支援 64 位元 ARM Android 手機；排除其他 ABI 的 native library。
         ndk { abiFilters.add("arm64-v8a") }
     }
-
-    // 預覽版 APK 使用可辨識的產品與版本檔名。
-}
-
-tasks.register("releasePreviewApk") {
-    dependsOn("verifyReleaseNativeLibraries")
-    doLast {
-        copy {
-            from(layout.buildDirectory.file("outputs/apk/release/app-release-unsigned.apk"))
-            into(layout.buildDirectory.dir("outputs/apk/release"))
-            rename { "YourDesk-0.26.0915-build-1801-preview.apk" }
+    buildTypes {
+        getByName("debug") {
+            // 實機 Smoke 與正式套件分開安裝，避免改寫使用者的站台與密碼。
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+        }
+        getByName("release") {
+            isDebuggable = false
         }
     }
+    androidResources { ignoreAssetsPattern = "!.git:!.svn:!.DS_Store:!*.bak:!*.bak.*:!*~" }
+    sourceSets.getByName("androidTest").assets.srcDir("../tests/smoke-host/fixtures")
+    lint { abortOnError = true; checkReleaseBuilds = true }
 }
 
-// Inspect the final APK too: third-party FFmpeg/MLKit libraries are not in the Go AAR.
-val verifyReleaseNativeLibraries by tasks.registering(Exec::class) {
+val verifyReleaseNativeLibraries = tasks.register<Exec>("verifyReleaseNativeLibraries") {
     dependsOn("assembleRelease")
     workingDir(rootProject.projectDir.parentFile)
     commandLine(providers.gradleProperty("python").getOrElse("python3"), "scripts/android_core.py", "verify-apk",
         "--apk", layout.buildDirectory.file("outputs/apk/release/app-release-unsigned.apk").get().asFile.path)
 }
-// AGP creates variant assemble tasks after project evaluation.
 tasks.configureEach {
     if (name == "assembleRelease") finalizedBy(verifyReleaseNativeLibraries)
 }
+
+// 相容舊入口；預覽檔仍未簽章。可安裝正式檔請使用 scripts/android_release.py。
+tasks.register("releasePreviewApk") {
+    dependsOn(verifyReleaseNativeLibraries)
+    doLast {
+        copy {
+            from(layout.buildDirectory.file("outputs/apk/release/app-release-unsigned.apk"))
+            into(layout.buildDirectory.dir("outputs/apk/release"))
+            rename { "YourDesk-${productVersion.replace(" ", "-")}-preview-unsigned.apk" }
+        }
+    }
+}
+
 dependencies {
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
@@ -57,13 +96,9 @@ dependencies {
     implementation("androidx.core:core-ktx:1.16.0")
     implementation("androidx.activity:activity:1.10.1")
     implementation("androidx.lifecycle:lifecycle-runtime:2.9.2")
-    implementation("androidx.lifecycle:lifecycle-process:2.9.2")
     implementation("androidx.webkit:webkit:1.14.0")
-    // 預編譯 FFmpeg 共享庫；APK 僅輸出目前支援的 arm64-v8a。
-    // 先作 fallback runtime 與能力探測，實際即時影格仍優先使用 Android 硬解。
-    implementation("com.mrljdx:ffmpeg-kit-full:6.1.4")
-    implementation("androidx.camera:camera-camera2:1.4.2")
-    implementation("androidx.camera:camera-lifecycle:1.4.2")
-    implementation("androidx.camera:camera-view:1.4.2")
+    // 播放採 MediaCodec 與 JPEG；不封裝只有版本探測用途的 FFmpeg 原生庫。
+    implementation("androidx.camera:camera-camera2:1.6.2")
+    implementation("androidx.camera:camera-lifecycle:1.6.2")
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
 }

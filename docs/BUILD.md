@@ -2,7 +2,7 @@
 
 早期跨平台修正隨 [1.26.0914 build 1049](RELEASE-1.26.0914-build-1049.md) 發行；下方亦保留歷史測試條件，不能將開發分支變更視為已發布套件。
 
-2026-09-21 原始碼同步包含[桌面深度檢查修復](DEEP-REVIEW-FIXES-2026-09-20.md)、[記憶體最佳化](MEMORY-OPTIMIZATION-2026-09-19.md)及 [Android 修正](ANDROID-REVIEW-FIXES-2026-09-20.md)。本次不建立 Release、更新版號或發布安裝包；Android AAR／APK 與實機驗收仍未完成。
+2026-09-21 原始碼同步包含[桌面深度檢查修復](DEEP-REVIEW-FIXES-2026-09-20.md)、[記憶體最佳化](MEMORY-OPTIMIZATION-2026-09-19.md)及 [Android 修正](ANDROID-REVIEW-FIXES-2026-09-20.md)。後續 Android 已於 2026-10-01 完成核心重建、正式 APK 簽章與 Android 11 真機驗證；目前版本及剩餘限制見 [Android 發行說明](ANDROID-RELEASE-2026-10-01.md)。
 
 AV1 更新：已補上 Windows／macOS 軟體編碼、macOS VideoToolbox 硬解與軟解備援；編解碼分析頁面隱藏 128×128，但保留內部快速探測。最新支援範圍、建置與驗證限制見 [AV1 編解碼](AV1.md)。
 
@@ -195,11 +195,13 @@ Windows 桌面 Client／顯示區域 正式建置使用 `turbojpeg,ffmpeg` tags�
 
 桌面 Release 打包不包含 `android/`、`androidcore/` 與本機編譯輸出；預設六個平台維持不變。這是封裝範圍，不代表 Android 原始碼未納入 Git。
 
-## Android Viewer（開發中）
+## Android Viewer
 
 Android 使用獨立的 `android/core` Go module，不會自動取得桌面 core 的變更；Java APP 依賴 `android/libs/androidcore.aar`。目前加入的 Go API 必須先重建 AAR 才能進入 APK，不能只執行 `assembleRelease` 沿用舊核心。
 
-完整環境、來源驗證、16 KB 原生庫檢查與回歸命令見 [Android 建置與測試](ANDROID-BUILD.md)。主機端邏輯測試與真實 Android API 型別編譯已完成，但新的 JNI／AAR、完整 Gradle／APK、不同 codec 裝置及 16 KB 系統尚未驗收。既有 FFmpeg 二進位保留，不因一般 Java／Go 程式修改強制重建。
+以 `python3 scripts/android_release.py build` 產生正式簽章 APK，版本由 `android/version.properties` 管理。流程驗證或重建 Go AAR／CameraX JNI，執行 Release lint，並檢查 APK 的版本、非 Debug 狀態、16 KB ELF／ZIP 對齊及 v2／v3 簽章；正式憑證須由維護者提供。完整環境與個別回歸命令見 [Android 建置與測試](ANDROID-BUILD.md)。
+
+build 1524 已於 Android 11 手機安裝並實際連線，確認站台與記憶密碼保留、串流後關閉按鈕位置正確。Android 16、16 KB pagesize 裝置及跨廠解碼器仍須另行驗收。Android 使用 MediaCodec／JPEG，不封裝 FFmpeg；桌面既有 FFmpeg 產物保留。
 
 ## Siri 擴充
 
