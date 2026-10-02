@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""YourDesk 跨平台建置、macOS DMG／Windows Installer／WinPE 實驗性 ZIP／Linux 命令列封裝。"""
+"""YourDesk 跨平台建置、macOS DMG／Windows Portable ZIP／WinPE 實驗性 ZIP／Linux 命令列封裝。"""
 import argparse
 import hashlib
 import json
@@ -614,10 +614,14 @@ def pack(release, targets=None):
                 staple(output)
                 run(['spctl', '--assess', '--type', 'open', '--context', 'context:primary-signature', '--verbose=2', output])
         elif system == 'windows':
-            windows_installer(folder, stem, version, arch)
+            # 公開下載預設提供免安裝 ZIP；NSIS 待簽章流程就緒後再按需產生。
+            if os.environ.get('YOURDESK_WINDOWS_INSTALLER') == '1':
+                windows_installer(folder, stem, version, arch)
+            else:
+                for previous in folder.glob('YourDesk-*-setup.exe'):
+                    previous.unlink()
             windows_service_zip(folder, stem, version, arch)
-            if arch == 'amd64':
-                windows_portable_zip(folder, stem, version)
+            windows_portable_zip(folder, stem, version)
         elif system == 'linux':
             for pattern in ('YourDesk-*.tar.gz', 'YourDesk-*.zip'):
                 for previous in folder.glob(pattern):

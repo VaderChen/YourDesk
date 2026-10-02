@@ -135,7 +135,7 @@ func readLocalReleaseNotes() map[string][]string {
 }
 func automaticUpdateSupported(system, name string) bool {
 	name = strings.ToLower(name)
-	return (system == "darwin" && strings.HasSuffix(name, ".dmg")) || (system == "windows" && strings.HasSuffix(name, "-setup.exe"))
+	return (system == "darwin" && strings.HasSuffix(name, ".dmg")) || (system == "windows" && (strings.HasSuffix(name, "-setup.exe") || strings.HasSuffix(name, "-portable.zip")))
 }
 
 func (u *updateManager) snapshotLocked() updateStatus {
@@ -329,18 +329,16 @@ func fetchReleaseChannel(ctx context.Context, prerelease bool) (updateStatus, er
 		result.Notes = fetchReleaseNotes(ctx, release.Assets)
 	}
 	system := runtime.GOOS
-	// Windows 安裝版與 Portable 版必須更新到同一種封裝；安裝版由
-	// 安裝目錄內的空識別檔判斷。x64 Portable 沒有安裝程式標記，選 ZIP。
-	installer := runningFromInstaller()
+	// Windows 公開發行優先使用 Portable；保留舊 ZIP 與 Installer 的相容性。
 	extensions := []string{"-setup.exe", ".zip"}
-	if system == "windows" && runtime.GOARCH == "amd64" && !installer {
-		extensions = []string{".zip", "-setup.exe"}
+	if system == "windows" {
+		extensions = []string{"-portable.zip", ".zip", "-setup.exe"}
 	}
 	if system == "darwin" {
 		system = "macos"
 		extensions = []string{".dmg"}
 	}
-	// 對外採 x64，保留舊 amd64 套件的相容性；安裝程式仍優先於 ZIP。
+	// 對外採 x64，保留舊 amd64 套件的相容性；各架構共用相同封裝優先順序。
 	architectures := []string{runtime.GOARCH}
 	if runtime.GOARCH == "amd64" {
 		architectures = []string{"x64", "amd64"}
@@ -476,7 +474,7 @@ func (u *updateManager) startDownload(onOpened func()) error {
 			return
 		}
 		if !automaticUpdateSupported(runtime.GOOS, asset.Name) {
-			// Portable ZIP 只開啟獨立解壓目錄，沒有倒數，也不結束現有 APP。
+			// 舊式 ZIP 或其他不支援的封裝僅開啟下載檔案。
 			err = u.openPackage(u.ctx, path)
 			u.mu.Lock()
 			u.state.Opening = false

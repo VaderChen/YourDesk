@@ -191,3 +191,16 @@ func TestServiceZIPAllowsOnlyExpectedFiles(t *testing.T) {
 		}
 	}
 }
+
+func TestPortableReleaseSelectsServicePackage(t *testing.T) {
+	release := fixtureRelease()
+	raw := strings.TrimSuffix(fixtureURL, "-setup.exe") + "-portable.zip"
+	release.Assets[0].Name = strings.TrimSuffix(release.Assets[0].Name, "-setup.exe") + "-portable.zip"
+	release.Assets[0].URL = raw
+	if _, _, err := Select(release, raw, "amd64", fixtureVersion); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := Select(release, raw, "arm64", fixtureVersion); err == nil {
+		t.Fatal("接受錯誤架構")
+	}
+}

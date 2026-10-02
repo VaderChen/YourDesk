@@ -24,7 +24,7 @@ buildMac.command／buildWin.command／buildLinux.command 與 pack.command 統一
 ./pack.command
 ```
 
-需要 Go 1.27.1 以上、Python 3.9 以上、zsh。macOS 桌面版使用 Xcode Command Line Tools。從 macOS 建置 Windows x64 桌面版需要 MinGW 的 gcc、g++、windres；Windows 封裝改用 NSIS 產生 Installer EXE，需要 makensis（macOS：brew install nsis）；可用 YOURDESK_MAKENSIS 指定編譯器。
+需要 Go 1.27.1 以上、Python 3.9 以上、zsh。macOS 桌面版使用 Xcode Command Line Tools。從 macOS 建置 Windows x64 桌面版需要 MinGW 的 gcc、g++、windres；Windows 預設封裝為 Portable ZIP，不需要 NSIS。只有明確設定 `YOURDESK_WINDOWS_INSTALLER=1` 時，才另產生 NSIS Installer EXE，需安裝 makensis（macOS：brew install nsis），可用 YOURDESK_MAKENSIS 指定編譯器。
 
 macOS 本機 `runUITest.command` 也會建置 FFmpeg／libaom 與 TurboJPEG；首次建置前須安裝 CMake 與 pkg-config：
 
@@ -51,8 +51,8 @@ pack.command 預設目標：
 | 目標 | 內容 | 封裝 |
 | --- | --- | --- |
 | macOS arm64 | 原生 Client UI、遠端顯示 | YourDesk.app、DMG |
-| Windows x64 | 原生 Client UI、遠端顯示 | Installer EXE + portable ZIP |
-| Windows arm64（WOA） | 原生 ARM64 Client UI、遠端顯示 | ARM64 Installer EXE |
+| Windows x64 | 原生 Client UI、遠端顯示 | Portable ZIP + 服務更新 ZIP |
+| Windows arm64（WOA） | 原生 ARM64 Client UI、遠端顯示 | ARM64 Portable ZIP + 服務更新 ZIP |
 | WinPE x64（實驗性） | 原生 Win32 救援 Host | 便攜 ZIP |
 
 Linux 提供 x64／arm64 命令列 Host ZIP；圖形處理與 REMOTE 尚未提供。Windows arm64（WOA）列入預設目標，需要 LLVM-MinGW 的 aarch64 編譯器及 windres。
@@ -127,8 +127,8 @@ Apple 平台目錄僅輸出 YourDesk.app（build）與 DMG（pack）；獨立執
 下載依目前系統與執行檔架構選擇資產，命名與 `scripts/release.py` 一致：
 
 - `YourDesk-<版本>-macos-arm64.dmg`
-- `YourDesk-<版本>-windows-x64-setup.exe`
-- `YourDesk-<版本>-windows-arm64-setup.exe`
+- `YourDesk-<版本>-windows-x64-portable.zip`
+- `YourDesk-<版本>-windows-arm64-portable.zip`
 
 請將安裝包作為 Release 資產提供；原始碼壓縮包不作為安裝包。缺少符合架構的資產時，程式顯示原因並停用提醒視窗的下載按鈕。下載驗證資產大小及 API 提供的 SHA-256；簽章、公證與下載完整性驗證是不同步驟。
 
@@ -158,12 +158,12 @@ WinPE 不使用 Installer，固定封裝為 `dist/winpe-x64/YourDesk-<版本>-wi
 
 已驗證的工具鏈為 `20260908 UCRT`，官方 macOS universal 封存的 SHA-256 為 `d1dc5d1ecf3a3ced5ed5544c72f1acd0c8e84eb3024d520ecc6b143eec62a149`。安裝步驟：
 
-1. 使用 Homebrew 安裝 `cmake nasm pkgconf nsis`；NASM 用於 x64 SIMD，NSIS 用於安裝包。
+1. 使用 Homebrew 安裝 `cmake nasm pkgconf`；NASM 用於 x64 SIMD。選擇產生 NSIS 安裝包時再安裝 `nsis`。
 2. 從下方官方發行頁下載 `llvm-mingw-20260908-ucrt-macos-universal.tar.xz`，使用 `shasum -a 256` 核對上述雜湊。
 3. 將封存內的工具鏈目錄放到 `~/.local/share/yourdesk/toolchains/llvm-mingw`，確認該目錄下直接包含 `bin/`。安裝至此預設位置後，雙擊 `buildWin.command` 不需另外設定環境變數。
 4. 執行 `./buildWin.command`，完成後使用 `python3 scripts/release.py pack --no-build` 產生安裝包。首次建置會下載並編譯 TurboJPEG、FFmpeg 及 libaom，後續使用本機快取。
 
-WOA 採原生 ARM64 編譯，不以 x64 模擬版替代；圖示資源也使用 ARM64 windres。建置產物為 dist/windows-arm64/，安裝包檔名使用 windows-arm64-setup.exe。Installer 本體使用 NSIS 引導程式，安裝的 YourDesk 三個 EXE 為原生 ARM64；仍須 WOA 實機確認硬體加速與周邊輸入相容性。
+WOA 採原生 ARM64 編譯，不以 x64 模擬版替代；圖示資源也使用 ARM64 windres。建置產物為 dist/windows-arm64/，免安裝包檔名使用 windows-arm64-portable.zip，其中 YourDesk 三個 EXE 為原生 ARM64；仍須 WOA 實機確認硬體加速與周邊輸入相容性。
 
 工具鏈來源：[LLVM-MinGW 官方發行頁](https://github.com/mstorsjo/llvm-mingw/releases)。本機已完成三個 ARM64 EXE 及 NSIS Installer 的編譯確認，尚未執行 WOA 實機功能測試。
 
@@ -216,3 +216,9 @@ macOS DMG 使用 ULMO（LZMA）壓縮，支援範圍涵蓋產品要求的 macOS 
 2026-09-14 本機比較：build 1007 的相同 DMG 內容由 65,554,123 bytes 壓縮到 53,115,461 bytes（62.5 → 50.7 MiB，減少 18.97%）；掛載後 App 的 35 個檔案／連結完全一致。同一份工作樹與建置旗標下，拆除版號依賴使 顯示區域 由 48,201,522 降到 47,013,186 bytes，另減少約 1.1 MiB；此減少量尚未包含於前述 DMG 比較數字。
 
 本輪保留編解碼、AI 模型、第三方授權、精確來源封存與重建腳本；未刪除功能。已完成映像校驗與內容比對、版號注入一致性，以及 FFmpeg／TurboJPEG 顯示區域 和管理介面 Smoke。體積比較映像只用於驗證，尚未重新簽章、公證或發布正式套件。
+
+### Windows Portable 發行政策
+
+目前 Windows x64／ARM64 公開下載均使用 `-portable.zip`。首次安裝請完整解壓後執行 `YourDesk.exe`。新版 APP 偵測更新後會下載、驗證 GitHub 雜湊與套件清單／架構，退出後備份、解壓替換並重新啟動；失敗時嘗試還原，保留使用者額外檔案。已啟用的登入前服務沿用服務更新交接。舊 APP／舊服務尚不支援 Portable 協定時，第一次升級需手動處理。ZIP 內的 Windows EXE 仍未簽章。
+
+若確定需要 NSIS，可用 `YOURDESK_WINDOWS_INSTALLER=1 ./pack.command --no-build` 額外產生安裝包；一般 Release 不上傳該附件。

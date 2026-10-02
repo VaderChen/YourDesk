@@ -22,6 +22,8 @@ func TestAutomaticUpdateCapability(t *testing.T) {
 		want         bool
 	}{
 		{"windows", "YourDesk-windows-x64.zip", false},
+		{"windows", "YourDesk-windows-x64-portable.zip", true},
+		{"windows", "YourDesk-windows-arm64-portable.zip", true},
 		{"windows", "YourDesk-windows-x64-setup.exe", true},
 		{"windows", "YourDesk-windows-arm64-setup.exe", true},
 		{"darwin", "YourDesk-macos-arm64.dmg", true},

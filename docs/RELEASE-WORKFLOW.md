@@ -13,7 +13,7 @@ Android 的公開安裝包固定為 ZIP，內含正式簽章 APK、四語安裝�
 
 若已有涵蓋本次修改的完整套件，可使用該版本，不必重複建置。對外架構名稱使用 `x64`／`arm64`。發行說明應聚焦使用者可見的功能與修正，不把編譯成功描述成實機功能驗證成功。
 
-Windows `pack` 同時產生同版同架構的 `-setup.exe` 與 `-service.zip`；每個 Windows 架構的兩個附件都必須上傳。後者供已授權服務自行更新，不列為一般 APP 安裝包。發布前從 GitHub API 核對服務 ZIP 的 `size` 與 `digest`（`sha256:`），並核對其 `manifest.json` 版本／架構；缺少服務附件或 GitHub 雜湊時，服務會拒絕更新，不會改以 UAC 安裝。測試版同樣需要完整附件。
+Windows `pack` 預設產生 x64／ARM64 同版同架構的 `-portable.zip` 與 `-service.zip`；每個 Windows 架構的兩個附件都必須上傳。一般使用者下載 Portable ZIP，暫不發布未簽章的 NSIS `-setup.exe`。服務 ZIP 供已授權服務自行更新，不列為一般 APP 安裝包。只有明確設定 `YOURDESK_WINDOWS_INSTALLER=1` 才額外產生 NSIS；預設封裝會清除平台目錄內舊的 setup.exe，避免誤上傳。發布前從 GitHub API 核對服務 ZIP 的 `size` 與 `digest`（`sha256:`），並核對其 `manifest.json` 版本／架構；缺少服務附件或 GitHub 雜湊時，服務會拒絕更新，不會改以 UAC 安裝。測試版同樣需要完整附件。
 
 ## README 內容定位
 
@@ -26,3 +26,5 @@ Windows `pack` 同時產生同版同架構的 `-setup.exe` 與 `-service.zip`；
 - 使用舊文件時，先檢查並移除開頭的產品／版本標題；不可直接將含有重複標題的整份 Markdown 傳給 `--notes-file`。
 - 發布前檢查草稿的標題欄與內文；發布後以 `gh release view <tag> --json name,body` 讀回核對，確認內文從語言段落開始，頁面沒有第二個版本標題。不能只檢查標題欄。
 - 單純修正發行說明時，只更新內文，不改版本標籤、指向提交、發布狀態或下載附件。
+
+Android 與桌面版合併發行時，使用共同版本與桌面版標籤，Android versionCode 必須遞增；同一 Release 上傳 Android ZIP／ZIP SHA-256／ZIP JSON，並更新四語 README 入口。獨立 Android Release 才使用 android- 標籤及 latest=false。

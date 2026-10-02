@@ -2,7 +2,7 @@ package clientui
 
 // 此腳本始終保留使用者身分。停止／替換／恢復受保護服務由 SYSTEM worker 完成。
 // 不含 RunAs；服務更新失敗不可退回另一輪 UAC。
-const windowsServiceUpdateScript = windowsRollbackScript + `
+const windowsServiceUpdateScript = windowsRollbackScript + windowsPortableApplyScript + `
 $ErrorActionPreference = 'Stop'
 $dir = $PSScriptRoot
 $backup = Join-Path $dir 'previous'
@@ -54,10 +54,12 @@ try {
  }
  Backup-ManagedFiles $config.target $backup $config.files
  $installed = $true
+ if ($config.portable) { Install-PortablePayload $dir $config.target $config.files } else {
  # 仍以一般使用者安裝，確保 HKCU、捷徑及重新開啟的 APP 都屬於原帳號。
  $setupArgs = '/S /SERVICEUPDATE /D=' + $config.target
  $setup = Start-Process -FilePath (Join-Path $dir 'setup.exe') -ArgumentList $setupArgs -PassThru -Wait
  if ($setup.ExitCode -ne 0) { throw ('Installer exit code: ' + $setup.ExitCode) }
+ }
  $app = Join-Path $config.target 'YourDesk.exe'
  if (-not (Test-Path -LiteralPath $app)) { throw 'Updated application was not found.' }
  if ((Request-ServiceUpdate 'commit') -ne 'applied') { throw 'Updated service did not pass health checks.' }

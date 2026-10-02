@@ -69,6 +69,26 @@ class ReleasePathTests(unittest.TestCase):
         self.assertEqual(commands, [[
             'File', '/r', '/x', '._*', '/x', '.DS_Store', '${PAYLOAD_DIR}/ThirdPartyLicenses']])
 
+    def test_windows_default_pack_uses_portable_for_both_architectures(self):
+        for arch in ('x64', 'arm64'):
+            with self.subTest(arch=arch), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                folder = root / ('windows-' + arch)
+                folder.mkdir()
+                stale = self.write(folder, 'YourDesk-old-setup.exe')
+                (root / 'release.json').write_text(json.dumps({'version': self.VERSION, 'targets': ['windows/' + arch]}))
+                with mock.patch.dict(release.os.environ, {'YOURDESK_WINDOWS_INSTALLER': '0'}), \
+                     mock.patch.object(release, 'copy_release_notes'), \
+                     mock.patch.object(release, 'copy_notes_to_folder'), \
+                     mock.patch.object(release, 'write_instructions'), \
+                     mock.patch.object(release, 'windows_installer', side_effect=AssertionError('NSIS 不應執行')), \
+                     mock.patch.object(release, 'windows_service_zip') as service, \
+                     mock.patch.object(release, 'windows_portable_zip') as portable:
+                    release.pack(root)
+                self.assertFalse(stale.exists())
+                self.assertEqual(portable.call_args.args[0], folder)
+                self.assertEqual(service.call_args.args[-1], 'amd64' if arch == 'x64' else arch)
+
     def test_manifest_omits_metadata_and_preserves_regular_hidden_files(self):
         with tempfile.TemporaryDirectory() as temporary:
             folder = Path(temporary)

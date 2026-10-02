@@ -43,17 +43,17 @@ IP 白名單預設開啟且只允許 `127.0.0.1`；名單內免 Token、名單�
 
 ## 下載與開始使用
 
-桌面版從 [GitHub Releases](https://github.com/VaderChen/YourDesk/releases/latest) 下載；手機版請使用 [Android 1.26.1001 build 1524 發行頁](https://github.com/VaderChen/YourDesk/releases/tag/android-1.26.1001-build-1524)。
+桌面版從 [GitHub Releases](https://github.com/VaderChen/YourDesk/releases/latest) 下載；手機版請使用 [Android 1.26.1002 build 2301 發行頁](https://github.com/VaderChen/YourDesk/releases/tag/1.26.1002-build-2301)。
 
 本文件介紹原始碼提供的功能；已發布安裝包實際包含的功能，請以對應發行說明為準。
 
 | 平台 | 下載套件 |
 | --- | --- |
 | macOS Apple Silicon | 已簽章並通過 Apple 公證的 DMG |
-| Windows x64 | Windows x64 安裝程式／免安裝 ZIP（完整解壓縮後執行 YourDesk.exe） |
-| Windows on ARM（WOA） | Windows ARM64 安裝程式 |
+| Windows x64 | Portable ZIP |
+| Windows on ARM（WOA） | Portable ZIP |
 | Linux x64／arm64 | CLI Host ZIP（無桌面／REMOTE） |
-| Android 8.0 以上／arm64 | [Android ZIP](https://github.com/VaderChen/YourDesk/releases/download/android-1.26.1001-build-1524/YourDesk-1.26.1001-build-1524-android-arm64.zip)（解壓縮後安裝正式簽章 APK，手機 Viewer） |
+| Android 8.0 以上／arm64 | [Android ZIP](https://github.com/VaderChen/YourDesk/releases/download/1.26.1002-build-2301/YourDesk-1.26.1002-build-2301-android-arm64.zip)（解壓縮後安裝正式簽章 APK，手機 Viewer） |
 
 1. 在兩台電腦安裝並開啟 YourDesk。
 2. 在快速連線輸入遠端 ID，或選擇已儲存的站台。

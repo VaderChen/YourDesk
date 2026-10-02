@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 	"yourdesk/internal/prelogin"
@@ -17,8 +18,9 @@ func detachUpdateHelper(cmd *exec.Cmd) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x00000200}
 }
 func prepareAutomaticUpdate(ctx context.Context, archive, assetURL string) error {
+	portable := strings.HasSuffix(strings.ToLower(archive), "-portable.zip")
 	serviceEnabled := prelogin.Status().Enabled
-	if !strings.HasSuffix(strings.ToLower(archive), "-setup.exe") {
+	if !portable && !strings.HasSuffix(strings.ToLower(archive), "-setup.exe") {
 		return fmt.Errorf("此套件不支援自動安裝，請手動開啟下載檔案")
 	}
 	exe, err := os.Executable()
@@ -51,24 +53,32 @@ func prepareAutomaticUpdate(ctx context.Context, archive, assetURL string) error
 			os.RemoveAll(dir)
 		}
 	}()
-	// 獨立副本避免下載檔案或安裝目錄在退出後被覆寫。
-	installer := filepath.Join(dir, "setup.exe")
-	source, err := os.Open(archive)
-	if err != nil {
-		return err
-	}
-	defer source.Close()
-	output, err := os.OpenFile(installer, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
-	if err != nil {
-		return err
-	}
-	_, copyErr := io.Copy(output, source)
-	closeErr := output.Close()
-	if copyErr != nil {
-		return copyErr
-	}
-	if closeErr != nil {
-		return closeErr
+	files := windowsManagedUpdateFiles
+	if portable {
+		files, err = extractPortableUpdate(ctx, archive, filepath.Join(dir, "payload"), runtime.GOARCH)
+		if err != nil {
+			return err
+		}
+	} else {
+		// 獨立副本避免下載檔案或安裝目錄在退出後被覆寫。
+		installer := filepath.Join(dir, "setup.exe")
+		source, err := os.Open(archive)
+		if err != nil {
+			return err
+		}
+		defer source.Close()
+		output, err := os.OpenFile(installer, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+		if err != nil {
+			return err
+		}
+		_, copyErr := io.Copy(output, source)
+		closeErr := output.Close()
+		if copyErr != nil {
+			return copyErr
+		}
+		if closeErr != nil {
+			return closeErr
+		}
 	}
 	ticket := ""
 	legacy := false
@@ -84,7 +94,7 @@ func prepareAutomaticUpdate(ctx context.Context, archive, assetURL string) error
 			prelogin.CancelServiceUpdate(context.Background(), ticket)
 		}
 	}()
-	config, _ := json.Marshal(map[string]any{"parent": os.Getpid(), "target": target, "files": windowsManagedUpdateFiles, "prelogin": serviceEnabled, "serviceTicket": ticket})
+	config, _ := json.Marshal(map[string]any{"parent": os.Getpid(), "target": target, "files": files, "portable": portable, "prelogin": serviceEnabled, "serviceTicket": ticket})
 	if err = os.WriteFile(filepath.Join(dir, "config.json"), config, 0600); err != nil {
 		return err
 	}
@@ -105,7 +115,7 @@ func prepareAutomaticUpdate(ctx context.Context, archive, assetURL string) error
 }
 
 const windowsUpdateScript = `param([switch]$Elevated, [switch]$Rollback)
-` + windowsRollbackScript + `
+` + windowsRollbackScript + windowsPortableApplyScript + `
 $ErrorActionPreference = 'Stop'
 $dir = $PSScriptRoot
 $backup = Join-Path $dir 'previous'
@@ -189,6 +199,7 @@ try {
  }
  Backup-ManagedFiles $config.target $backup $config.files
  $installed = $true
+ if ($config.portable) { Install-PortablePayload $dir $config.target $config.files } else {
  # NSIS 的 /D 必須最後傳入，且即使路徑有空白也不能再加引號。
  Write-Output 'Starting silent installer.'
  $setupArgs = '/S /D=' + $config.target
@@ -196,6 +207,7 @@ try {
  $setup = Start-Process -FilePath (Join-Path $dir 'setup.exe') -ArgumentList $setupArgs -PassThru -Wait
  if ($setup.ExitCode -ne 0) { throw ('Installer exit code: ' + $setup.ExitCode) }
  Write-Output ('Installer finished: ' + $setup.ExitCode)
+ }
  $app = Join-Path $config.target 'YourDesk.exe'
  if (-not (Test-Path -LiteralPath $app)) { throw 'Updated application was not found.' }
  if ($config.prelogin) {
@@ -209,7 +221,7 @@ try {
   exit 0
  }
  Remove-Item Env:YOURDESK_TEST_UPDATE -ErrorAction SilentlyContinue
- Start-Process -FilePath $app -WorkingDirectory $config.target
+ Start-Process -FilePath $app -WorkingDirectory $config.target -ErrorAction Stop
  Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue
 } catch {
  $_ | Out-String | Add-Content -LiteralPath (Join-Path $dir 'update.log')
@@ -221,6 +233,9 @@ try {
   try { Restore-ManagedFiles $serviceRoot $serviceBackup $serviceManagedFiles } catch { $_ | Out-String | Add-Content -LiteralPath (Join-Path $dir 'update.log') }
  }
  if ($serviceStopped) { try { Start-Prelogin } catch { $_ | Out-String | Add-Content -LiteralPath (Join-Path $dir 'update.log') } }
+ if ($installed -and -not $config.prelogin -and -not $Elevated) {
+  try { Start-Process -FilePath (Join-Path $config.target 'YourDesk.exe') -WorkingDirectory $config.target -ErrorAction Stop } catch {}
+ }
  if ($Elevated -or -not (Test-Path -LiteralPath (Join-Path $dir 'ready'))) { exit 1 }
  Add-Type -AssemblyName PresentationFramework
  [System.Windows.MessageBox]::Show(('YourDesk update failed. Please install the downloaded package manually. Log: ' + (Join-Path $dir 'update.log')), 'YourDesk') | Out-Null

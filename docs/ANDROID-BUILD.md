@@ -1,14 +1,14 @@
 # Android 建置、簽章與驗證
 
-更新於 2026-10-01。Android Viewer 位於 `android/`，使用獨立 Go module；桌面版的編譯不能代替 Android core、APK 與手機驗證。
+更新於 2026-10-02。Android Viewer 位於 `android/`，使用獨立 Go module；桌面版的編譯不能代替 Android core、APK 與手機驗證。
 
-一般使用者可直接下載 [Android 1.26.1001 build 1524](https://github.com/VaderChen/YourDesk/releases/tag/android-1.26.1001-build-1524)；本版功能、安裝方式、SHA-256 與驗證摘要見[發行說明](ANDROID-RELEASE-2026-10-01.md)。以下為操作、建置與維護文件。
+一般使用者可直接下載 [Android 1.26.1002 build 2301](https://github.com/VaderChen/YourDesk/releases/tag/1.26.1002-build-2301)；本次與桌面版合併發行，安裝方式與驗證範圍見[發行說明](RELEASE-1.26.1002-build-2301.md)。既有功能與歷史實機結果見 [Android 功能紀錄](ANDROID-RELEASE-2026-10-01.md)。以下為操作、建置與維護文件。
 
 ## 發行範圍
 
 本版提供 Android 8.0 以上的 arm64 手機 APK，支援遠端桌面、右鍵／遠端捲動、多螢幕切換、遠端聲音、Shell、站台新增／編輯／刪除、加密記憶密碼及 QR 匯入。影像使用 JPEG 與 MediaCodec H.264／HEVC，聲音使用系統 Opus／AAC 解碼與 AudioTrack，並支援 PCM。剪貼簿同步尚未實作；AV1、獨立檔案傳輸與 FFmpeg 軟解碼不在本版範圍。相機為選用功能，沒有相機仍可手動新增站台。
 
-- 版本由 `android/version.properties` 統一管理：`1.26.1001 build 1524`、versionCode `29847324`。每次正式更新必須遞增 versionCode。
+- 版本由 `android/version.properties` 統一管理：`1.26.1002 build 2301`、versionCode `29849221`。每次正式更新必須遞增 versionCode。
 - 正式套件為 `com.yourdesk.android`；Debug 使用 `com.yourdesk.android.debug`，實機測試不覆蓋正式資料。
 - 站台與密碼更新使用一次儲存交易。密碼由 Android Keystore／AES-GCM 保護，依「信令伺服器＋遠端 ID」隔離；刪除站台會清除對應密碼。編輯時留白保留密碼，另有明確的清除選項。
 - QR 僅接受 YourDesk v1 白名單欄位，拒絕密碼、重複欄位與不安全信令位址；掃描後必須確認再儲存。相機拒絕、取消、背景切換均能返回手動操作。
@@ -69,19 +69,19 @@
 
 ```sh
 python3 scripts/android_release.py build
-python3 scripts/android_release.py verify --apk dist/android/YourDesk-1.26.1001-build-1524-android-arm64.apk
-python3 scripts/android_release.py verify-zip --zip dist/android/YourDesk-1.26.1001-build-1524-android-arm64.zip
+python3 scripts/android_release.py verify --apk dist/android/YourDesk-1.26.1002-build-2301-android-arm64.apk
+python3 scripts/android_release.py verify-zip --zip dist/android/YourDesk-1.26.1002-build-2301-android-arm64.zip
 ```
 
 腳本依序驗證或重建 Go core／CameraX JNI，執行 Wrapper 的 `lintRelease`、`assembleRelease`，以 16 KB ZIP 對齊後簽章，再核對版本、非偵錯狀態、ABI、所有原生 ELF、ZIP 與 v2／v3 簽章。成品驗證成功才替換目標檔，再使用固定檔案清單與 Deflate 壓縮封裝 ZIP，內含原版簽章 APK、四語安裝說明、四語授權文件、BUILD.json 與 SHA256SUMS。每個檔案逐一核對 SHA-256；固定時間與權限使相同輸入產生相同 ZIP。封裝不重簽 APK。
 
 ```text
-dist/android/YourDesk-1.26.1001-build-1524-android-arm64.apk
-dist/android/YourDesk-1.26.1001-build-1524-android-arm64.sha256
-dist/android/YourDesk-1.26.1001-build-1524-android-arm64.json
-dist/android/YourDesk-1.26.1001-build-1524-android-arm64.zip
-dist/android/YourDesk-1.26.1001-build-1524-android-arm64.zip.sha256
-dist/android/YourDesk-1.26.1001-build-1524-android-arm64.zip.json
+dist/android/YourDesk-1.26.1002-build-2301-android-arm64.apk
+dist/android/YourDesk-1.26.1002-build-2301-android-arm64.sha256
+dist/android/YourDesk-1.26.1002-build-2301-android-arm64.json
+dist/android/YourDesk-1.26.1002-build-2301-android-arm64.zip
+dist/android/YourDesk-1.26.1002-build-2301-android-arm64.zip.sha256
+dist/android/YourDesk-1.26.1002-build-2301-android-arm64.zip.json
 ```
 
 GitHub Release 僅上傳 `.zip`、`.zip.sha256`、`.zip.json` 三個檔案。APK 與其原始建置紀錄保留在本機；ZIP 的 JSON 另記錄 `archive.sha256`、大小及逐檔雜湊，頂層 `sha256` 仍為 APK。
@@ -89,8 +89,8 @@ GitHub Release 僅上傳 `.zip`、`.zip.sha256`、`.zip.json` 三個檔案。APK
 已有通過驗證的正式 APK 時，可直接封裝並檢查：
 
 ```sh
-python3 scripts/android_release.py pack --apk dist/android/YourDesk-1.26.1001-build-1524-android-arm64.apk
-python3 scripts/android_release.py verify-zip --zip dist/android/YourDesk-1.26.1001-build-1524-android-arm64.zip
+python3 scripts/android_release.py pack --apk dist/android/YourDesk-1.26.1002-build-2301-android-arm64.apk
+python3 scripts/android_release.py verify-zip --zip dist/android/YourDesk-1.26.1002-build-2301-android-arm64.zip
 ```
 
 `pack` 會重新驗證 APK 簽章並比對旁邊的 `.json` 建置紀錄；若發行時另有補上來源提交資訊的紀錄，可用 `--record <檔案>` 指定，仍須與 APK 的版本、ABI、雜湊及憑證一致。
@@ -149,7 +149,7 @@ android/gradlew -p android :app:connectedDebugAndroidTest \
 
 ## 本輪驗證與限制
 
-2026-10-01 已在 ASUS_I01WD／Android 11 以簽章輪替將原 `0.1.0` 升級為正式 build 1524，未卸載或清除資料。安裝前後 UID 維持一致；原有一個站台及記憶密碼保留，使用原設定成功開始真實遠端串流。手機上的最終 APK 與 `dist/android/YourDesk-1.26.1001-build-1524-android-arm64.apk` 的 SHA-256 完全一致，且非 Debug。ADB 擷圖與 UI 邊界確認關閉按鈕位於標題列右上角，沒有遮住螢幕選單；安裝紀錄及截圖位於 `.local-run/android-install/`。
+2026-10-01 已在 ASUS_I01WD／Android 11 以簽章輪替將原 `0.1.0` 升級為正式 build 1524，未卸載或清除資料。安裝前後 UID 維持一致；原有一個站台及記憶密碼保留，使用原設定成功開始真實遠端串流。手機上的最終 APK 與 `dist/android/YourDesk-1.26.1002-build-2301-android-arm64.apk` 的 SHA-256 完全一致，且非 Debug。ADB 擷圖與 UI 邊界確認關閉按鈕位於標題列右上角，沒有遮住螢幕選單；安裝紀錄及截圖位於 `.local-run/android-install/`。
 
 本版（build 1524）修正串流開始後關閉按鈕偏移：隱藏期間不再以舊邊界累積位移，預設位置隨標題列及系統安全區配置；拖曳位置以安全區比例保存。先在同一真機重現「返回首頁、轉直向、重新串流」的錯位，再完成 17 項畫面及操作 Smoke（全部通過、無略過），其中三項新增驗證涵蓋重連、標題列高度／安全區變更、全螢幕、拖曳旋轉及實際點擊關閉；另以截圖像素確認旋轉動畫結束後的顯示位置。完整結果保留於 `.local-run/android-close-smoke-results.xml`，視覺結果於 `.local-run/android-close-visual-smoke-results.xml`，截圖於 `.local-run/android-close-fixed.png`。Release lint 為零 error／fatal、30 項 warning，正式 APK 的版本、v2／v3 簽章及 16 KB ELF／ZIP 檢查通過。
 
@@ -162,3 +162,5 @@ android/gradlew -p android :app:connectedDebugAndroidTest \
 發行內文遵循[共同 Release 流程](RELEASE-WORKFLOW.md)，儲存於 `docs/RELEASE-<tag>.md`，從 `## 繁體中文` 開始，依序提供繁體中文、英文、日文、韓文。四語均須包含功能、安裝與升級注意事項、驗證範圍及已知限制；發布後讀回核對。本版來源為 [RELEASE-android-1.26.1001-build-1524.md](RELEASE-android-1.26.1001-build-1524.md)。修正既有發行的翻譯時，只更新內文，保留原 APK、標籤及發布狀態。
 
 16 KB 靜態檢查不能取代 [16 KB 裝置啟動與 JNI 驗證](https://developer.android.com/guide/practices/page-sizes)。Android 16 實機、HEVC／不同廠牌解碼器、平板／折疊螢幕、真實通話／耳機／藍牙切換、跨行動網路切換及長時間負載仍需對應環境驗收，不能由單一 Android 11 手機推論全部完成。音訊已驗證非靜音 PCM 與系統播放進度，沒有使用麥克風回錄喇叭輸出。
+
+本次 Android 與桌面版合併至同一正式 Release；桌面版 latest 中包含 Android ZIP 不影響桌面平台附件選取。獨立 Android 發行仍採 android- 前綴與 latest=false。

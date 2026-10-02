@@ -67,7 +67,7 @@ func Identity(raw, arch string) (tag, installer string, err error) {
 	if a == "amd64" {
 		a = "x64"
 	}
-	if (a != "x64" && a != "arm64") || !strings.HasPrefix(p[6], "YourDesk-") || !strings.HasSuffix(p[6], "-windows-"+a+"-setup.exe") || strings.ContainsAny(p[6], `\:`) {
+	if (a != "x64" && a != "arm64") || !strings.HasPrefix(p[6], "YourDesk-") || !(strings.HasSuffix(p[6], "-windows-"+a+"-setup.exe") || strings.HasSuffix(p[6], "-windows-"+a+"-portable.zip")) || strings.ContainsAny(p[6], `\:`) {
 		return "", "", errors.New("更新套件架構不符")
 	}
 	return p[5], p[6], nil
@@ -85,7 +85,7 @@ func Select(release Release, raw, arch, installed string) (Asset, string, error)
 	if release.Draft || release.Tag != tag || VersionKey(version) == "" || VersionKey(installed) == "" || VersionKey(version) < VersionKey(installed) {
 		return Asset{}, "", errors.New("服務更新不接受草稿、未知版本或較舊版本")
 	}
-	name := strings.TrimSuffix(installer, "-setup.exe") + "-service.zip"
+	name := strings.TrimSuffix(strings.TrimSuffix(installer, "-setup.exe"), "-portable.zip") + "-service.zip"
 	var selected Asset
 	installerFound := false
 	for _, a := range release.Assets {
