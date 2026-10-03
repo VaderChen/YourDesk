@@ -389,19 +389,26 @@ func (s *Sync) servePull(parent context.Context, m packet) {
 		_ = s.sendPacket(ctx, packet{Type: "pull-error", ID: m.ID, Error: fmt.Sprint(err)})
 		return
 	}
-	id, _ := hex.DecodeString(m.ID)
+	_ = sendPullChunks(ctx, m.ID, data, s.peer.SendClipboard)
+}
+
+func sendPullChunks(ctx context.Context, requestID string, data []byte, send func(context.Context, []byte) error) error {
+	if len(data) == 0 {
+		return nil
+	}
+	id, _ := hex.DecodeString(requestID)
+	// SendClipboard 返回前已複製資料；同一次讀取只需一個分塊暫存。
+	buf := make([]byte, 17+min(len(data), dataChunk))
+	buf[0] = 2
+	copy(buf[1:17], id)
 	for len(data) > 0 {
-		n := len(data)
-		if n > dataChunk {
-			n = dataChunk
-		}
-		buf := append([]byte{2}, id...)
-		buf = append(buf, data[:n]...)
-		if err = s.peer.SendClipboard(ctx, buf); err != nil {
-			return
+		n := copy(buf[17:], data)
+		if err := send(ctx, buf[:17+n]); err != nil {
+			return err
 		}
 		data = data[n:]
 	}
+	return nil
 }
 
 func validatePullEntries(entries []pullEntry) error {
@@ -457,6 +464,8 @@ func (s *Sync) reapPull() {
 			kept = append(kept, l)
 		}
 	}
+	// 縮短切片不會清除底層參照；釋放過期清單及其關閉函式捕捉的資源。
+	clear(p.cleanup[len(kept):])
 	p.cleanup = kept
 	p.Unlock()
 	for _, l := range expired {

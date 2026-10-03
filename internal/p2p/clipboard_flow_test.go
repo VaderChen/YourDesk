@@ -12,7 +12,7 @@ import (
 	"github.com/pion/webrtc/v4"
 )
 
-func clipboardTestPeers(t *testing.T, handle func(Control)) (*Peer, *Peer) {
+func clipboardTestPeers(t testing.TB, handle func(Control)) (*Peer, *Peer) {
 	t.Helper()
 	t.Setenv("YOURDESK_AUTH_LOG_DIR", t.TempDir())
 	makePeer := func() *Peer {
@@ -100,7 +100,7 @@ func clipboardTestPeers(t *testing.T, handle func(Control)) (*Peer, *Peer) {
 	})
 	return a, b
 }
-func clipboardEventually(t *testing.T, ready func() bool) {
+func clipboardEventually(t testing.TB, ready func() bool) {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
 	for !ready() {
@@ -296,5 +296,51 @@ func TestSlowLegacyClipboardKeepsControlResponsive(t *testing.T) {
 		case <-ctx.Done():
 			t.Fatal("控制工作未恢復")
 		}
+	}
+}
+
+func TestClipboardSendBufferOwnership(t *testing.T) {
+	a, b := clipboardTestPeers(t, nil)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	const count = 40
+	wantPacket := func(index int, data []byte) []byte {
+		n := 17 + 16*1024
+		if index == count-1 {
+			n = 23
+		}
+		data = data[:n]
+		for i := range data {
+			data[i] = byte(index + i/101)
+		}
+		data[0] = 2
+		return data
+	}
+	done := make(chan error, 1)
+	go func() {
+		buffer := make([]byte, 17+16*1024)
+		for i := 0; i < count; i++ {
+			if err := a.SendClipboard(ctx, wantPacket(i, buffer)); err != nil {
+				done <- err
+				return
+			}
+			clear(buffer)
+		}
+		done <- nil
+	}()
+	expected := make([]byte, 17+16*1024)
+	for i := 0; i < count; i++ {
+		select {
+		case data := <-b.ClipboardMessages():
+			if !bytes.Equal(data, wantPacket(i, expected)) {
+				t.Fatalf("送出來源覆寫後第 %d 包內容改變", i)
+			}
+			b.ClipboardConsumed(data)
+		case <-ctx.Done():
+			t.Fatal(ctx.Err())
+		}
+	}
+	if err := <-done; err != nil {
+		t.Fatal(err)
 	}
 }

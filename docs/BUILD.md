@@ -24,7 +24,7 @@ buildMac.command／buildWin.command／buildLinux.command 與 pack.command 統一
 ./pack.command
 ```
 
-需要 Go 1.27.1 以上、Python 3.9 以上、zsh。macOS 桌面版使用 Xcode Command Line Tools。從 macOS 建置 Windows x64 桌面版需要 MinGW 的 gcc、g++、windres；Windows 預設封裝為 Portable ZIP，不需要 NSIS。只有明確設定 `YOURDESK_WINDOWS_INSTALLER=1` 時，才另產生 NSIS Installer EXE，需安裝 makensis（macOS：brew install nsis），可用 YOURDESK_MAKENSIS 指定編譯器。
+需要 Go 1.27.1 以上、Python 3.9 以上、zsh。macOS 桌面版使用 Xcode Command Line Tools。從 macOS 建置 Windows x64 桌面版需要 MinGW 的 gcc、g++、windres；Windows 預設封裝為 Portable ZIP，不需要 NSIS。公開 Release 固定設定 `YOURDESK_WINDOWS_INSTALLER=0`。舊流程相容用途若需額外產生 NSIS，可明確設定 `YOURDESK_WINDOWS_INSTALLER=1` 並提供 makensis；產物不列入公開附件。
 
 macOS 本機 `runUITest.command` 也會建置 FFmpeg／libaom 與 TurboJPEG；首次建置前須安裝 CMake 與 pkg-config：
 
@@ -76,7 +76,7 @@ YOURDESK_VERSION='1.26.0908 build 1800' ./pack.command --no-build
 - `YOURDESK_CODESIGN_IDENTITY`：macOS Developer ID Application 簽章身分。
 - `YOURDESK_NOTARY_PROFILE`：必填，指定已儲存在本機 Keychain 的 notarytool profile；專案不保存個人設定名稱或認證資料。
 
-未指定簽章身分時優先選擇 Keychain 的 Developer ID Application；找不到時停止建置，不退回 ad-hoc。固定 Developer ID 可讓 macOS 依簽章身分辨識更新版本；buildMac.command 的 App 與 pack.command 的 DMG 均必須完成 Apple 公證、附加並驗證票根與 Gatekeeper 評估；任一步驟失敗即停止。Windows 安裝程式及執行檔目前未做 Authenticode 簽章。
+未指定簽章身分時優先選擇 Keychain 的 Developer ID Application；找不到時停止建置，不退回 ad-hoc。固定 Developer ID 可讓 macOS 依簽章身分辨識更新版本；buildMac.command 的 App 與 pack.command 的 DMG 均必須完成 Apple 公證、附加並驗證票根與 Gatekeeper 評估；任一步驟失敗即停止。Windows ZIP 內的執行檔目前未做 Authenticode 簽章；公開發行不提供 NSIS 安裝包。
 
 ## macOS 公證憑證設定
 
@@ -108,6 +108,8 @@ Windows 套件包含繁體中文、英文、日文、韓文的 README.txt，使�
 
 本專案僅提供 Client／遠端顯示，不含中央 Server 原始碼或執行檔。封裝使用明確檔案清單，不包含本機設定、連線密碼或 TLS 私鑰。Client 的 IP 直連 TLS 身分於本機首次使用時產生。雜湊清單只用於檔案完整性核對，不代表簽章或公證。
 
+外接磁碟上的 AppleDouble `._*` 與 `.DS_Store` 不屬於執行時內容。FFmpeg 複製 Windows DLL 與授權文件、建置完成後搬移平台目錄時，都會排除這些中繼檔；真正的 DLL 仍須通過數量、相依性與原生路徑檢查。
+
 macOS 遠端顯示 使用內嵌 WebView 標題列。全螢幕以無邊框視窗模擬，保留同一個視窗與繪圖表面；雙擊標題區或使用縮放選單切換。工具列預設隱藏，頂端停留一秒浮現。原始鍵盤模式下 Ctrl／Cmd + Shift + F 與 F12 傳至遠端，不作為本機快捷鍵。完整操作與平台差異見[使用說明](../README.md)。
 
 本機 runUITest.command、localRun.command、remoteRun.command、remoteClientOnly.command 皆在編譯後呼叫 scripts/sign-local.sh，使用相同 Developer ID 並驗證簽章後才執行。buildMac.command 產生的 macOS 原始執行檔與 App 也使用同一身分；直接手動 go build 不會自動執行簽章，執行前應呼叫此腳本。
@@ -116,7 +118,7 @@ Apple 平台目錄僅輸出 YourDesk.app（build）與 DMG（pack）；獨立執
 
 路徑以腳本所在的專案目錄為基準，移動專案後仍可建置。編譯使用 `-trimpath` 並移除除錯符號；公證設定由環境變數提供。DMG 的 `/Applications` 是 macOS 安裝捷徑，並非開發者本機目錄。
 
-## 更新安裝包命名
+## 更新套件命名
 
 自動更新讀取 `VaderChen/YourDesk` 最新正式 Release，不使用草稿或預發行版本。版本比較沿用 `1.YY.MMDD-build-HHmm` 或 `1.YY.MMDD build HHmm`；正式建置須注入正確版本。
 
@@ -129,6 +131,10 @@ Apple 平台目錄僅輸出 YourDesk.app（build）與 DMG（pack）；獨立執
 - `YourDesk-<版本>-macos-arm64.dmg`
 - `YourDesk-<版本>-windows-x64-portable.zip`
 - `YourDesk-<版本>-windows-arm64-portable.zip`
+- `YourDesk-<版本>-windows-x64-service.zip`（登入前服務更新專用）
+- `YourDesk-<版本>-windows-arm64-service.zip`（登入前服務更新專用）
+
+Windows 兩種架構都必須同時上傳 Portable 與服務 ZIP。APP 優先下載 Portable ZIP 並沿用既有倒數、取消、套用與還原流程；服務自行取得同版同架構的服務 ZIP。發布時指定 `YOURDESK_WINDOWS_INSTALLER=0`，不產生或上傳 `-setup.exe`；舊安裝格式的相容程式碼不代表仍提供安裝包。
 
 請將安裝包作為 Release 資產提供；原始碼壓縮包不作為安裝包。缺少符合架構的資產時，程式顯示原因並停用提醒視窗的下載按鈕。下載驗證資產大小及 API 提供的 SHA-256；簽章、公證與下載完整性驗證是不同步驟。
 
@@ -161,11 +167,11 @@ WinPE 不使用 Installer，固定封裝為 `dist/winpe-x64/YourDesk-<版本>-wi
 1. 使用 Homebrew 安裝 `cmake nasm pkgconf`；NASM 用於 x64 SIMD。選擇產生 NSIS 安裝包時再安裝 `nsis`。
 2. 從下方官方發行頁下載 `llvm-mingw-20260908-ucrt-macos-universal.tar.xz`，使用 `shasum -a 256` 核對上述雜湊。
 3. 將封存內的工具鏈目錄放到 `~/.local/share/yourdesk/toolchains/llvm-mingw`，確認該目錄下直接包含 `bin/`。安裝至此預設位置後，雙擊 `buildWin.command` 不需另外設定環境變數。
-4. 執行 `./buildWin.command`，完成後使用 `python3 scripts/release.py pack --no-build` 產生安裝包。首次建置會下載並編譯 TurboJPEG、FFmpeg 及 libaom，後續使用本機快取。
+4. 執行 `./buildWin.command`，完成後使用 `python3 scripts/release.py pack --no-build` 產生 Portable／服務 ZIP。首次建置會下載並編譯 TurboJPEG、FFmpeg 及 libaom，後續使用本機快取。
 
 WOA 採原生 ARM64 編譯，不以 x64 模擬版替代；圖示資源也使用 ARM64 windres。建置產物為 dist/windows-arm64/，免安裝包檔名使用 windows-arm64-portable.zip，其中 YourDesk 三個 EXE 為原生 ARM64；仍須 WOA 實機確認硬體加速與周邊輸入相容性。
 
-工具鏈來源：[LLVM-MinGW 官方發行頁](https://github.com/mstorsjo/llvm-mingw/releases)。本機已完成三個 ARM64 EXE 及 NSIS Installer 的編譯確認，尚未執行 WOA 實機功能測試。
+工具鏈來源：[LLVM-MinGW 官方發行頁](https://github.com/mstorsjo/llvm-mingw/releases)。ARM64 發布需核對三個原生 EXE、DLL 相依閉包及 Portable／服務 ZIP；交叉編譯與靜態核對不等同 WOA 實機功能測試。
 
 ## 畫面增強模型
 
@@ -209,7 +215,7 @@ macOS 正式 App 封裝現在需要完整 Xcode 27 SDK，用於編譯 App Intent
 
 ## 封裝體積與共用版號
 
-macOS DMG 使用 ULMO（LZMA）壓縮，支援範圍涵蓋產品要求的 macOS 13 以上；Windows 免安裝、WinPE 與 Linux ZIP 使用標準 Deflate 第 9 級。Windows 安裝程式維持既有的 solid LZMA。壓縮在封裝階段執行，可能增加建包時間；不改變解壓後的功能或資料。
+macOS DMG 使用 ULMO（LZMA）壓縮，支援範圍涵蓋產品要求的 macOS 13 以上；Windows 免安裝、WinPE 與 Linux ZIP 使用標準 Deflate 第 9 級。僅舊流程相容用途的 NSIS 保留既有 solid LZMA，公開 Release 不含此格式。壓縮在封裝階段執行，可能增加建包時間；不改變解壓後的功能或資料。
 
 共用版號位於 `internal/buildinfo`，正式建置以 `-X 'yourdesk/internal/buildinfo.Version=1.YY.MMDD build HHmm'` 注入；顯示區域 不再為了讀取版號而依賴整個 `clientui`。自行建置的腳本應同步使用此符號。未注入版號時，仍採執行檔修改時間產生開發版號。
 

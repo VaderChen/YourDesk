@@ -290,6 +290,25 @@ test('UI pause retains job and gives explicit resume button, with percentage',as
   env.h.setHook(null);action(env,0,'resume');await flush();await flush();assert.match(rowText(env),/Done.*100%/);
   assert.equal(env.h.calls.filter(call=>call.action==='resume').length,1);
 });
+test('upload progress preserves controls without rescanning a 1000-entry remote list',async()=>{
+  const env=uiHost(Array.from({length:1000},(_,i)=>fileEntry('remote-'+i)));await flush();
+  const writes=[];env.h.setHook(actionName=>actionName==='write'?new Promise(resolve=>writes.push(resolve)):undefined);
+  input(env,file('large',new Uint8Array(9000)));await flush();assert.equal(writes.length,1);
+  const rows=env.get('files-list').children;
+  const elements=['files-close','files-up','files-pick','files-refresh','files-more','files-new-folder','files-open','files-delete','files-prepare','files-select-all','files-input'].map(env.get);
+  for(const row of rows){elements.push(row.querySelector('button'));const check=row.querySelector('input');if(check)elements.push(check);}
+  elements.push(...env.get('files-queue').children[0].children[3].children);
+  const snapshot=()=>elements.map(element=>[element.hidden,element.disabled,element.checked,element.indeterminate]);
+  const before=snapshot();let queries=0;
+  for(const row of rows){const query=row.querySelector.bind(row);row.querySelector=tag=>{queries++;return query(tag);};}
+  writes.shift()();await flush();assert.equal(writes.length,1);
+  assert.equal(queries,0);assert.deepEqual(snapshot(),before);
+  assert.equal(env.get('queue-progress').value,4096);assert.equal(env.get('files-queue').children[0].children[1].value,4096);assert.match(rowText(env),/45%/);
+  action(env,0,'pause');assert.ok(queries>=2002);writes.shift()();await flush();await flush();assert.match(rowText(env),/Paused/);
+  env.h.setHook(null);action(env,0,'resume');await flush();await flush();
+  assert.match(rowText(env),/Done/);const actions=env.get('files-queue').children[0].children[3].children;
+  assert.ok(actions.every(button=>button.hidden));assert.equal(env.get('queue-progress').value,9000);
+});
 test('disconnect preserves upload and new session does not auto-resume',async()=>{
   const env=uiHost();await flush();let release;env.h.setHook(actionName=>{if(actionName==='write')return new Promise(resolve=>{release=resolve;});});
   input(env,file('large',new Uint8Array(9000)));await flush();env.setConnection(false);await env.poll();release();await flush();await flush();
@@ -298,6 +317,25 @@ test('disconnect preserves upload and new session does not auto-resume',async()=
   assert.equal(env.h.calls.filter(call=>call.action==='resume').length,0);
   env.h.setHook(null);action(env,0,'resume');await flush();await flush();assert.match(rowText(env),/Done.*100%/);
   const resumed=env.calls.find(call=>JSON.parse(call.options.body).action==='resume');assert.equal(JSON.parse(resumed.options.body).instance,'two');
+});
+test('scanning across disconnect or rebind preserves selected Files for manual continuation',async()=>{
+  for(const disconnected of [true,false]){
+    const env=uiHost();await flush();let release;
+    const value=file('slow-scan','original contents'),slice=value.slice.bind(value);
+    value.slice=(start,end)=>start===0&&end===1?{arrayBuffer:()=>new Promise(resolve=>{release=resolve;})}:slice(start,end);
+    input(env,value);await flush();assert.equal(typeof release,'function');
+    if(disconnected){env.setConnection(false);await env.poll();}
+    else env.events.get('yourdesk-files-session')({detail:{instance:'two'}});
+    release(new ArrayBuffer(1));await flush();await flush();
+    assert.equal(env.h.calls.length,0);assert.match(rowText(env),/Interrupted/);
+    if(disconnected)env.events.get('yourdesk-files-session')({detail:{instance:'two'}});
+    await flush();assert.equal(env.h.calls.length,0);
+    action(env,0,'resume');await flush();await flush();
+    assert.deepEqual(env.h.calls.map(request=>request.action),['begin','write','commit']);
+    assert.equal(Buffer.from([...env.h.uploads.values()][0].bytes).toString(),'original contents');
+    assert.match(rowText(env),/Done/);
+    const begun=env.calls.find(call=>JSON.parse(call.options.body).action==='begin');assert.equal(JSON.parse(begun.options.body).instance,'two');
+  }
 });
 test('a paused queued descendant prevents deleting its ancestor',async()=>{
   const env=uiHost([fileEntry('folder',true)]);await flush();let release;env.h.setHook(actionName=>{if(actionName==='write')return new Promise(resolve=>{release=resolve;});});
@@ -359,6 +397,36 @@ test('native cancel keeps Prepare disabled until original promise settles',async
   const {done:prepare}=await chooseDownload(env);await env.get('download-cancel').events.get('click')();
   assert.equal(env.get('files-prepare').disabled,true);assert.match(env.get('download-status').textContent,/Cancelling/);
   rejectPrepare(Error('cancelled'));await prepare;assert.equal(env.get('files-prepare').disabled,false);assert.match(env.get('download-status').textContent,/Cancelled/);
+});
+test('native cleanup failure keeps ownership pending and allows cancellation retry',async()=>{
+  for(const requested of [true,false]){
+    const env=uiHost();await flush();env.get('files-list').children[1].querySelector('button').click();let rejectPrepare,cancels=0;
+    env.window.yourdeskPrepareFile=()=>new Promise((_,reject)=>{rejectPrepare=reject;});env.window.yourdeskCancelFile=async()=>{cancels++;};
+    const {done:prepare}=await chooseDownload(env);
+    if(requested)await env.get('download-cancel').events.get('click')();
+    env.events.get('yourdesk-file-progress')({detail:{state:'cancelFailed',received:1,total:3}});
+    assert.match(env.get('download-status').textContent,/Choose Cancel to retry/);
+    assert.equal(env.get('files-prepare').disabled,true);assert.equal(env.get('download-cancel').disabled,false);assert.equal(env.get('download-resume').hidden,true);
+    await env.get('download-cancel').events.get('click')();assert.equal(cancels,requested?2:1);
+    assert.match(env.get('download-status').textContent,/Cancelling/);
+    // A progress event already queued before cancellation cannot reopen Resume.
+    env.events.get('yourdesk-file-progress')({detail:{state:'interrupted',received:1,total:3}});
+    assert.match(env.get('download-status').textContent,/Cancelling/);assert.equal(env.get('download-resume').hidden,true);
+    rejectPrepare(Error('cancelled'));await prepare;
+    assert.equal(env.get('files-prepare').disabled,false);assert.match(env.get('download-status').textContent,/Cancelled/);
+  }
+});
+test('failed native cleanup preserves the window until an explicit close retry succeeds',async()=>{
+  const env=uiHost();await flush();env.get('files-list').children[1].querySelector('button').click();let rejectPrepare,closed=false,cancels=0;
+  env.window.yourdeskPrepareFile=()=>new Promise((_,reject)=>{rejectPrepare=reject;});
+  env.window.yourdeskCancelFile=async()=>{cancels++;env.events.get('yourdesk-file-progress')({detail:{state:'cancelFailed',received:1,total:3}});};
+  env.window.yourdeskCloseFiles=async()=>{closed=true;};
+  const {done:prepare}=await chooseDownload(env);env.get('files-close').click();await flush();env.expireClose();await flush();
+  assert.equal(closed,false);assert.equal(env.get('files-close').disabled,false);assert.equal(env.get('files-prepare').disabled,true);
+  assert.match(env.get('files-status').textContent,/window and resume data were kept/);
+  env.window.yourdeskCancelFile=async()=>{cancels++;rejectPrepare(Error('cancelled'));};
+  env.get('files-close').click();await prepare;await flush();await flush();
+  assert.equal(cancels,2);assert.equal(closed,true);
 });
 test('stable local unavailable code changes to interrupted rather than a generic failure',async()=>{
   const env=browser(async()=>({ok:false,status:400,json:async()=>({code:'files_session_unavailable',error:'private backend details'})}));

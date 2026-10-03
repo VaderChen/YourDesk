@@ -3,6 +3,7 @@ package clientui
 import (
 	"context"
 	"errors"
+	"os"
 	"sync"
 	"time"
 )
@@ -14,6 +15,7 @@ var errFileDownloadSuspended = errors.New("下載已暫停")
 // wait for network or disk I/O. A pause can finish the already-started local
 // write, after which the next progress event reports its confirmed byte count.
 type fileDownloadControl struct {
+	parent context.Context
 	ctx    context.Context
 	cancel context.CancelFunc
 	mu     sync.Mutex
@@ -31,7 +33,7 @@ type fileDownloadControl struct {
 
 func newFileDownloadControl(parent context.Context, progress func(fileProgress)) *fileDownloadControl {
 	ctx, cancel := context.WithCancel(parent)
-	return &fileDownloadControl{ctx: ctx, cancel: cancel, wake: make(chan struct{}, 1), state: "running", activeSince: time.Now(), onProgress: progress}
+	return &fileDownloadControl{parent: parent, ctx: ctx, cancel: cancel, wake: make(chan struct{}, 1), state: "running", activeSince: time.Now(), onProgress: progress}
 }
 
 func (c *fileDownloadControl) signal() {
@@ -87,7 +89,7 @@ func (c *fileDownloadControl) update(name string, received, total int64) {
 
 func (c *fileDownloadControl) pause() (fileProgress, error) {
 	c.mu.Lock()
-	if c.ctx.Err() != nil || c.state == "complete" || c.state == "failed" {
+	if c.ctx.Err() != nil || c.state == "complete" || c.state == "failed" || c.state == "cancelFailed" {
 		c.mu.Unlock()
 		return fileProgress{}, errors.New("目前沒有可暫停的下載")
 	}
@@ -106,7 +108,7 @@ func (c *fileDownloadControl) pause() (fileProgress, error) {
 
 func (c *fileDownloadControl) resume() error {
 	c.mu.Lock()
-	if c.ctx.Err() != nil || c.state == "complete" || c.state == "failed" {
+	if c.ctx.Err() != nil || c.state == "complete" || c.state == "failed" || c.state == "cancelFailed" {
 		c.mu.Unlock()
 		return errors.New("目前沒有可繼續的下載")
 	}
@@ -132,7 +134,7 @@ func (c *fileDownloadControl) stop() {
 
 func (c *fileDownloadControl) interrupt(epoch *uint64) {
 	c.mu.Lock()
-	if c.ctx.Err() != nil || c.state == "complete" || c.state == "failed" || (epoch != nil && (c.epoch != *epoch || c.state != "running")) {
+	if c.ctx.Err() != nil || c.state == "complete" || c.state == "failed" || c.state == "cancelFailed" || (epoch != nil && (c.epoch != *epoch || c.state != "running")) {
 		c.mu.Unlock()
 		return
 	}
@@ -147,6 +149,59 @@ func (c *fileDownloadControl) interrupt(epoch *uint64) {
 	}
 	c.notify(true)
 	c.signal()
+}
+
+// A failed cleanup retains the worker's file identity and directory handle.
+// Only an explicit cancellation retries; window/process shutdown still ends
+// the wait, even though a user cancellation has already cancelled c.ctx.
+func (c *fileDownloadControl) waitCleanupRetry(attemptEpoch uint64) bool {
+	c.mu.Lock()
+	if c.parent.Err() != nil {
+		c.mu.Unlock()
+		return false
+	}
+	if c.epoch != attemptEpoch && c.state == "cancelled" {
+		c.mu.Unlock()
+		return true
+	}
+	c.state = "cancelFailed"
+	failedEpoch := c.epoch
+	c.mu.Unlock()
+	c.notify(true)
+	for {
+		if c.parent.Err() != nil {
+			return false
+		}
+		c.mu.Lock()
+		retry := c.epoch != failedEpoch && c.state == "cancelled"
+		c.mu.Unlock()
+		if retry {
+			return true
+		}
+		select {
+		case <-c.parent.Done():
+			return false
+		case <-c.wake:
+		}
+	}
+}
+
+func cleanupFileDownload(control *fileDownloadControl, remove func() error) error {
+	for {
+		var epoch uint64
+		if control != nil {
+			control.mu.Lock()
+			epoch = control.epoch
+			control.mu.Unlock()
+		}
+		err := remove()
+		if errors.Is(err, os.ErrNotExist) {
+			err = nil
+		}
+		if err == nil || control == nil || !control.waitCleanupRetry(epoch) {
+			return err
+		}
+	}
 }
 
 func (c *fileDownloadControl) waitRunning() (uint64, error) {

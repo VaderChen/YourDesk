@@ -471,7 +471,7 @@ def build(version, targets):
         manifest(stage)
         # 平台目錄直接位於 dist；中繼資料最後發布，供 --no-build 判斷建置完成。
         for item in stage.iterdir():
-            if item.name != "release.json":
+            if item.name != "release.json" and not is_filesystem_metadata(item.name):
                 os.rename(item, release / item.name)
         os.rename(stage / "release.json", release / "release.json")
     native = capture(['go', 'env', 'GOHOSTOS']) + '/' + capture(['go', 'env', 'GOHOSTARCH'])
@@ -484,6 +484,8 @@ def build(version, targets):
         if native.startswith('darwin/'):
             binaries += list((folder.parent / 'Frameworks').glob('*.dylib'))
         for binary in binaries:
+            if is_filesystem_metadata(binary.name):
+                continue
             if binary.is_file() and (binary.name.startswith('yourdesk-') or binary.name in ('YourDesk', 'YourDesk.exe') or binary.suffix == '.dylib'):
                 # 不覆寫執行中程序映射的 inode，避免 macOS 簽章頁面失效。
                 # 暫存檔與目的檔位於同一檔案系統，以原子替換發布完整檔案。

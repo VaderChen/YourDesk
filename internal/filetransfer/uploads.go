@@ -27,6 +27,9 @@ type transferHub struct {
 	reserved    int64
 	now         func() time.Time
 	maintenance sync.Once
+	// Commands hold mu through decoding and the synchronous file write. The
+	// two extra bytes accommodate unpadded input before enforcing ChunkSize.
+	writeBuffer [ChunkSize + 2]byte
 }
 
 type transferIdentity struct {
@@ -42,6 +45,7 @@ type upload struct {
 	transferIdentity
 	parent     *os.Root
 	file       *os.File
+	stageInfo  os.FileInfo
 	temp, name string
 	offset     int64
 	touched    time.Time
@@ -129,7 +133,11 @@ func (s *session) begin(raw json.RawMessage) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.uploads[id] = &upload{transferIdentity: transferIdentity{filesystem: s.filesystem != nil, owner: s, home: s.homeInfo, path: name, size: in.Size, tokenHash: sha256.Sum256([]byte(token))}, parent: r, file: f, temp: temp, name: base, touched: s.now()}
+	// Retain inode identity independently of the writable handle so even a
+	// later handle failure can be cancelled. A transient Stat error is retried
+	// during cleanup, without discarding the stage or its reservation.
+	stageInfo, _ := f.Stat()
+	s.uploads[id] = &upload{transferIdentity: transferIdentity{filesystem: s.filesystem != nil, owner: s, home: s.homeInfo, path: name, size: in.Size, tokenHash: sha256.Sum256([]byte(token))}, parent: r, file: f, stageInfo: stageInfo, temp: temp, name: base, touched: s.now()}
 	s.reserved += in.Size
 	keep = true
 	return map[string]any{"id": id, "resumeToken": token, "state": "uploading", "nextOffset": int64(0)}, nil
@@ -240,16 +248,18 @@ func (s *session) write(raw json.RawMessage) (any, error) {
 	if u == nil || u.owner != s {
 		return nil, errors.New("傳輸不存在、未續接或已逾時")
 	}
-	data, err := base64.StdEncoding.Strict().DecodeString(in.Data)
-	if err != nil || len(data) < 1 || len(data) > ChunkSize || in.Offset != u.offset || int64(len(data)) > u.size-u.offset {
+	n, err := base64.StdEncoding.Strict().Decode(s.writeBuffer[:], []byte(in.Data))
+	if err != nil || n < 1 || n > ChunkSize || in.Offset != u.offset || int64(n) > u.size-u.offset {
 		return nil, errors.New("傳輸資料或連續位移無效")
 	}
-	n, err := u.file.Write(data)
-	if err != nil || n != len(data) {
-		s.removeUpload(in.ID)
+	written, err := u.file.Write(s.writeBuffer[:n])
+	if err != nil || written != n {
+		if cleanupErr := s.removeUpload(in.ID); cleanupErr != nil {
+			return nil, errors.New("寫入失敗，暫存尚未清理；請重試取消此上傳")
+		}
 		return nil, errors.New("寫入失敗，已取消此上傳")
 	}
-	u.offset += int64(n)
+	u.offset += int64(written)
 	u.touched = s.now()
 	return map[string]int64{"nextOffset": u.offset}, nil
 }
@@ -325,32 +335,68 @@ func (s *session) finish(ctx context.Context, method string, raw json.RawMessage
 		delete(s.receipts, oldest)
 	}
 	s.receipts[in.ID] = &receipt{transferIdentity: u.transferIdentity, info: receiptInfo, completed: s.now()}
-	s.releaseUpload(in.ID, info)
+	s.releaseCommittedUpload(in.ID, info)
 	return map[string]bool{"ok": true}, nil
 }
 
-func (h *transferHub) removeUpload(id string) {
+func (h *transferHub) removeUpload(id string) error {
 	u := h.uploads[id]
 	if u == nil {
-		return
+		return nil
 	}
-	owned, _ := u.file.Stat()
-	h.releaseUpload(id, owned)
+	owned := u.stageInfo
+	if owned == nil {
+		var err error
+		owned, err = u.file.Stat()
+		if err != nil {
+			return err
+		}
+		u.stageInfo = owned
+	}
+	// The reservation owns the staged inode, never an external replacement
+	// symlink, directory, or unrelated regular file under the same name.
+	current, err := u.parent.Lstat(u.temp)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	if err == nil && owned.Mode().IsRegular() && current.Mode().IsRegular() && os.SameFile(owned, current) {
+		// Keep the handle and reservation until removal is confirmed, allowing
+		// cancel/expiry to retry a temporary filesystem failure. os.Root stages
+		// are opened with delete sharing on Windows as well.
+		if err := u.parent.Remove(u.temp); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+	}
+	h.releaseUpload(id)
+	return nil
 }
 
-func (h *transferHub) releaseUpload(id string, owned os.FileInfo) {
+// A successful commit already has a receipt. The hard-link fallback on other
+// platforms may leave a staging name, but must not become an active upload
+// again when best-effort unlinking fails after the file has been committed.
+func (h *transferHub) releaseCommittedUpload(id string, owned os.FileInfo) {
 	u := h.uploads[id]
 	if u == nil {
 		return
 	}
-	// Cancellation/expiry owns the staged inode, not any file a local process
-	// might later put under the same name. In particular, never unlink a
-	// replacement symlink, directory, or unrelated regular file.
+	// A staging name left by the hard-link fallback still requires ownership
+	// verification before unlinking; a local replacement must be preserved.
 	current, currentErr := u.parent.Lstat(u.temp)
 	u.file.Close()
 	if owned != nil && currentErr == nil && owned.Mode().IsRegular() && current.Mode().IsRegular() && os.SameFile(owned, current) {
 		_ = u.parent.Remove(u.temp)
 	}
+	h.releaseUpload(id)
+}
+
+// releaseUpload only relinquishes handles and quota; cancellation calls it
+// after confirming the owned staging name is gone or has been replaced.
+func (h *transferHub) releaseUpload(id string) {
+	u := h.uploads[id]
+	if u == nil {
+		return
+	}
+	u.file.Close()
 	u.parent.Close()
 	h.reserved -= u.size
 	delete(h.uploads, id)

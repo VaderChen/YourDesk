@@ -87,15 +87,25 @@ func (w *mlWorker) submit(frame *image.RGBA, display, model int) {
 		return
 	}
 	w.initialized = true
+	w.enqueue(frame, display, model)
+}
+
+func (w *mlWorker) enqueue(frame *image.RGBA, display, model int) {
 	// 以最新快照替換尚未開始的工作。
+	// 只有從佇列取回的快照可重用；worker 已取走的影格仍保有獨立像素。
+	var snapshot *image.RGBA
 	select {
-	case <-w.jobs:
+	case pending := <-w.jobs:
+		snapshot = pending.frame
 	default:
 	}
-	copy := image.NewRGBA(image.Rect(0, 0, w.width, w.height))
-	draw.Draw(copy, copy.Bounds(), frame, frame.Bounds().Min, draw.Src)
+	bounds := image.Rect(0, 0, frame.Bounds().Dx(), frame.Bounds().Dy())
+	if snapshot == nil || snapshot == frame || snapshot.Bounds() != bounds || snapshot.Stride != bounds.Dx()*4 || len(snapshot.Pix) != bounds.Dx()*bounds.Dy()*4 {
+		snapshot = image.NewRGBA(bounds)
+	}
+	draw.Draw(snapshot, bounds, frame, frame.Bounds().Min, draw.Src)
 	select {
-	case w.jobs <- mlJob{model, copy, display, w.generation}:
+	case w.jobs <- mlJob{model, snapshot, display, w.generation}:
 	default:
 	}
 }

@@ -60,23 +60,27 @@ func (p *frameInterpolator) reset() {
 	p.generated = false
 	p.status = "等待影格"
 }
-func snapshotRGBA(src *image.RGBA) *image.RGBA {
-	dst := image.NewRGBA(image.Rect(0, 0, src.Bounds().Dx(), src.Bounds().Dy()))
-	draw.Draw(dst, dst.Bounds(), src, src.Bounds().Min, draw.Src)
-	return dst
-}
 
 // Apple 的真實幀、生成幀與回退共用工作尺寸，最後統一交給顯示縮放。
-func interpolationSnapshot(src *image.RGBA, method string) *image.RGBA {
-	if method != "apple" {
-		return snapshotRGBA(src)
+// dst 只能是尚未交給推論或顯示的快照；已取走的影格必須保有獨立像素。
+func interpolationSnapshot(src *image.RGBA, method string, dst *image.RGBA) *image.RGBA {
+	bounds := image.Rect(0, 0, src.Bounds().Dx(), src.Bounds().Dy())
+	scale := false
+	if method == "apple" {
+		w, h := frameinterp.AppleWorkingSize(bounds.Dx(), bounds.Dy())
+		if w >= 2 && h >= 2 {
+			bounds = image.Rect(0, 0, w, h)
+			scale = true
+		}
 	}
-	w, h := frameinterp.AppleWorkingSize(src.Bounds().Dx(), src.Bounds().Dy())
-	if w < 2 || h < 2 {
-		return snapshotRGBA(src)
+	if dst == nil || dst == src || dst.Bounds() != bounds || dst.Stride != bounds.Dx()*4 || len(dst.Pix) != bounds.Dx()*bounds.Dy()*4 {
+		dst = image.NewRGBA(bounds)
 	}
-	dst := image.NewRGBA(image.Rect(0, 0, w, h))
-	xdraw.ApproxBiLinear.Scale(dst, dst.Bounds(), src, src.Bounds(), draw.Src, nil)
+	if scale {
+		xdraw.ApproxBiLinear.Scale(dst, dst.Bounds(), src, src.Bounds(), draw.Src, nil)
+	} else {
+		draw.Draw(dst, dst.Bounds(), src, src.Bounds().Min, draw.Src)
+	}
 	return dst
 }
 
@@ -114,7 +118,7 @@ func (p *frameInterpolator) frame(src *image.RGBA, display int, dirty, enabled b
 		}
 		p.display = display
 		p.sourceBounds = src.Bounds()
-		p.queued = interpolationSnapshot(src, method)
+		p.queued = interpolationSnapshot(src, method, p.queued)
 		p.queuedAt = now
 	}
 	if p.results == nil {

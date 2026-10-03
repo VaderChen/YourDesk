@@ -16,8 +16,9 @@ import (
 )
 
 type nativeDevice struct {
-	ptr unsafe.Pointer
-	hw  bool
+	ptr    unsafe.Pointer
+	hw     bool
+	output []byte
 }
 
 func platformSupported() bool { return true }
@@ -31,7 +32,7 @@ func openNative(mode, codec, bitrate, preference int) (device, error) {
 	if p == nil {
 		return nil, errors.New(C.GoString((*C.char)(unsafe.Pointer(&message[0]))))
 	}
-	return &nativeDevice{p, hw != 0}, nil
+	return &nativeDevice{ptr: p, hw: hw != 0}, nil
 }
 func (d *nativeDevice) hardware() bool { return d.hw }
 func (d *nativeDevice) close() {
@@ -39,9 +40,15 @@ func (d *nativeDevice) close() {
 		C.yd_audio_close(d.ptr)
 		d.ptr = nil
 	}
+	d.output = nil
 }
 func (d *nativeDevice) process(data []byte) ([]byte, error) {
-	out := make([]byte, MaxPacket)
+	// Native devices are confined to one OS thread. Reuse the scratch buffer,
+	// including capture polls and playback calls that produce no output.
+	if d.output == nil {
+		d.output = make([]byte, MaxPacket)
+	}
+	out := d.output
 	var in unsafe.Pointer
 	if len(data) > 0 {
 		in = unsafe.Pointer(&data[0])
@@ -53,5 +60,6 @@ func (d *nativeDevice) process(data []byte) ([]byte, error) {
 	if n > len(out) {
 		return nil, errors.New("原生聲音資料超出容量")
 	}
-	return out[:n], nil
+	// Callers may retain packets (including Probe); never expose scratch memory.
+	return append([]byte{}, out[:n]...), nil
 }

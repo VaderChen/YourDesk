@@ -145,10 +145,12 @@ func (p *packetLink) WriteTo(buf []byte, addr net.Addr) (int, error) {
 	if count == 0 {
 		count = 1
 	}
+	// net.Conn.Write 不保留呼叫端的資料，單次 datagram 可共用分片暫存。
+	fragment := make([]byte, fragmentHeader+min(fragmentPayload, len(buf)))
 	for i := 0; i < count; i++ {
 		start := i * fragmentPayload
 		end := min(start+fragmentPayload, len(buf))
-		fragment := make([]byte, fragmentHeader+end-start)
+		fragment = fragment[:fragmentHeader+end-start]
 		binary.BigEndian.PutUint64(fragment, p.sequence)
 		binary.BigEndian.PutUint16(fragment[8:], uint16(i))
 		binary.BigEndian.PutUint16(fragment[10:], uint16(count))
@@ -240,9 +242,13 @@ func (p *packetLink) receive(c net.Conn) {
 		if a.received != count {
 			continue
 		}
-		data := make([]byte, 0, a.size)
-		for _, part := range a.parts {
-			data = append(data, part...)
+		// 單分片已具有獨立所有權，無須再配置與合併一次。
+		data := a.parts[0]
+		if count > 1 {
+			data = make([]byte, 0, a.size)
+			for _, part := range a.parts {
+				data = append(data, part...)
+			}
 		}
 		delete(pending, id)
 		select {

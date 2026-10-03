@@ -24,6 +24,8 @@ type DeltaEncoder struct {
 	CompareBytes  int // 偵測策略允許的前一畫面快照預算；0 使用完整雜湊。
 	previousRGBA  *image.RGBA
 	previous      []uint64
+	hashes        []uint64
+	changed       []bool
 	width, height int
 }
 
@@ -42,8 +44,19 @@ func (e *DeltaEncoder) Encode(src image.Image, forceKeyframe bool) ([]Patch, err
 	}
 	cols := (w + tile - 1) / tile
 	rows := (h + tile - 1) / tile
-	hashes := make([]uint64, cols*rows)
-	changed := make([]bool, len(hashes))
+	// 保留工作切片，未變動的畫面不必每幀配置 tile metadata。
+	// hashes 與 previous 分開，直到全部 JPEG 成功才交換基準。
+	if len(e.hashes) != cols*rows {
+		e.hashes = make([]uint64, cols*rows)
+	} else {
+		clear(e.hashes)
+	}
+	if len(e.changed) != cols*rows {
+		e.changed = make([]bool, cols*rows)
+	} else {
+		clear(e.changed)
+	}
+	hashes, changed := e.hashes, e.changed
 	count := 0
 	reset := w != e.width || h != e.height || len(e.previous) != len(hashes)
 	rgba, direct := src.(*image.RGBA)
@@ -72,15 +85,20 @@ func (e *DeltaEncoder) Encode(src image.Image, forceKeyframe bool) ([]Patch, err
 		}
 	}
 	// 編碼全部成功後才提交基準；失敗重試不可漏掉尚未送出的區塊。
-	commit := func() {
-		e.previous, e.width, e.height = hashes, w, h
+	commit := func(patches []Patch) {
+		e.previous, e.hashes = hashes, e.previous
+		e.width, e.height = w, h
 		if compare {
 			if e.previousRGBA == nil || e.previousRGBA.Bounds().Size() != b.Size() {
 				e.previousRGBA = image.NewRGBA(image.Rect(0, 0, w, h))
 			}
-			for y := 0; y < h; y++ {
-				i := rgba.PixOffset(b.Min.X, b.Min.Y+y)
-				copy(e.previousRGBA.Pix[y*e.previousRGBA.Stride:y*e.previousRGBA.Stride+w*4], rgba.Pix[i:i+w*4])
+			// 未變的 tile 已逐位元組比對相同，只更新成功編碼的區域。
+			for _, p := range patches {
+				for y := p.Y; y < p.Y+p.Height; y++ {
+					i := rgba.PixOffset(b.Min.X+p.X, b.Min.Y+y)
+					j := e.previousRGBA.PixOffset(p.X, y)
+					copy(e.previousRGBA.Pix[j:j+p.Width*4], rgba.Pix[i:i+p.Width*4])
+				}
 			}
 		} else {
 			e.previousRGBA = nil
@@ -91,10 +109,11 @@ func (e *DeltaEncoder) Encode(src image.Image, forceKeyframe bool) ([]Patch, err
 	}
 	if reset || forceKeyframe || count*100 >= len(changed)*35 {
 		p, err := e.encodePatch(src, image.Rect(0, 0, w, h), true)
+		patches := []Patch{p}
 		if err == nil {
-			commit()
+			commit(patches)
 		}
-		return []Patch{p}, err
+		return patches, err
 	}
 	patches := make([]Patch, 0, count)
 	for y := 0; y < rows; y++ {
@@ -115,7 +134,7 @@ func (e *DeltaEncoder) Encode(src image.Image, forceKeyframe bool) ([]Patch, err
 			patches = append(patches, p)
 		}
 	}
-	commit()
+	commit(patches)
 	return patches, nil
 }
 
@@ -168,7 +187,8 @@ func patchImage(src image.Image, r image.Rectangle) image.Image {
 	region := r.Add(src.Bounds().Min)
 	if rgba, ok := src.(*image.RGBA); ok {
 		sub := rgba.SubImage(region).(*image.RGBA)
-		return &image.RGBA{Pix: sub.Pix, Stride: sub.Stride, Rect: image.Rect(0, 0, r.Dx(), r.Dy())}
+		sub.Rect = image.Rect(0, 0, r.Dx(), r.Dy())
+		return sub
 	}
 	out := image.NewRGBA(image.Rect(0, 0, r.Dx(), r.Dy()))
 	draw.Draw(out, out.Bounds(), src, region.Min, draw.Src)

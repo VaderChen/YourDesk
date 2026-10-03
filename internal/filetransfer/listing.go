@@ -8,6 +8,8 @@ import (
 	"path"
 	"sort"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 // 分頁前先過濾及排序，避免下一頁的資料夾出現在前一頁檔案之後。
@@ -58,11 +60,40 @@ func sortedVisibleEntries(ctx context.Context, root *os.Root, name string, limit
 		if a.Directory != b.Directory {
 			return a.Directory
 		}
-		left, right := strings.ToLower(a.Name), strings.ToLower(b.Name)
-		if left != right {
-			return left < right
+		if order := compareFoldedNames(a.Name, b.Name); order != 0 {
+			return order < 0
 		}
 		return a.Name < b.Name
 	})
 	return entries, ctx.Err()
+}
+
+// 與 strings.ToLower 後的 UTF-8 字典序一致，但排序時不反覆配置小寫副本。
+// 有效 UTF-8 的位元組順序與 rune 順序相同；大小寫相同時仍由呼叫端比較原名。
+func compareFoldedNames(a, b string) int {
+	for len(a) > 0 && len(b) > 0 {
+		left, right := rune(a[0]), rune(b[0])
+		an, bn := 1, 1
+		if left >= utf8.RuneSelf {
+			left, an = utf8.DecodeRuneInString(a)
+		}
+		if right >= utf8.RuneSelf {
+			right, bn = utf8.DecodeRuneInString(b)
+		}
+		left, right = unicode.ToLower(left), unicode.ToLower(right)
+		if left < right {
+			return -1
+		}
+		if left > right {
+			return 1
+		}
+		a, b = a[an:], b[bn:]
+	}
+	if len(a) < len(b) {
+		return -1
+	}
+	if len(a) > len(b) {
+		return 1
+	}
+	return 0
 }

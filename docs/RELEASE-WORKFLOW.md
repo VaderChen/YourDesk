@@ -13,7 +13,7 @@ Android 的公開安裝包固定為 ZIP，內含正式簽章 APK、四語安裝�
 
 若已有涵蓋本次修改的完整套件，可使用該版本，不必重複建置。對外架構名稱使用 `x64`／`arm64`。發行說明應聚焦使用者可見的功能與修正，不把編譯成功描述成實機功能驗證成功。
 
-Windows `pack` 預設產生 x64／ARM64 同版同架構的 `-portable.zip` 與 `-service.zip`；每個 Windows 架構的兩個附件都必須上傳。一般使用者下載 Portable ZIP，暫不發布未簽章的 NSIS `-setup.exe`。服務 ZIP 供已授權服務自行更新，不列為一般 APP 安裝包。只有明確設定 `YOURDESK_WINDOWS_INSTALLER=1` 才額外產生 NSIS；預設封裝會清除平台目錄內舊的 setup.exe，避免誤上傳。發布前從 GitHub API 核對服務 ZIP 的 `size` 與 `digest`（`sha256:`），並核對其 `manifest.json` 版本／架構；缺少服務附件或 GitHub 雜湊時，服務會拒絕更新，不會改以 UAC 安裝。測試版同樣需要完整附件。
+Windows `pack` 預設產生 x64／ARM64 同版同架構的 `-portable.zip` 與 `-service.zip`；每個 Windows 架構的兩個附件都必須上傳。一般使用者下載 Portable ZIP，Windows 發布與 APP 更新均使用 ZIP，不發布 NSIS `-setup.exe`。服務 ZIP 供已授權服務自行更新，不列為一般 APP 安裝包。發行建置明確設定 `YOURDESK_WINDOWS_INSTALLER=0`；封裝會清除平台目錄內舊的 setup.exe，發布附件清單也必須排除所有 `-setup.exe`。腳本保留的 `YOURDESK_WINDOWS_INSTALLER=1` 僅供舊流程相容性用途，不用於公開 Release。發布前從 GitHub API 核對服務 ZIP 的 `size` 與 `digest`（`sha256:`），並核對其 `manifest.json` 版本／架構；缺少服務附件或 GitHub 雜湊時，服務會拒絕更新，不會改以 UAC 安裝。測試版同樣需要完整附件。
 
 ## README 內容定位
 

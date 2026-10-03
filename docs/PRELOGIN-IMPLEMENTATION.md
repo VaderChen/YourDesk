@@ -33,7 +33,7 @@ macOS 自動更新需連續三次確認受保護 broker 可回覆 `health`，且
 
 影像輸出編碼及傳輸策略可在服務啟用時直接修改：由目前主控台透過既有控制管道更新受保護的設定檔，服務自行重建 Host 套用，不需停用服務或重新取得管理員授權。既有被控連線會中斷，需重新連線。重複套用相同設定不再重啟；儲存失敗不改變服務設定，服務拒絕時還原本機偏好。舊服務需先透過 APP 更新取得此能力，不會以刪除限制的方式假裝套用成功。聲音編碼仍由連線協商，不受此限制。
 
-修改配對密碼、IP 直連或 Tailcat 模式仍需先停用再啟用，避免介面與服務設定不同。手動安裝及 Windows ZIP 更新不經上述交接，仍需手動停用再啟用。
+修改配對密碼、IP 直連或 Tailcat 模式仍需先停用再啟用，避免介面與服務設定不同。手動替換套件內容不經上述交接，仍需手動停用再啟用；Windows APP 內的 Portable ZIP 自動更新則沿用服務交接。
 
 取消授權或安裝失敗會回報錯誤；安裝進度經狀態輪詢顯示，不受單次 HTTP 請求的短逾時限制。若清理失敗而保留服務目錄，介面維持服務模式以防重複啟動，應由管理員檢查後再次停用。
 
@@ -60,7 +60,7 @@ MCP 沒有隨此功能安裝成系統服務，也不會自動啟用；原本的 
 - Session 0 的服務以自己的主權杖建立目前主控台 Session 的代理。跨 Session 不繼承匿名管線，改用隨機名稱、SYSTEM 專用的本機管線；密碼不寫入命令列。代理以 `OpenInputDesktop` 取得桌面名稱，在對應 `winsta0` 桌面建立 Host。
 - 代理每秒觀察登入、登出、鎖定與解鎖造成的桌面變化；先回收舊 Host 再建立新 Host。服務亦監看主控台 Session 變更。兩層 Job Object 在父程序退出時終止子程序；另以服務目錄的檔案鎖避免重複 Host。桌面切換需要重新連線，不保證無縫串流。
 - 本機控制管線接受狀態查詢、斷線、已驗證 Host 的 SAS 及官方服務更新交接，拒絕網路登入身分，不提供配對密碼或任意命令。服務 Host 沿用既有 SYSTEM 帳號不可開啟遠端終端機的限制。
-- 停用經 UAC 停止 SCM 服務，等待停止後刪除註冊及專用副本。APP 自動更新會停止並更新服務副本；直接執行安裝程式或解除安裝仍要求先停用服務。一般使用者的站台資料不隨服務移除。
+- 停用經 UAC 停止 SCM 服務，等待停止後刪除註冊及專用副本。APP 自動更新會停止並更新服務副本；手動替換檔案或移除程式仍要求先停用服務。一般使用者的站台資料不隨服務移除。
 - 此次僅做交叉編譯與語法檢查，沒有 Windows 實機測試。仍須驗證 UAC 取消、首次開機、登入／登出、鎖定、快速使用者切換、服務重啟及移除。僅管理實體主控台 Session，不提供多個 RDP 工作階段；不支援 BitLocker 開機前解鎖或安全注意序列 Ctrl+Alt+Del 的合成。
 
 架構依據：[Microsoft 互動式服務](https://learn.microsoft.com/en-us/windows/win32/services/interactive-services)、[CreateProcessAsUser](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessasusera)、[SetThreadDesktop](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setthreaddesktop)。
@@ -71,17 +71,17 @@ MCP 沒有隨此功能安裝成系統服務，也不會自動啟用；原本的 
 
 ### 更新驗證範圍
 
-已以隔離目錄驗證 macOS 更新成功、失敗還原與保留設定，並完成 Windows 交叉編譯及 NSIS 安裝器編譯。尚待實機驗證管理員授權、SCM／launchd 交接及更新後重新連線。Windows 舊服務首次遷移需以目前帳號提升權限；以另一帳號提供 UAC 憑證會停止更新，避免寫入錯誤的使用者安裝登錄。新版服務更新器的安裝器與 APP 始終保留原使用者身分。
+已以隔離目錄驗證 macOS 更新成功、失敗還原與保留設定，並完成 Windows 交叉編譯及 ZIP 套件選擇／解壓驗證。尚待實機驗證管理員授權、SCM／launchd 交接及更新後重新連線。Windows 舊服務首次遷移需以目前帳號提升權限；以另一帳號提供 UAC 憑證會停止更新，避免寫入錯誤的使用者安裝登錄。新版服務更新器的 ZIP 套用程序與 APP 始終保留原使用者身分。
 
 ## Windows 一次授權後的更新
 
 - 第一次啟用登入前服務時，同一次 UAC 同時設定服務產生 SAS 的權限；後續 Ctrl+Alt+Del 由已安裝的服務處理。若管理原則後來撤銷 SAS 權限，不會在每次 APP 啟動時反覆要求 UAC，設定頁仍可由本機使用者明確選擇重新授權。
 - APP 先核對控制管線確實屬於 SCM 登記的 LocalSystem 服務，再查詢更新能力。只有已驗證的舊服務不認識能力查詢時才走首次遷移；新版服務離線、下載失敗或拒絕請求，都直接回報原因，不退回 RunAs。
 - 服務以 OS 提供的管線 PID 查出本機呼叫者 SID 與主控台 session。固定 worker 從 Program Files 的受保護服務副本啟動，另有跨程序檔案鎖；控制管線只授權原 SID／session，不能傳入執行命令、來源檔案或任意目的路徑。
-- worker 自行向 `VaderChen/YourDesk` 的 GitHub Release API 取得同版同架構 `-service.zip`，必須有 GitHub SHA-256 與正確大小。正式版及已發布的測試版都可使用；不接受草稿、未知版本或降版。ZIP 只抽出四個服務檔案，檢查 manifest、PE 架構、重複檔名、連結及路徑越界。一般使用者下載的安裝器、腳本與 DLL 不會交給 SYSTEM 執行或直接複製成服務。
-- 套件準備完成後才讓 APP 退出。worker 先停止及備份服務；一般使用者執行 NSIS，完成後通知 worker 安裝已驗證的服務檔案，啟動並核對服務版本／控制管線，再由原使用者重開 APP。此健康檢查不代表 P2P、螢幕授權或外部網路都已通過。
+- worker 自行向 `VaderChen/YourDesk` 的 GitHub Release API 取得同版同架構 `-service.zip`，必須有 GitHub SHA-256 與正確大小。正式版及已發布的測試版都可使用；不接受草稿、未知版本或降版。ZIP 只抽出四個服務檔案，檢查 manifest、PE 架構、重複檔名、連結及路徑越界。一般使用者下載的 Portable ZIP、腳本與 DLL 不會交給 SYSTEM 執行或直接複製成服務。
+- 套件準備完成後才讓 APP 退出。worker 先停止及備份服務；一般使用者套用已驗證的 Portable ZIP，完成後通知 worker 安裝已驗證的服務檔案，啟動並核對服務版本／控制管線，再由原使用者重開 APP。此健康檢查不代表 P2P、螢幕授權或外部網路都已通過。
 - 安裝、啟動或健康檢查失敗會嘗試還原；worker 不隨 SCM 的停止而結束，交接逾時亦會回復服務。配對設定、SAS 原則與安裝目錄的非管理檔案不受影響。失敗記錄留在使用者更新暫存目錄；無法回復的服務備份保留於 `Program Files/YourDeskPrelogin/updates`，不宣稱可防止斷電造成的所有部分更新。
-- Release 必須同時上傳每個 Windows 架構的 `-setup.exe` 及 `-service.zip`；缺少附件或雜湊時，APP 會留在原版本並顯示錯誤。手動安裝、停用／移除服務及變更配對／網路設定仍需管理員授權；影像編碼與傳輸策略透過既有服務同步，不重新授權。
+- Release 必須同時上傳每個 Windows 架構的 `-portable.zip` 及 `-service.zip`，公開發行不提供 NSIS 安裝包；缺少附件或雜湊時，APP 會留在原版本並顯示錯誤。手動安裝、停用／移除服務及變更配對／網路設定仍需管理員授權；影像編碼與傳輸策略透過既有服務同步，不重新授權。
 
 本輪完成 Windows x64／ARM64 交叉編譯、套件拒絕條件、交易失敗回復與隔離更新腳本 Smoke。尚未在 Windows 實機跑完「首次遷移 → 下一版免 UAC 更新」；不把編譯及替身測試當成實機驗證。
 

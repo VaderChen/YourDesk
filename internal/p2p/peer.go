@@ -470,14 +470,15 @@ func (p *Peer) sendFrame(f Frame, beforeSend func(int) error) error {
 		return ErrFrameDropped
 	}
 	total := (len(f.JPEG) + chunkSize - 1) / chunkSize
+	headerSize := frameHeaderSize
+	if f.ViewID != 0 {
+		headerSize += 8
+	}
+	var msg []byte
 	for i := 0; i < total; i++ {
 		start, end := i*chunkSize, (i+1)*chunkSize
 		if end > len(f.JPEG) {
 			end = len(f.JPEG)
-		}
-		headerSize := frameHeaderSize
-		if f.ViewID != 0 {
-			headerSize += 8
 		}
 		if beforeSend != nil {
 			if err := beforeSend(headerSize + end - start); err != nil {
@@ -487,7 +488,12 @@ func (p *Peer) sendFrame(f Frame, beforeSend func(int) error) error {
 		if p.controlBackpressure() || dc.ReadyState() != webrtc.DataChannelStateOpen || dc.BufferedAmount() > maxScreenBuffer {
 			return ErrFrameDropped
 		}
-		msg := make([]byte, headerSize+end-start)
+		if msg == nil {
+			// Pion SCTP 在 Send 返回前複製 payload；同張影格的後續分片
+			// 可重用暫存。緩衝僅屬於這次呼叫，不跨影格或並行傳送共用。
+			msg = make([]byte, headerSize+min(chunkSize, len(f.JPEG)))
+		}
+		msg = msg[:headerSize+end-start]
 		binary.BigEndian.PutUint64(msg[0:8], f.Sequence)
 		binary.BigEndian.PutUint32(msg[8:12], f.Width)
 		binary.BigEndian.PutUint32(msg[12:16], f.Height)

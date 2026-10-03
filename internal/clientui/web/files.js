@@ -84,13 +84,13 @@
     $('queue-summary').textContent=progressText(received,total,items.length>0&&items.every(item=>item.state==='done'));
     $('queue-progress').max=total||1; $('queue-progress').value=received||(items.length>0&&items.every(item=>item.state==='done')?1:0);
   }
-  function renderItem(item) {
+  function renderItem(item,refreshControls=true) {
     const record=F.transfer(item), speed=item.active ? Math.max(0,(record.offset-item.meter.bytes)/Math.max(.001,(Date.now()-item.meter.time)/1000)) : 0;
     const stage=item.error?errorText({code:item.error}):t(item.state==='queued'?'waiting':item.state==='running'?(item.control.paused?'pausing':'uploading'):item.state==='cancelling'?'cancelPending':item.state);
     item.ui.text.textContent=stage+(item.directory?'':' · '+progressText(record.offset,item.size,item.state==='done',speed,speed>0?(item.size-record.offset)/speed:undefined));
     item.ui.progress.max=item.size||1; item.ui.progress.value=record.offset||(item.state==='done'?1:0);
     item.ui.li.classList.toggle('failed',item.state==='error'||!!item.blocked);
-    queueSummary(); controls();checkClose?.();
+    queueSummary();if(refreshControls)controls();checkClose?.();
   }
   function interruptUploads() {
     for(const item of state.queue) if(!terminal(item)&&!item.control.cancelled) {
@@ -230,7 +230,9 @@
             const result=await F.cancelUpload(item,boundCall);item.state=result.complete?'done':'cancelled';item.error='';
           }else{
             item.state='running';renderItem(item);
-            await F.upload(item,boundCall,()=>renderItem(item),item.control);
+            // Confirmed offsets only change row/aggregate progress. Buttons and
+            // protected paths depend on job state, updated by the other renders.
+            await F.upload(item,boundCall,()=>renderItem(item,false),item.control);
             item.state='done';item.error='';
           }
         }catch(error){
@@ -258,16 +260,19 @@
   async function enqueue(items,files) {
     if(state.closed||state.closing||state.initializing||!state.connected||state.mutating||virtualDirectory)return;
     if(state.scanning||state.listing){status(t('busy'),true);return;}
-    state.scanning=true;controls();status(t('scanning'));
+    const scanInstance=instance;state.scanning=true;controls();status(t('scanning'));
     try{
       const pending=state.queue.filter(item=>!terminal(item)),bytes=pending.reduce((sum,item)=>sum+item.size,0);
       const collected=await F.collect(items,files,state.path,F.MAX_ITEMS-pending.length,F.MAX_BYTES-bytes);
-      if(state.closed||state.closing||!state.connected||state.mutating)return;
+      if(state.closed||state.closing||state.mutating)return;
+      // A scan can outlive its authenticated connection. Keep the selected
+      // Files, but require the same explicit continuation as an interrupted job.
+      const interrupted=!state.connected||scanInstance!==instance;
       const paths=new Set(pending.map(item=>item.path));if(collected.some(item=>paths.has(item.path)))throw new F.FileError('duplicate');
       for(const old of state.queue)if(terminal(old))old.ui.li.remove();
       state.queue=state.queue.filter(item=>!terminal(item));const batch=++state.batch;
-      for(const item of collected){item.batch=batch;item.state='queued';item.control={cancelled:false,paused:false,interrupted:false};state.queue.push(item);queueView(item);}
-      $('queue-empty').hidden=state.queue.length>0;status(t('ready'));void runQueue();
+      for(const item of collected){item.batch=batch;item.state=interrupted?'interrupted':'queued';item.control={cancelled:false,paused:false,interrupted};state.queue.push(item);queueView(item);}
+      $('queue-empty').hidden=state.queue.length>0;status(t(interrupted?'interrupted':'ready'));void runQueue();
     }catch(error){status(errorText(error),true);}
     finally{state.scanning=false;controls();}
   }
@@ -402,9 +407,13 @@
   });
   window.addEventListener('yourdesk-file-progress',event=>{
     const value=event.detail,item=state.download;
-    if(state.closed||!item.pending||item.state==='cancelling'||!value||!Number.isSafeInteger(value.received)||!Number.isSafeInteger(value.total)||value.received<0||value.total<value.received)return;
+    if(state.closed||!item.pending||!value||!Number.isSafeInteger(value.received)||!Number.isSafeInteger(value.total)||value.received<0||value.total<value.received)return;
+    // Native cleanup keeps Prepare pending until its owned partial is removed.
+    // A failed attempt must re-enable Cancel without releasing the download slot.
+    if(item.cancelRequested&&value.state!=='cancelFailed')return;
     item.received=value.received;item.total=value.total;
-    if(['running','paused','interrupted'].includes(value.state))item.state=value.state;
+    if(value.state==='cancelFailed'){item.state='cancelFailed';item.error='cancelFailed';}
+    else if(['running','paused','interrupted'].includes(value.state))item.state=value.state;
     if(value.state==='complete')item.received=value.total;
     item.speed=value.speed;item.eta=value.eta;renderDownload();
   });
@@ -428,7 +437,7 @@
   });
   async function cancelDownload() {
     const item=state.download;if(!item.pending||item.state==='cancelling')return;
-    ++item.generation;item.cancelRequested=true;item.state='cancelling';renderDownload();
+    ++item.generation;item.cancelRequested=true;item.state='cancelling';item.error='';renderDownload();
     item.continueBatch?.();
     try{await window.yourdeskCancelFile();}catch{}
     // Native cancellation schedules worker shutdown. Only the original Prepare

@@ -103,11 +103,15 @@ func (p *Peer) RemoteCommands() CommandCapabilities {
 	return c
 }
 func (p *Peer) SupportsCommand(method string) bool {
-	c := p.RemoteCommands()
-	if c.Version != CommandVersion {
+	p.commandsInit()
+	p.commands.mu.Lock()
+	defer p.commands.mu.Unlock()
+	// Every file chunk checks support; inspect the bounded list under its lock
+	// without allocating the independent snapshot exposed by RemoteCommands.
+	if p.commands.remote.Version != CommandVersion {
 		return false
 	}
-	for _, m := range c.Methods {
+	for _, m := range p.commands.remote.Methods {
 		if m == method {
 			return true
 		}

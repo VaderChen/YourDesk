@@ -272,11 +272,28 @@ func (c *fileDownloadClient) prepareWithControl(ctx context.Context, path, direc
 		return nil
 	}
 	complete := false
+	var identityPin *os.File
 	defer func() {
-		_ = f.Close()
+		defer f.Close()
+		if identityPin != nil {
+			defer identityPin.Close()
+		}
 		if !complete {
-			if ownedPartial() {
-				_ = root.Remove(partial)
+			cleanupErr := cleanupFileDownload(control, func() error {
+				current, statErr := root.Lstat(partial)
+				if errors.Is(statErr, os.ErrNotExist) {
+					return nil
+				}
+				if statErr != nil {
+					return statErr
+				}
+				if !current.Mode().IsRegular() || !os.SameFile(original, current) {
+					return nil
+				}
+				return root.Remove(partial)
+			})
+			if cleanupErr != nil {
+				err = errors.Join(err, errors.New("無法清理下載暫存；請確認下載目錄權限後重試取消"))
 			}
 		}
 	}()
@@ -290,6 +307,7 @@ func (c *fileDownloadClient) prepareWithControl(ctx context.Context, path, direc
 	}
 	emitProgress(0)
 	var offset int64
+	var decoded []byte
 	for offset < meta.Size {
 		if err = ctx.Err(); err != nil {
 			return out, err
@@ -321,11 +339,12 @@ func (c *fileDownloadClient) prepareWithControl(ctx context.Context, path, direc
 			}
 			return out, err
 		}
-		data, e := base64.StdEncoding.DecodeString(chunk.Data)
-		if e != nil || int64(len(data)) != length || chunk.Bytes != len(data) || chunk.NextOffset != offset+length || chunk.EOF != (offset+length == meta.Size) {
+		var decodeErr error
+		decoded, decodeErr = base64.StdEncoding.AppendDecode(decoded[:0], []byte(chunk.Data))
+		if decodeErr != nil || int64(len(decoded)) != length || chunk.Bytes != len(decoded) || chunk.NextOffset != offset+length || chunk.EOF != (offset+length == meta.Size) {
 			return out, errors.New("遠端檔案區塊不完整或已變更")
 		}
-		if _, err = f.Write(data); err != nil {
+		if _, err = f.Write(decoded); err != nil {
 			return out, err
 		}
 		offset += length
@@ -342,6 +361,13 @@ func (c *fileDownloadClient) prepareWithControl(ctx context.Context, path, direc
 		return out, err
 	}
 	if err = f.Sync(); err != nil {
+		return out, err
+	}
+	// Keep the inode alive if closing the writer or publishing fails and cleanup
+	// must wait for another cancellation. Duplicate the open handle rather than
+	// opening the path again: an external replacement may be a special file.
+	identityPin, err = duplicateDownloadFile(f)
+	if err != nil {
 		return out, err
 	}
 	if err = f.Close(); err != nil {

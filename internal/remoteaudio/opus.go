@@ -27,6 +27,7 @@ const opusAvailable = true
 type opusDevice struct {
 	encoder *C.OpusEncoder
 	decoder *C.OpusDecoder
+	pcm     [OpusFrameSamples * Channels]C.opus_int16
 }
 
 func opusError(code C.int) error {
@@ -73,7 +74,9 @@ func (d *opusDevice) close() {
 }
 
 func (d *opusDevice) process(data []byte) ([]byte, error) {
-	pcm := make([]C.opus_int16, OpusFrameSamples*Channels)
+	// The codec and its PCM scratch belong to the same fixed OS thread.
+	// Only the returned packet/samples need independent storage.
+	pcm := d.pcm[:]
 	if d.encoder != nil {
 		if len(data) != len(pcm)*2 {
 			return nil, errors.New("Opus 輸入須為 20 ms 雙聲道 PCM")

@@ -67,6 +67,27 @@ func (s *Source) snapshot() Settings {
 	return v
 }
 func (s *Source) publish(status Status) { s.mu.Lock(); s.status = status; s.mu.Unlock() }
+
+// 只保留最近六包 PCM，且在複製前裁掉過期資料，避免擷取突波擴大配置。
+func appendCapturedPCM(pending, data []byte, frameBytes int) []byte {
+	if len(data) == 0 {
+		return pending
+	}
+	limit := frameBytes * 6
+	if len(data) >= limit {
+		pending = pending[:0]
+		data = data[len(data)-limit:]
+	} else if excess := len(pending) + len(data) - limit; excess > 0 {
+		pending = pending[:copy(pending, pending[excess:])]
+	}
+	if cap(pending) < len(pending)+len(data) {
+		buffer := make([]byte, len(pending), limit)
+		copy(buffer, pending)
+		pending = buffer
+	}
+	return append(pending, data...)
+}
+
 func (s *Source) Run(ctx context.Context, send func([]byte) error) {
 	open := s.open
 	if open == nil {
@@ -146,15 +167,12 @@ func (s *Source) Run(ctx context.Context, send func([]byte) error) {
 			s.publish(Status{Generation: applied.Generation, Error: err.Error()})
 			continue
 		}
-		pending = append(pending, data...)
 		frameBytes := applied.FrameBytes()
-		// 只保留最近六包 PCM，避免暫時阻塞後補播陳舊聲音。
-		if len(pending) > frameBytes*6 {
-			pending = pending[len(pending)-frameBytes*6:]
-		}
-		for len(pending) >= frameBytes {
-			pcm := pending[:frameBytes]
-			pending = pending[frameBytes:]
+		pending = appendCapturedPCM(pending, data, frameBytes)
+		consumed := 0
+		for len(pending)-consumed >= frameBytes {
+			pcm := pending[consumed : consumed+frameBytes]
+			consumed += frameBytes
 			encoded, e := encoder.process(pcm)
 			if len(encoded) == 0 {
 				emptyFrames++
@@ -182,6 +200,10 @@ func (s *Source) Run(ctx context.Context, send func([]byte) error) {
 				sequence++
 				_ = send(Packet{applied.Generation, sequence, applied.WireCodec(), encoded}.Marshal())
 			}
+		}
+		if pending != nil {
+			// 編碼及硬體備援完成後才搬動殘餘資料，保留整個緩衝區供下次擷取重用。
+			pending = pending[:copy(pending, pending[consumed:])]
 		}
 	}
 }

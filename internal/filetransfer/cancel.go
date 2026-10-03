@@ -62,7 +62,9 @@ func (s *session) cancel(raw json.RawMessage) (any, error) {
 		return map[string]any{"ok": true, "state": "complete"}, nil
 	}
 	if u != nil {
-		s.removeUpload(in.ID)
+		if err := s.removeUpload(in.ID); err != nil {
+			return nil, err
+		}
 	}
 	// Missing IDs are idempotent, including lost begin replies and expired
 	// reservations. No other transfer can be affected by this branch.

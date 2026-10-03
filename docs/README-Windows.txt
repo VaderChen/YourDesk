@@ -1,7 +1,7 @@
-Windows x64 免安裝 ZIP：請完整解壓縮後開啟 YourDesk.exe，保留同目錄 DLL 與授權資料；仍需 Microsoft Edge WebView2 Runtime。免安裝版沿用系統使用者設定目錄，並非將設定儲存在 USB 隨身碟。登入前服務仍須另行啟用與管理員授權。
-Portable Windows x64 ZIP: extract all files and run YourDesk.exe. Keep the DLLs and licenses together. Microsoft Edge WebView2 Runtime is required. Settings use the system user profile, not the ZIP folder. The pre-login service requires separate activation and administrator approval.
-Windows x64 ポータブル ZIP：全て展開して YourDesk.exe を実行してください。DLL とライセンスを保持し、WebView2 Runtime を導入してください。設定はユーザープロファイルに保存されます。ログイン前サービスは別途有効化と管理者承認が必要です。
-Windows x64 무설치 ZIP: 전체 압축 해제 후 YourDesk.exe를 실행하세요. DLL과 라이선스를 유지하고 WebView2 Runtime을 설치하세요. 설정은 사용자 프로필에 저장됩니다. 로그인 전 서비스는 별도 활성화와 관리자 승인이 필요합니다.
+Windows x64／ARM64 免安裝 ZIP：請完整解壓縮後開啟 YourDesk.exe，保留同目錄 DLL 與授權資料；仍需 Microsoft Edge WebView2 Runtime。免安裝版沿用系統使用者設定目錄，並非將設定儲存在 USB 隨身碟。登入前服務仍須另行啟用與管理員授權。
+Portable Windows x64 / ARM64 ZIP: extract all files and run YourDesk.exe. Keep the DLLs and licenses together. Microsoft Edge WebView2 Runtime is required. Settings use the system user profile, not the ZIP folder. The pre-login service requires separate activation and administrator approval.
+Windows x64／ARM64 ポータブル ZIP：全て展開して YourDesk.exe を実行してください。DLL とライセンスを保持し、WebView2 Runtime を導入してください。設定はユーザープロファイルに保存されます。ログイン前サービスは別途有効化と管理者承認が必要です。
+Windows x64／ARM64 무설치 ZIP: 전체 압축 해제 후 YourDesk.exe를 실행하세요. DLL과 라이선스를 유지하고 WebView2 Runtime을 설치하세요. 설정은 사용자 프로필에 저장됩니다. 로그인 전 서비스는 별도 활성화와 관리자 승인이 필요합니다.
 
 防毒偵測說明：目前部分防毒軟體會對 YourDesk 發出告警。我們測試的空 Go 專案也出現告警，Go 官方 FAQ 亦說明 Go 程式可能遭誤判；但目前尚未確認正式版的所有告警都是誤報。作者會持續調查與改善，朝消除這些告警的方向努力。請自行評估後下載使用，勿為此關閉防毒保護。
 Antivirus notice: some antivirus products currently flag YourDesk. Our empty Go test project also triggered detections, and the official Go FAQ describes possible false positives for Go programs. However, not all detections in the release have been confirmed as false positives. The author will continue investigating and improving the project to address these alerts. Assess the risk before downloading; do not disable antivirus protection.
@@ -10,9 +10,10 @@ Antivirus notice: some antivirus products currently flag YourDesk. Our empty Go 
 
 繁體中文
 --------------------
-登入前啟動（實驗性功能）：在進階設定開啟後，經管理員授權安裝 Windows 自動啟動服務；開機後不需先登入，即啟動 Host，登入後持續運作。關閉時亦需管理員授權。APP 內更新會自動交接服務，首次安裝或舊服務遷移需一次 UAC，後續支援的更新沿用已授權服務。手動安裝、ZIP 更新或解除安裝前仍請先停用；不支援 BitLocker 開機前解鎖，登入畫面操作仍待實機驗證。
+登入前啟動（實驗性功能）：在進階設定開啟後，經管理員授權安裝 Windows 自動啟動服務；開機後不需先登入，即啟動 Host，登入後持續運作。關閉時亦需管理員授權。APP 內更新會自動交接服務，首次安裝或舊服務遷移需一次 UAC，後續支援的更新沿用已授權服務。手動替換 ZIP 內容或移除程式前仍請先停用服務；APP 內的 ZIP 自動更新沿用服務交接；不支援 BitLocker 開機前解鎖，登入畫面操作仍待實機驗證。
 
-執行 setup.exe 安裝後，從桌面或開始功能表啟動 YourDesk。需要 Microsoft Edge WebView2 Runtime。
+下載符合電腦架構的 -portable.zip，完整解壓縮到具有寫入權限的資料夾，再執行 YourDesk.exe。需要 Microsoft Edge WebView2 Runtime。
+Windows 發布與 APP 自動更新均使用 ZIP，不提供 setup.exe 安裝包。-service.zip 僅供已授權的登入前服務更新，不是一般啟動套件。舊版本若無法辨識 Portable ZIP，請從 GitHub Release 手動下載；手動替換前須先退出 APP，若已啟用登入前服務，另須先停用服務。
 新增站台並輸入對方 ID，選擇桌面或命令列圖示，再輸入對方密碼。雙擊站台可選擇模式。
 設定 → 網路安全可修改本機連線密碼。關閉視窗後仍常駐；從 Tray 選擇關閉程式才會結束。
 
@@ -26,9 +27,10 @@ CLI：-signal 指定配對伺服器；-print-uid 顯示裝置 ID；-print-secret
 
 English
 --------------------
-Start before login (experimental): enable it in Advanced Settings to install an automatic Windows service with administrator approval. The Host starts at boot before sign-in and continues after sign-in. Disabling also requires approval. In-app updates hand off the service automatically. Initial installation or legacy migration needs one UAC approval; subsequent supported updates use the authorized service. Turn it off before manual installation, ZIP updates or uninstalling. BitLocker pre-boot unlock is unsupported; login-screen control still requires on-device validation.
+Start before login (experimental): enable it in Advanced Settings to install an automatic Windows service with administrator approval. The Host starts at boot before sign-in and continues after sign-in. Disabling also requires approval. In-app updates hand off the service automatically. Initial installation or legacy migration needs one UAC approval; subsequent supported updates use the authorized service. Turn the service off before manually replacing ZIP contents or removing the app. In-app ZIP updates use the service handoff. BitLocker pre-boot unlock is unsupported; login-screen control still requires on-device validation.
 
-Run setup.exe and launch YourDesk from the desktop or Start menu. Microsoft Edge WebView2 Runtime is required.
+Download the -portable.zip for your architecture, extract all files to a writable folder, and run YourDesk.exe. Microsoft Edge WebView2 Runtime is required.
+Windows releases and in-app updates use ZIP; setup.exe installers are not published. The -service.zip is only for updating an authorized pre-login service, not for launching the app. If an older version cannot recognize Portable ZIP, download it manually from GitHub Releases. Quit the app and disable any enabled pre-login service before manually replacing files.
 Add a site with the remote ID, choose Desktop or Terminal, then enter the remote password. Double-click a site to choose a mode.
 Change the local connection password in Settings → Network Security. Closing the window keeps the app running; choose Quit in the tray menu to exit.
 
@@ -42,9 +44,10 @@ Set the password for this run with -secret "your password"; no JSON input is nee
 
 日本語
 --------------------
-ログイン前の起動（実験的機能）：詳細設定から管理者の許可で Windows 自動起動サービスをインストールします。ログイン前に Host が起動し、ログイン後も継続します。無効化にも管理者の許可が必要です。アプリ内更新ではサービスを自動で引き継ぎます。初回導入や旧サービス移行は一度 UAC 承認が必要で、以後の対応更新は承認済みサービスを使います。手動インストール、ZIP 更新やアンインストール前には無効にしてください。BitLocker の起動前解除には非対応で、ログイン画面の操作は実機確認が必要です。
+ログイン前の起動（実験的機能）：詳細設定から管理者の許可で Windows 自動起動サービスをインストールします。ログイン前に Host が起動し、ログイン後も継続します。無効化にも管理者の許可が必要です。アプリ内更新ではサービスを自動で引き継ぎます。初回導入や旧サービス移行は一度 UAC 承認が必要で、以後の対応更新は承認済みサービスを使います。ZIP の内容を手動で置き換える場合やアプリを削除する前にはサービスを無効にしてください。アプリ内の ZIP 自動更新はサービスの引き継ぎを使用します。BitLocker の起動前解除には非対応で、ログイン画面の操作は実機確認が必要です。
 
-setup.exe でインストールし、デスクトップまたはスタートメニューから起動します。Microsoft Edge WebView2 Runtime が必要です。
+対応するアーキテクチャの -portable.zip をダウンロードし、書き込み可能なフォルダーに全て展開して YourDesk.exe を実行します。Microsoft Edge WebView2 Runtime が必要です。
+Windows の配布とアプリ内更新は ZIP を使用し、setup.exe インストーラーは公開しません。-service.zip は承認済みのログイン前サービスの更新専用で、通常の起動用ではありません。旧版が Portable ZIP を認識しない場合は GitHub Releases から手動で取得してください。ファイルを手動で置き換える前にアプリを終了し、有効なログイン前サービスも無効にしてください。
 接続先の ID を登録し、デスクトップまたはターミナルを選んで相手のパスワードを入力します。ダブルクリックでもモードを選べます。
 本機の接続パスワードは設定 → ネットワークセキュリティで変更します。ウィンドウを閉じても常駐するため、終了はトレイメニューから行います。
 
@@ -58,9 +61,10 @@ CLI：-signal は配対サーバー、-print-uid は装置 ID 表示、-print-se
 
 한국어
 --------------------
-로그인 전 시작(실험적 기능): 고급 설정에서 관리자 승인으로 Windows 자동 시작 서비스를 설치합니다. 부팅 시 로그인 전에 Host가 시작되며 로그인 후에도 계속 실행됩니다. 끌 때도 승인이 필요합니다. 앱 내 업데이트는 서비스를 자동으로 인계합니다. 최초 설치나 구형 서비스 이전은 한 번의 UAC 승인이 필요하며 이후 지원 업데이트는 승인된 서비스를 사용합니다. 수동 설치, ZIP 업데이트 또는 제거 전에는 꺼 주세요. BitLocker 부팅 전 잠금 해제는 지원하지 않으며 로그인 화면 제어는 실제 장치에서 확인이 필요합니다.
+로그인 전 시작(실험적 기능): 고급 설정에서 관리자 승인으로 Windows 자동 시작 서비스를 설치합니다. 부팅 시 로그인 전에 Host가 시작되며 로그인 후에도 계속 실행됩니다. 끌 때도 승인이 필요합니다. 앱 내 업데이트는 서비스를 자동으로 인계합니다. 최초 설치나 구형 서비스 이전은 한 번의 UAC 승인이 필요하며 이후 지원 업데이트는 승인된 서비스를 사용합니다. ZIP 내용을 수동으로 교체하거나 앱을 제거하기 전에는 서비스를 꺼 주세요. 앱 내 ZIP 자동 업데이트는 서비스 인계를 사용합니다. BitLocker 부팅 전 잠금 해제는 지원하지 않으며 로그인 화면 제어는 실제 장치에서 확인이 필요합니다.
 
-setup.exe로 설치한 후 바탕 화면이나 시작 메뉴에서 실행하세요. Microsoft Edge WebView2 Runtime이 필요합니다.
+컴퓨터 아키텍처에 맞는 -portable.zip을 다운로드하고 쓰기 가능한 폴더에 모든 파일을 압축 해제한 다음 YourDesk.exe를 실행하세요. Microsoft Edge WebView2 Runtime이 필요합니다.
+Windows 배포와 앱 내 업데이트는 ZIP을 사용하며 setup.exe 설치 프로그램은 게시하지 않습니다. -service.zip은 승인된 로그인 전 서비스의 업데이트 전용이며 일반 앱 실행용이 아닙니다. 구버전에서 Portable ZIP을 인식하지 못하면 GitHub Releases에서 직접 다운로드하세요. 파일을 수동으로 교체하기 전에 앱을 종료하고 활성화된 로그인 전 서비스도 꺼 주세요.
 상대 장치 ID로 연결을 추가하고 데스크톱 또는 터미널을 선택한 뒤 상대 암호를 입력하세요. 더블 클릭으로도 모드를 선택할 수 있습니다.
 로컬 연결 암호는 설정 → 네트워크 보안에서 변경합니다. 창을 닫아도 실행되므로 완전히 종료하려면 트레이 메뉴를 사용하세요.
 

@@ -343,7 +343,8 @@ def copy_runtime(prefix, folder):
     folder = Path(folder)
     if (prefix / 'bin/avcodec-62.dll').exists():
         windows_runtime.validate(prefix / 'bin')
-        dlls = list((prefix / 'bin').glob('*.dll'))
+        # 外接磁碟的 AppleDouble sidecar 不是 DLL，不能列入執行時數量檢查。
+        dlls = [path for path in (prefix / 'bin').glob('*.dll') if not path.name.startswith('._')]
     else:
         dlls = [prefix / 'lib' / name for name in ('libavcodec.62.dylib','libavutil.60.dylib','libswscale.9.dylib')]
         if not all(p.is_file() for p in dlls):
@@ -356,6 +357,8 @@ def copy_runtime(prefix, folder):
     dest = folder / 'ThirdPartyLicenses' / 'FFmpeg'
     dest.mkdir(parents=True, exist_ok=True)
     for license_file in (prefix.parent / 'metadata/licenses').iterdir():
+        if license_file.name.startswith('._') or license_file.name == '.DS_Store':
+            continue
         shutil.copy2(license_file, dest / license_file.name)
     # 隨附精確來源及重建腳本，動態函式庫可由使用者替換。
     for name, suffix, _, _ in SOURCES:
