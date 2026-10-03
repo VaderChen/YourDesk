@@ -9,21 +9,22 @@ type av1OBU struct {
 	raw, body []byte
 }
 
-func av1OBUs(data []byte) ([]av1OBU, error) {
+// walkAV1OBUs visits views into data; callers must copy anything they retain.
+func walkAV1OBUs(data []byte, visit func(av1OBU)) error {
 	if len(data) == 0 || len(data) > 32<<20 {
-		return nil, fmt.Errorf("AV1 封包長度無效")
+		return fmt.Errorf("AV1 封包長度無效")
 	}
-	var result []av1OBU
+	count := 0
 	for len(data) > 0 {
 		start := data
 		header := data[0]
 		data = data[1:]
 		if header&0x81 != 0 || header&2 == 0 {
-			return nil, fmt.Errorf("AV1 OBU 標頭無效或未包含長度")
+			return fmt.Errorf("AV1 OBU 標頭無效或未包含長度")
 		}
 		if header&4 != 0 {
 			if len(data) == 0 || data[0]&7 != 0 {
-				return nil, fmt.Errorf("AV1 extension 無效")
+				return fmt.Errorf("AV1 extension 無效")
 			}
 			data = data[1:]
 		}
@@ -39,38 +40,49 @@ func av1OBUs(data []byte) ([]av1OBU, error) {
 			}
 		}
 		if !done || size > uint64(len(data)) {
-			return nil, fmt.Errorf("AV1 OBU 截斷")
+			return fmt.Errorf("AV1 OBU 截斷")
 		}
 		n := int(size)
-		result = append(result, av1OBU{(header >> 3) & 15, start[:len(start)-len(data)+n], data[:n]})
-		data = data[n:]
-		if len(result) > 4096 {
-			return nil, fmt.Errorf("AV1 OBU 過多")
+		count++
+		if count > 4096 {
+			return fmt.Errorf("AV1 OBU 過多")
 		}
+		visit(av1OBU{(header >> 3) & 15, start[:len(start)-len(data)+n], data[:n]})
+		data = data[n:]
 	}
-	return result, nil
+	return nil
 }
 func av1Keyframe(data []byte) (bool, error) {
-	obus, err := av1OBUs(data)
-	if err != nil {
-		return false, err
-	}
 	sequence, reduced, picture, key := false, false, false, false
-	for _, obu := range obus {
+	var invalid string
+	err := walkAV1OBUs(data, func(obu av1OBU) {
+		// Finish syntax validation even after a semantic failure so malformed
+		// trailing OBUs retain the original error precedence.
+		if invalid != "" {
+			return
+		}
 		switch obu.kind {
 		case 1:
 			if len(obu.body) == 0 || picture {
-				return false, fmt.Errorf("AV1 sequence header 無效")
+				invalid = "AV1 sequence header 無效"
+				return
 			}
 			sequence = true
 			reduced = obu.body[0]&8 != 0
 		case 3, 6:
 			if !sequence || len(obu.body) == 0 || picture {
-				return false, fmt.Errorf("AV1 需單一影格及 sequence header")
+				invalid = "AV1 需單一影格及 sequence header"
+				return
 			}
 			picture = true
 			key = reduced || (obu.body[0]&0x80 == 0 && (obu.body[0]>>5)&3 == 0)
 		}
+	})
+	if err != nil {
+		return false, err
+	}
+	if invalid != "" {
+		return false, fmt.Errorf("%s", invalid)
 	}
 	if !picture {
 		return false, fmt.Errorf("AV1 封包缺少影格")
@@ -78,29 +90,36 @@ func av1Keyframe(data []byte) (bool, error) {
 	return key, nil
 }
 func packAV1(data, config []byte, sequence *[]byte) ([]byte, error) {
-	obus, err := av1OBUs(data)
+	var header []byte
+	err := walkAV1OBUs(data, func(obu av1OBU) {
+		if obu.kind == 1 {
+			header = obu.raw
+		}
+	})
 	if err != nil {
 		return nil, err
 	}
-	found := false
-	for _, obu := range obus {
-		if obu.kind == 1 {
-			*sequence = append((*sequence)[:0], obu.raw...)
-			found = true
-		}
+	found := header != nil
+	if found {
+		*sequence = append((*sequence)[:0], header...)
 	}
 	if !found && len(*sequence) == 0 && len(config) > 4 && config[0] == 0x81 {
-		if extra, e := av1OBUs(config[4:]); e == nil {
-			for _, obu := range extra {
-				if obu.kind == 1 {
-					*sequence = append([]byte(nil), obu.raw...)
-				}
+		if e := walkAV1OBUs(config[4:], func(obu av1OBU) {
+			if obu.kind == 1 {
+				header = obu.raw
 			}
+		}); e == nil && header != nil {
+			*sequence = append([]byte(nil), header...)
 		}
 	}
 	payload := data
 	if !found {
-		payload = append(append([]byte(nil), (*sequence)...), data...)
+		if len(*sequence) > (32<<20)-len(data) {
+			return nil, fmt.Errorf("AV1 封包長度無效")
+		}
+		// data is nonempty. Capping the prefix forces a new backing array while
+		// append copies both parts without first zeroing the complete payload.
+		payload = append((*sequence)[:len(*sequence):len(*sequence)], data...)
 	}
 	if _, err = av1Keyframe(payload); err != nil {
 		return nil, err

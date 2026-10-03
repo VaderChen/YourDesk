@@ -32,6 +32,8 @@ type Viewer struct {
 	// JPEG 模式會把一張桌面拆成多個區塊影格；不能只保留最後一筆，
 	// 否則 Android 尚未讀取前面的區塊時，合成基底就會缺塊。
 	frames             []*p2p.Frame
+	frameHead          int
+	frameCount         int
 	frameGeneration    uint64
 	frameBytes         int
 	awaitingKeyframe   bool
@@ -181,6 +183,8 @@ const (
 
 func (v *Viewer) resetFramesLocked(generation uint64) {
 	v.frames = nil
+	v.frameHead = 0
+	v.frameCount = 0
 	v.frameBytes = 0
 	v.frameGeneration = generation
 	v.awaitingKeyframe = true
@@ -201,8 +205,10 @@ func (v *Viewer) enqueueSessionFrame(f p2p.Frame, generation uint64) {
 		v.frameMu.Unlock()
 		return
 	}
-	if len(f.JPEG) == 0 || len(f.JPEG) > maxQueuedFrameBytes || len(v.frames) >= maxQueuedFrames || v.frameBytes > maxQueuedFrameBytes-len(f.JPEG) {
+	if len(f.JPEG) == 0 || len(f.JPEG) > maxQueuedFrameBytes || v.frameCount >= maxQueuedFrames || v.frameBytes > maxQueuedFrameBytes-len(f.JPEG) {
 		v.frames = nil
+		v.frameHead = 0
+		v.frameCount = 0
 		v.frameBytes = 0
 		v.awaitingKeyframe = true
 		v.recoveryPending = true
@@ -216,7 +222,17 @@ func (v *Viewer) enqueueSessionFrame(f p2p.Frame, generation uint64) {
 		v.awaitingKeyframe = false
 		v.recoveryPending = false
 	}
-	v.frames = append(v.frames, &copyFrame)
+	// Grow only when full. A ring keeps dequeue O(1) without retaining consumed
+	// payloads; reconnect and overflow still release the complete queue.
+	if v.frameCount == len(v.frames) {
+		frames := make([]*p2p.Frame, min(maxQueuedFrames, max(1, len(v.frames)*2)))
+		n := copy(frames, v.frames[v.frameHead:])
+		copy(frames[n:], v.frames[:v.frameHead])
+		v.frames = frames
+		v.frameHead = 0
+	}
+	v.frames[(v.frameHead+v.frameCount)%len(v.frames)] = &copyFrame
+	v.frameCount++
 	v.frameBytes += len(f.JPEG)
 	v.frameMu.Unlock()
 
@@ -262,14 +278,14 @@ func (v *Viewer) ReadFrameJSON() string {
 
 func (v *Viewer) popFrame() *p2p.Frame {
 	v.frameMu.Lock()
-	if len(v.frames) == 0 {
+	if v.frameCount == 0 {
 		v.frameMu.Unlock()
 		return nil
 	}
-	f := v.frames[0]
-	copy(v.frames, v.frames[1:])
-	v.frames[len(v.frames)-1] = nil
-	v.frames = v.frames[:len(v.frames)-1]
+	f := v.frames[v.frameHead]
+	v.frames[v.frameHead] = nil
+	v.frameHead = (v.frameHead + 1) % len(v.frames)
+	v.frameCount--
 	v.frameBytes -= len(f.JPEG)
 	// JSON/Base64 costs scale with payload size. Never hold the receive lock
 	// while serializing or copying the return string across the JNI boundary.

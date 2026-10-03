@@ -83,6 +83,41 @@ async function main() {
     assert.equal(await page.locator('[data-site-id="older"] [data-connect-mode="files"]').isDisabled(),true);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),true,'main page overflow');
     await page.screenshot({path:path.join(output,'main-820x640.png')});
+    const libraryChecks = await page.evaluate(() => {
+      const saved = {library: state.library, presence: sitePresence, group: selectedGroup, query: document.querySelector('#search').value};
+      try {
+        state.library = {
+          groups: Array.from({length: 40}, (_, i) => ({id: `g${i}`, name: `Group ${i}`})),
+          sites: Array.from({length: 500}, (_, i) => ({id: `s${i}`, name: `Device ${i}`, room: `room-${i}`, note: `note-${i}`, group: i < 480 ? `g${i % 40}` : ''})),
+        };
+        sitePresence = Object.fromEntries(state.library.sites.map(site => [site.id, {online: true, capabilities: {desktop: true, terminal: true, files: true}}]));
+        selectedGroup = '*'; document.querySelector('#search').value = '';
+        renderLibrary(); refreshSiteDeviceStatuses(); refreshSiteCapabilities();
+        const counts = [...document.querySelectorAll('.group-count')].map(node => Number(node.textContent));
+        const all = document.querySelectorAll('.site-card').length;
+        const names = [...document.querySelectorAll('.site-card .card-title p')].slice(0, 40).map(node => node.textContent);
+        selectedGroup = 'g2'; renderLibrary();
+        const group = [...document.querySelectorAll('.site-card')].map(card => card.dataset.siteId);
+        document.querySelector('#search').value = 'NOTE-42'; renderSites();
+        const search = [...document.querySelectorAll('.site-card')].map(card => card.dataset.siteId);
+        // Same array, replaced site: per-pass indexes must never retain stale records.
+        state.library.sites[42] = {...state.library.sites[42], id: 'replacement'};
+        sitePresence.replacement = {online: true, capabilities: {desktop: true, terminal: true, files: false}};
+        renderSites(); refreshSiteDeviceStatuses(); refreshSiteCapabilities();
+        const unavailable = document.querySelector('[data-site-id="replacement"] [data-connect-mode="files"]').disabled;
+        return {counts, all, names, group, search, unavailable};
+      } finally {
+        state.library = saved.library; sitePresence = saved.presence; selectedGroup = saved.group;
+        document.querySelector('#search').value = saved.query;
+        renderLibrary(); refreshSiteDeviceStatuses(); refreshSiteCapabilities();
+      }
+    });
+    assert.equal(libraryChecks.all, 500);
+    assert.deepEqual(libraryChecks.counts, [500, ...Array(40).fill(12), 20]);
+    assert.deepEqual(libraryChecks.names, Array.from({length: 40}, (_, i) => `Group ${i}`));
+    assert.deepEqual(libraryChecks.group, Array.from({length: 12}, (_, i) => `s${i * 40 + 2}`));
+    assert.deepEqual(libraryChecks.search, ['s42']);
+    assert.equal(libraryChecks.unavailable, true);
     await page.locator('[data-site-id="files"] [data-connect-mode="files"]').click();
     await page.waitForFunction(() => !document.querySelector('#connection-progress-dialog').open);
     for (let i=0;i<30 && !actions.some(item => item.api === 'files/window');i++) await page.waitForTimeout(100);

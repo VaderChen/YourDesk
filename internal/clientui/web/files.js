@@ -78,11 +78,16 @@
     $('download-cancel').disabled=download.state==='cancelling';
   }
   function queueSummary() {
-    const items=state.queue.filter(item=>!item.directory&&item.state!=='cancelled');
-    const total=items.reduce((sum,item)=>sum+item.size,0), received=items.reduce((sum,item)=>sum+(item.transfer?.offset||0),0);
-    $('queue-summary').hidden=!items.length; $('queue-progress').hidden=!items.length;
-    $('queue-summary').textContent=progressText(received,total,items.length>0&&items.every(item=>item.state==='done'));
-    $('queue-progress').max=total||1; $('queue-progress').value=received||(items.length>0&&items.every(item=>item.state==='done')?1:0);
+    let count=0,total=0,received=0,complete=true;
+    for(const item of state.queue) {
+      if(item.directory||item.state==='cancelled')continue;
+      count++;total+=item.size;received+=item.transfer?.offset||0;
+      complete=complete&&item.state==='done';
+    }
+    complete=complete&&count>0;
+    $('queue-summary').hidden=!count; $('queue-progress').hidden=!count;
+    $('queue-summary').textContent=progressText(received,total,complete);
+    $('queue-progress').max=total||1; $('queue-progress').value=received||(complete?1:0);
   }
   function renderItem(item,refreshControls=true) {
     const record=F.transfer(item), speed=item.active ? Math.max(0,(record.offset-item.meter.bytes)/Math.max(.001,(Date.now()-item.meter.time)/1000)) : 0;

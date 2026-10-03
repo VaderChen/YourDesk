@@ -199,10 +199,22 @@ function applySiteDeviceStatus(icon, site) {
  icon.setAttribute('aria-label',i18n.t(label));
 }
 function refreshSiteDeviceStatuses() {
+ const sites=indexById(state.library.sites);
  document.querySelectorAll('.site-card').forEach(card=>{
   const icon=card.querySelector('.mini-device');
-  if(icon)applySiteDeviceStatus(icon,state.library.sites.find(site=>site.id===card.dataset.siteId));
+  if(icon)applySiteDeviceStatus(icon,sites.get(card.dataset.siteId));
  });
+}
+// Per-pass indexes cannot outlive mutable library data. Keep the first entry,
+// matching Array.find even if imported data contains duplicate IDs.
+function indexById(items) {
+ const index=new Map();
+ for(const item of items)if(!index.has(item.id))index.set(item.id,item);
+ return index;
+}
+function refreshSiteCapabilities() {
+ const sites=indexById(state.library.sites);
+ document.querySelectorAll('.site-card').forEach(card=>applySiteCapabilities(card,sites.get(card.dataset.siteId)));
 }
 function siteOnline(site) { const value=sitePresence[site?.id]; return value && typeof value==='object'?value.online:value; }
 function siteCapability(site,name) { return sitePresence[site?.id]?.capabilities?.[name]; }
@@ -242,6 +254,8 @@ function renderDevice() {
 }
 function renderLibrary() {
   const { groups, sites } = state.library;
+  const counts = new Map();
+  for (const site of sites) counts.set(site.group, (counts.get(site.group) || 0) + 1);
   if(selectedGroup!=='*' && selectedGroup!=='' && !groups.some(group=>group.id===selectedGroup))rememberGroup('*');
   $('#groups').replaceChildren();
   const options = [{ id: '*', name: i18n.t('所有站台') }, ...groups, { id: '', name: i18n.t('未分組') }];
@@ -249,7 +263,7 @@ function renderLibrary() {
     const row = text('div', '', `group-row${selectedGroup === group.id ? ' active' : ''}`);
     const select = button('', 'group-button', () => { rememberGroup(group.id); renderLibrary(); });
     select.setAttribute('aria-current', selectedGroup === group.id ? 'true' : 'false');
-    select.append(text('span', group.id === '*' ? '▦' : '▱'), text('span', group.name, 'group-name'), text('span', group.id === '*' ? sites.length : sites.filter(site => site.group === group.id).length, 'group-count'));
+    select.append(text('span', group.id === '*' ? '▦' : '▱'), text('span', group.name, 'group-name'), text('span', group.id === '*' ? sites.length : counts.get(group.id) || 0, 'group-count'));
     row.append(select);
     if (group.id && group.id !== '*') {
       row.dataset.groupId = group.id;
@@ -289,7 +303,8 @@ function siteIconButton(icon, label, onClick, active = false) {
 function renderSites() {
   if (siteDrag) return;
   const query = $('#search').value.trim().toLocaleLowerCase();
-  const sites = state.library.sites.filter(site => (selectedGroup === '*' || site.group === selectedGroup) && `${site.name} ${site.room} ${site.note}`.toLocaleLowerCase().includes(query));
+  const sites = state.library.sites.filter(site => (selectedGroup === '*' || site.group === selectedGroup) && (!query || `${site.name} ${site.room} ${site.note}`.toLocaleLowerCase().includes(query)));
+  const groups = indexById(state.library.groups);
   $('#filter-count').textContent = i18n.t(`${sites.length} 個站台`);
   $('#site-list').replaceChildren();
   if (!sites.length) {
@@ -313,7 +328,7 @@ function renderSites() {
     const header = text('div', '', 'card-header');
     const title = text('div', '', 'card-title');
     const name = text('h3', site.name); name.dataset.tooltip = site.name;
-    title.append(name, text('p', groupName(site.group)));
+    title.append(name, text('p', groups.get(site.group)?.name || i18n.t('未分組')));
     const device = text('span', '', 'mini-device');
     applySiteDeviceStatus(device,site);
     const screen = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -512,7 +527,7 @@ async function updateRunning() {
   lastNotice = latest.notice;
   renderDevice();
   if (changed) renderSites();
-  document.querySelectorAll('.site-card').forEach(card=>applySiteCapabilities(card,state.library.sites.find(site=>site.id===card.dataset.siteId)));
+  refreshSiteCapabilities();
   renderQuick();
 }
 function stop(key) {

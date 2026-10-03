@@ -29,6 +29,7 @@ type session struct {
 	stopped           bool
 	tty               console
 	buffer, pending   []byte
+	bufferRead        int
 	sequence, written uint64
 	ended             bool
 	failure           string
@@ -53,14 +54,14 @@ func (s *session) read() {
 	for {
 		n, e := s.tty.Read(b)
 		s.mu.Lock()
-		for len(s.buffer)+n > 256*1024 && !s.stopped {
+		for s.bufferedOutput()+n > 256*1024 && !s.stopped {
 			s.space.Wait()
 		}
 		if s.stopped {
 			s.mu.Unlock()
 			return
 		}
-		s.buffer = append(s.buffer, b[:n]...)
+		s.appendOutput(b[:n])
 		if e != nil {
 			s.ended = true
 		}
@@ -71,6 +72,55 @@ func (s *session) read() {
 		}
 	}
 }
+
+// These helpers run with s.mu held. The working buffer may be reused, but each
+// pending response must remain immutable while P2P marshals it outside the lock.
+func (s *session) bufferedOutput() int { return len(s.buffer) - s.bufferRead }
+
+func (s *session) appendOutput(data []byte) {
+	if len(s.buffer)+len(data) > cap(s.buffer) {
+		n := s.bufferedOutput()
+		if n+len(data) > cap(s.buffer) {
+			buffer := make([]byte, n, min(256*1024, max(n+len(data), cap(s.buffer)*2)))
+			copy(buffer, s.buffer[s.bufferRead:])
+			s.buffer = buffer
+		} else {
+			copy(s.buffer, s.buffer[s.bufferRead:])
+			s.buffer = s.buffer[:n]
+		}
+		s.bufferRead = 0
+	}
+	s.buffer = append(s.buffer, data...)
+}
+
+type readResult struct {
+	Data     []byte `json:"data"`
+	Ended    bool   `json:"ended"`
+	Error    string `json:"error"`
+	Sequence uint64 `json:"sequence"`
+}
+
+func (s *session) readOutput(ack uint64) (readResult, error) {
+	if ack > s.sequence {
+		return readResult{}, errors.New("終端機輸出序號無效")
+	}
+	if ack == s.sequence {
+		s.pending = nil
+	}
+	if len(s.pending) == 0 && s.bufferedOutput() > 0 {
+		n := min(s.bufferedOutput(), 4096)
+		s.pending = append([]byte(nil), s.buffer[s.bufferRead:s.bufferRead+n]...)
+		s.bufferRead += n
+		if s.bufferRead == len(s.buffer) {
+			s.buffer = s.buffer[:0]
+			s.bufferRead = 0
+		}
+		s.space.Broadcast()
+		s.sequence++
+	}
+	return readResult{s.pending, s.ended && s.bufferedOutput() == 0, s.failure, s.sequence}, nil
+}
+
 func Available() bool { return useraccess.Allowed() && supported() }
 
 func Register(peer *p2p.Peer, authorized func() bool, active func(bool)) {
@@ -185,20 +235,7 @@ func Register(peer *p2p.Peer, authorized func() bool, active func(bool)) {
 					return nil, errors.New("輸入過快，請重新連線。")
 				}
 			}
-			if in.Ack > s.sequence {
-				return nil, errors.New("終端機輸出序號無效")
-			}
-			if in.Ack == s.sequence {
-				s.pending = nil
-			}
-			if len(s.pending) == 0 && len(s.buffer) > 0 {
-				n := min(len(s.buffer), 4096)
-				s.pending = append([]byte(nil), s.buffer[:n]...)
-				s.buffer = s.buffer[n:]
-				s.space.Broadcast()
-				s.sequence++
-			}
-			return map[string]any{"sequence": s.sequence, "data": s.pending, "ended": s.ended && len(s.buffer) == 0, "error": s.failure}, nil
+			return s.readOutput(in.Ack)
 		})
 	}
 }

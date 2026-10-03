@@ -63,6 +63,7 @@ import com.yourdesk.android.video.EncodedVideoFrame;
 import com.yourdesk.android.video.MediaCodecVideoDecoder;
 import com.yourdesk.android.audio.RemoteAudioPlayer;
 import com.yourdesk.android.audio.RemoteAudioSession;
+import com.yourdesk.android.update.AppUpdater;
 
 /** Android Viewer：WebView 負責介面，原生畫面元件負責合成 JPEG 差分影格。 */
 public final class MainActivity extends ComponentActivity {
@@ -134,6 +135,9 @@ public final class MainActivity extends ComponentActivity {
   private volatile Viewer viewer = new Viewer();
   private volatile TerminalSession terminal;
   private SiteStore siteStore;
+  private AppUpdater appUpdater;
+  private boolean updatePageIdle, updateConnecting;
+  private String updateLanguage = "zh-Hant";
   private boolean foreground;
   private String homeMessage = "";
   private boolean inTerminal;
@@ -215,6 +219,7 @@ public final class MainActivity extends ComponentActivity {
     setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR);
     super.onCreate(b);
     siteStore = new SiteStore(getPreferences(0));
+    appUpdater = new AppUpdater(this);
     audioEnabled = getPreferences(0).getBoolean("remoteAudioEnabled", false);
     audioManager = (android.media.AudioManager) getSystemService(Context.AUDIO_SERVICE);
     setVolumeControlStream(android.media.AudioManager.STREAM_MUSIC);
@@ -304,6 +309,8 @@ public final class MainActivity extends ComponentActivity {
       }
       @Override public boolean onRenderProcessGone(WebView view, android.webkit.RenderProcessGoneDetail detail) {
         // 系統已終止 renderer；由 Activity 重建所有本地頁面與 native session。
+        updatePageIdle = false;
+        refreshAppUpdater();
         generation++;
         inDesktop = false;
         inTerminal = false;
@@ -1165,6 +1172,9 @@ public final class MainActivity extends ComponentActivity {
     hideDesktopKeyboard();
     inTerminal = false;
     inDesktop = false;
+    updatePageIdle = false;
+    updateConnecting = false;
+    refreshAppUpdater();
     updateKeyboardLayout();
     if (nativeScreen != null) nativeScreen.setVisibility(View.GONE);
     if (nativeBack != null) nativeBack.setVisibility(View.GONE);
@@ -1567,6 +1577,7 @@ public final class MainActivity extends ComponentActivity {
   private void startQrScannerOnMain() {
     if (isDestroyed() || isFinishing()) return;
     qrScanning = true;
+    refreshAppUpdater();
     if (checkSelfPermission(android.Manifest.permission.CAMERA) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
       requestCameraPermissionOnMain();
       return;
@@ -1602,6 +1613,7 @@ public final class MainActivity extends ComponentActivity {
 
   private void stopQrScannerOnMain() {
     qrScanning = false;
+    refreshAppUpdater();
     qrGeneration++;
     if (qrAnalysis != null) {
       qrAnalysis.clearAnalyzer();
@@ -1657,6 +1669,14 @@ public final class MainActivity extends ComponentActivity {
   }
 
   final class Bridge {
+    @JavascriptInterface public void setUpdateState(boolean idle, String language) {
+      runOnUiThread(() -> {
+        if (isDestroyed()) return;
+        updatePageIdle = idle;
+        updateLanguage = language == null ? "zh-Hant" : language;
+        refreshAppUpdater();
+      });
+    }
     @JavascriptInterface public String loadSites() { return siteStore.loadSites(); }
     @JavascriptInterface public boolean saveSites(String json) { return siteStore.saveSites(json); }
     @JavascriptInterface public String saveSite(String json, String original, String secret, boolean forget) {
@@ -1763,6 +1783,8 @@ public final class MainActivity extends ComponentActivity {
 
     @JavascriptInterface public void abortConnection() {
       runOnUiThread(() -> {
+        updateConnecting = false;
+        refreshAppUpdater();
         setDesktopFullscreen(false);
         hideDesktopKeyboard();
         generation++;
@@ -1784,6 +1806,8 @@ public final class MainActivity extends ComponentActivity {
     @JavascriptInterface public void connectSession(String payload) {
       runOnUiThread(() -> {
         if (isDestroyed() || io.isShutdown()) return;
+        updateConnecting = true;
+        refreshAppUpdater();
         stopQrScannerOnMain();
         final int epoch = ++generation;
         final Viewer previous = viewer;
@@ -1812,6 +1836,8 @@ public final class MainActivity extends ComponentActivity {
               terminal = ready;
               inTerminal = mode.equals("shell");
               inDesktop = mode.equals("desktop");
+              updateConnecting = false;
+              refreshAppUpdater();
               updateKeyboardLayout();
               getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
               if (inDesktop) {
@@ -1827,8 +1853,11 @@ public final class MainActivity extends ComponentActivity {
             });
           } catch (Exception e) {
             session.close();
-            runOnUiThread(() -> { if (epoch == generation && !isDestroyed())
-              web.evaluateJavascript("window.connectionFailed&&window.connectionFailed()", null); });
+            runOnUiThread(() -> { if (epoch == generation && !isDestroyed()) {
+              updateConnecting = false;
+              refreshAppUpdater();
+              web.evaluateJavascript("window.connectionFailed&&window.connectionFailed()", null);
+            } });
           }
         });
       });
@@ -1877,9 +1906,15 @@ public final class MainActivity extends ComponentActivity {
         && uri.getPath().startsWith("/assets/");
   }
 
+  private void refreshAppUpdater() {
+    if (appUpdater != null) appUpdater.setState(foreground && updatePageIdle && !updateConnecting
+        && !inDesktop && !inTerminal && !qrScanning, updateLanguage);
+  }
+
   @Override protected void onResume() {
     super.onResume();
     foreground = true;
+    refreshAppUpdater();
     if (web != null) web.onResume();
     if (inDesktop) {
       jpegPolicy.invalidate();
@@ -1892,6 +1927,7 @@ public final class MainActivity extends ComponentActivity {
 
   @Override protected void onPause() {
     foreground = false;
+    refreshAppUpdater();
     refreshRemoteAudio();
     cancelDesktopGesture();
     videoDecoder.reset();
@@ -1908,6 +1944,7 @@ public final class MainActivity extends ComponentActivity {
   }
 
   @Override protected void onDestroy() {
+    if (appUpdater != null) appUpdater.close();
     stopQrScannerOnMain();
     uiHandler.removeCallbacksAndMessages(null);
     if (fullscreenExitGesture != null) fullscreenExitGesture.reset();

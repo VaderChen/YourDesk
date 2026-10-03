@@ -40,7 +40,9 @@ IP 허용 목록은 기본으로 켜져 있고 `127.0.0.1`만 허용합니다. �
 
 ## 다운로드와 시작
 
-[GitHub Releases](https://github.com/VaderChen/YourDesk/releases/latest)에서 macOS Apple Silicon용 DMG, Windows x64 또는 Windows ARM64 Portable ZIP을 받으세요. macOS 패키지는 서명 및 Apple 공증을 완료했습니다. 휴대폰용 Viewer는 [Android 릴리스](https://github.com/VaderChen/YourDesk/releases/tag/1.26.1002-build-2301)에서 다운로드하세요.
+변경 사항과 검증 범위는 [1.26.1003 build 2028 릴리스 노트](RELEASE-1.26.1003-build-2028.md)를 참고하세요. Android는 [업데이트 자동 감지·다운로드](ANDROID-UPDATES.md)를 지원합니다. 기존 사용자는 이번 버전을 한 번 수동 설치해야 하며 이후 설치도 Android에서 확인해야 합니다.
+
+[GitHub Releases](https://github.com/VaderChen/YourDesk/releases/latest)에서 macOS Apple Silicon용 DMG, Windows x64 또는 Windows ARM64 Portable ZIP을 받으세요. macOS 패키지는 서명 및 Apple 공증을 완료했습니다. 휴대폰용 Viewer는 [Android 릴리스](https://github.com/VaderChen/YourDesk/releases/tag/1.26.1003-build-2028)에서 다운로드하세요.
 
 | 플랫폼 | 다운로드 패키지 |
 | --- | --- |
@@ -48,13 +50,13 @@ IP 허용 목록은 기본으로 켜져 있고 `127.0.0.1`만 허용합니다. �
 | Windows x64 | Portable ZIP |
 | Windows on ARM (WOA) | Portable ZIP |
 | Linux x64 / arm64 | CLI Host ZIP (데스크톱 / REMOTE 미포함) |
-| Android 8.0 이상 / arm64 | [Android ZIP](https://github.com/VaderChen/YourDesk/releases/download/1.26.1002-build-2301/YourDesk-1.26.1002-build-2301-android-arm64.zip) (압축 해제 후 서명된 APK 설치, 휴대폰용 Viewer) |
+| Android 8.0 이상 / arm64 | [Android ZIP](https://github.com/VaderChen/YourDesk/releases/download/1.26.1003-build-2028/YourDesk-1.26.1003-build-2028-android-arm64.zip) (압축 해제 후 서명된 APK 설치, 휴대폰용 Viewer) |
 
 1. 두 컴퓨터에 YourDesk를 설치하고 실행합니다.
 2. 원격 ID를 입력하거나 저장한 연결을 선택합니다.
 3. 연결 암호를 입력하면 원격 제어를 시작할 수 있습니다.
 
-Android에서는 ZIP 압축을 푼 뒤 포함된 APK를 휴대폰에 설치하세요. 원격 컴퓨터에서는 YourDesk Host를 실행하세요. 기능, 업그레이드 방법, 검증 범위는 [Android 릴리스 노트](RELEASE-1.26.1002-build-2301.md#한국어)를 참고하세요.
+Android에서는 ZIP 압축을 푼 뒤 포함된 APK를 휴대폰에 설치하세요. 원격 컴퓨터에서는 YourDesk Host를 실행하세요. 기능, 업그레이드 방법, 검증 범위는 [Android 릴리스 노트](RELEASE-1.26.1003-build-2028.md#한국어)를 참고하세요.
 
 macOS에서 원격 데스크톱을 제어하려면 화면 기록과 손쉬운 사용 권한이 필요합니다. 전용 파일 전송은 화면 캡처나 키보드·마우스 제어를 시작하지 않지만 일반 파일 접근 권한은 필요합니다. 클립보드로 원격 파일을 수신할 때 네트워크 볼륨 접근을 요청하면 허용하세요. 이전에 거부했다면 시스템 설정 → 개인정보 보호 및 보안 → 파일 및 폴더에서 YourDesk의 권한을 허용하고 다시 복사하세요. Windows에는 WebView2 Runtime이 필요합니다. Intel Mac과 Linux 데스크톱 버전은 지원하지 않습니다. 원격 컴퓨터에서 활성화하면 IP 직접 연결도 가능합니다. 연결은 암호화되며 직접 통신이 가능한 네트워크가 필요합니다.
 

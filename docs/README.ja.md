@@ -40,7 +40,9 @@ IP 許可リストは初期状態で有効、許可先は `127.0.0.1` のみで�
 
 ## ダウンロードと使い方
 
-[GitHub Releases](https://github.com/VaderChen/YourDesk/releases/latest) から、macOS Apple Silicon 用 DMG、Windows x64 または Windows ARM64 用 Portable ZIPをダウンロードしてください。macOS 版は署名・Apple 公証済みです。スマートフォン向け Viewer は [Android リリース](https://github.com/VaderChen/YourDesk/releases/tag/1.26.1002-build-2301)からダウンロードしてください。
+変更内容と検証範囲は [1.26.1003 build 2028 リリースノート](RELEASE-1.26.1003-build-2028.md)を参照してください。Android は[更新の自動検出・ダウンロード](ANDROID-UPDATES.md)に対応します。既存の利用者は最初に本版を手動インストールし、以後もインストール時は Android で確認してください。
+
+[GitHub Releases](https://github.com/VaderChen/YourDesk/releases/latest) から、macOS Apple Silicon 用 DMG、Windows x64 または Windows ARM64 用 Portable ZIPをダウンロードしてください。macOS 版は署名・Apple 公証済みです。スマートフォン向け Viewer は [Android リリース](https://github.com/VaderChen/YourDesk/releases/tag/1.26.1003-build-2028)からダウンロードしてください。
 
 | プラットフォーム | ダウンロードパッケージ |
 | --- | --- |
@@ -48,13 +50,13 @@ IP 許可リストは初期状態で有効、許可先は `127.0.0.1` のみで�
 | Windows x64 | Portable ZIP |
 | Windows on ARM（WOA） | Portable ZIP |
 | Linux x64／arm64 | CLI Host ZIP（デスクトップ／REMOTE なし） |
-| Android 8.0 以降／arm64 | [Android ZIP](https://github.com/VaderChen/YourDesk/releases/download/1.26.1002-build-2301/YourDesk-1.26.1002-build-2301-android-arm64.zip)（展開後に署名済み APK をインストールするスマートフォン向け Viewer） |
+| Android 8.0 以降／arm64 | [Android ZIP](https://github.com/VaderChen/YourDesk/releases/download/1.26.1003-build-2028/YourDesk-1.26.1003-build-2028-android-arm64.zip)（展開後に署名済み APK をインストールするスマートフォン向け Viewer） |
 
 1. 両方のパソコンに YourDesk をインストールして起動します。
 2. リモート ID を入力するか、保存した接続先を選びます。
 3. 接続パスワードを入力して操作を開始します。
 
-Android では ZIP を展開して、中の APK をスマートフォンにインストールしてください。リモートコンピューターでは YourDesk Host を起動します。機能、更新手順、検証の制限は [Android リリースノート](RELEASE-1.26.1002-build-2301.md#日本語)を参照してください。
+Android では ZIP を展開して、中の APK をスマートフォンにインストールしてください。リモートコンピューターでは YourDesk Host を起動します。機能、更新手順、検証の制限は [Android リリースノート](RELEASE-1.26.1003-build-2028.md#日本語)を参照してください。
 
 macOS でリモートデスクトップを操作するには、画面収録とアクセシビリティの許可が必要です。専用ファイル転送は画面取得やキーボード・マウス操作を開始しませんが、通常のファイルアクセス権限は必要です。クリップボード経由でリモートファイルを受信する際にネットワークボリュームへのアクセスを求められたら許可してください。以前拒否した場合は「システム設定 → プライバシーとセキュリティ → ファイルとフォルダ」で YourDesk のアクセスを許可し、再度コピーしてください。Windows は WebView2 Runtime が必要です。Intel Mac と Linux デスクトップ版は未対応です。接続先で有効にすると IP 直接接続も利用できます。接続は暗号化され、直接通信できるネットワークが必要です。
 

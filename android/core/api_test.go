@@ -15,11 +15,11 @@ func TestFrameQueueWorstCaseBoundedAndRecovers(t *testing.T) {
 	v := NewViewer()
 	for i := 1; i <= 100000; i++ {
 		v.enqueueFrame(p2p.Frame{Sequence: uint64(i), Keyframe: i == 1, JPEG: []byte{1}})
-		if len(v.frames) > maxQueuedFrames || v.frameBytes > maxQueuedFrameBytes {
+		if v.frameCount > maxQueuedFrames || v.frameBytes > maxQueuedFrameBytes {
 			t.Fatalf("unbounded queue at %d", i)
 		}
 	}
-	if len(v.frames) != 0 || !v.awaitingKeyframe || !v.ConsumeFrameRecoveryRequest() {
+	if v.frameCount != 0 || !v.awaitingKeyframe || !v.ConsumeFrameRecoveryRequest() {
 		t.Fatal("overflow did not invalidate dependent frames / request recovery")
 	}
 	if v.ConsumeFrameRecoveryRequest() {
@@ -27,7 +27,7 @@ func TestFrameQueueWorstCaseBoundedAndRecovers(t *testing.T) {
 	}
 	v.enqueueFrame(p2p.Frame{Sequence: 100001, Keyframe: true, JPEG: []byte{2}})
 	v.enqueueFrame(p2p.Frame{Sequence: 100002, JPEG: []byte{3}})
-	if len(v.frames) != 2 || v.awaitingKeyframe || v.ConsumeFrameRecoveryRequest() {
+	if v.frameCount != 2 || v.awaitingKeyframe || v.ConsumeFrameRecoveryRequest() {
 		t.Fatal("new keyframe did not restore queue")
 	}
 	for _, seq := range []uint64{100001, 100002} {
@@ -47,17 +47,17 @@ func TestFrameQueueByteBudgetAndKeyframeOverflow(t *testing.T) {
 	for i := 0; i < 40; i++ {
 		v.enqueueFrame(p2p.Frame{Sequence: uint64(i), Keyframe: i == 0, JPEG: data})
 	}
-	if len(v.frames) != 0 || !v.awaitingKeyframe || !v.ConsumeFrameRecoveryRequest() {
+	if v.frameCount != 0 || !v.awaitingKeyframe || !v.ConsumeFrameRecoveryRequest() {
 		t.Fatal("byte budget failed")
 	}
 	for i := 0; i < maxQueuedFrames+1; i++ {
 		v.enqueueFrame(p2p.Frame{Sequence: uint64(i + 100), Keyframe: true, JPEG: []byte{1}})
 	}
-	if len(v.frames) != 1 || !v.frames[0].Keyframe || v.frameBytes != 1 {
+	if v.frameCount != 1 || !v.frames[v.frameHead].Keyframe || v.frameBytes != 1 {
 		t.Fatal("overflowing keyframe was not safely retained")
 	}
 	v.enqueueFrame(p2p.Frame{Keyframe: true, JPEG: make([]byte, maxQueuedFrameBytes+1)})
-	if len(v.frames) != 0 || !v.awaitingKeyframe {
+	if v.frameCount != 0 || !v.awaitingKeyframe {
 		t.Fatal("oversized frame retained")
 	}
 }
@@ -65,7 +65,7 @@ func TestFrameQueueByteBudgetAndKeyframeOverflow(t *testing.T) {
 func TestFrameQueueNoDeltaWithoutBaseline(t *testing.T) {
 	v := NewViewer()
 	v.enqueueFrame(p2p.Frame{Sequence: 1, JPEG: []byte{1}})
-	if len(v.frames) != 0 || !v.ConsumeFrameRecoveryRequest() {
+	if v.frameCount != 0 || !v.ConsumeFrameRecoveryRequest() {
 		t.Fatal("initial delta accepted")
 	}
 	v.enqueueFrame(p2p.Frame{Sequence: 2, Keyframe: true, JPEG: []byte{2}})
@@ -75,7 +75,7 @@ func TestFrameQueueNoDeltaWithoutBaseline(t *testing.T) {
 	for i := 0; i < maxQueuedFrames+1; i++ {
 		v.enqueueFrame(p2p.Frame{Sequence: uint64(i + 3), JPEG: []byte{1}})
 	}
-	if len(v.frames) != 0 || !v.awaitingKeyframe {
+	if v.frameCount != 0 || !v.awaitingKeyframe {
 		t.Fatal("lost JPEG dependency was retained")
 	}
 }
@@ -118,7 +118,7 @@ func TestConcurrentProducerSlowReaderAndClose(t *testing.T) {
 		}
 	}()
 	wg.Wait()
-	if len(v.frames) > maxQueuedFrames || v.frameBytes > maxQueuedFrameBytes {
+	if v.frameCount > maxQueuedFrames || v.frameBytes > maxQueuedFrameBytes {
 		t.Fatal("concurrent queue exceeded budget")
 	}
 }
@@ -177,16 +177,16 @@ func TestOldGenerationCannotEnqueueAfterReconnect(t *testing.T) {
 	}
 	f := p2p.Frame{Keyframe: true, JPEG: []byte{1}}
 	v.enqueueSessionFrame(f, g1)
-	if len(v.frames) != 0 {
+	if v.frameCount != 0 {
 		t.Fatal("old session contaminated new queue")
 	}
 	v.enqueueSessionFrame(f, g2)
-	if len(v.frames) != 1 {
+	if v.frameCount != 1 {
 		t.Fatal("current session frame lost")
 	}
 	v.Close()
 	v.enqueueSessionFrame(f, g2)
-	if len(v.frames) != 0 {
+	if v.frameCount != 0 {
 		t.Fatal("closed session retained a late frame")
 	}
 }
@@ -231,7 +231,7 @@ func TestSlowConsumerPressureWithoutClosingSession(t *testing.T) {
 			// Independent payloads model the network's ownership transfer.
 			v.enqueueFrame(p2p.Frame{Sequence: uint64(i), Keyframe: i%120 == 0, JPEG: make([]byte, 64<<10)})
 			v.frameMu.Lock()
-			bounded := len(v.frames) <= maxQueuedFrames && v.frameBytes <= maxQueuedFrameBytes
+			bounded := v.frameCount <= maxQueuedFrames && v.frameBytes <= maxQueuedFrameBytes
 			v.frameMu.Unlock()
 			if !bounded {
 				t.Error("slow reader caused unbounded retention")

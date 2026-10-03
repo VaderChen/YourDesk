@@ -221,6 +221,8 @@ func search(ctx context.Context, home string, in Search) (any, error) {
 	truncated := false
 	stopped := false
 	query := strings.ToLower(in.Query)
+	content := []byte(in.Content)
+	var contentBuffer []byte // One request owns the scratch space across the entire walk.
 	var walk func(string, int) error
 	walk = func(dir string, depth int) error {
 		if stopped {
@@ -267,10 +269,10 @@ func search(ctx context.Context, home string, in Search) (any, error) {
 					if info.Mode().IsRegular() {
 						file, e := openRegular(root, path)
 						if e == nil {
-							data, e := io.ReadAll(io.LimitReader(file, 65536))
+							contentBuffer, e = readSearchContent(file, contentBuffer, info.Size())
 							file.Close()
-							if e == nil && utf8.Valid(data) && !bytes.ContainsRune(data, 0) {
-								match = bytes.Contains(data, []byte(in.Content))
+							if e == nil && utf8.Valid(contentBuffer) && !bytes.ContainsRune(contentBuffer, 0) {
+								match = bytes.Contains(contentBuffer, content)
 							}
 							if info.Size() > 65536 {
 								truncated = true
@@ -319,4 +321,28 @@ func search(ctx context.Context, home string, in Search) (any, error) {
 		return nil, err
 	}
 	return map[string]any{"entries": entries, "visited": visited, "skipped": skipped, "truncated": truncated, "contentBytesPerFile": 65536}, nil
+}
+
+// The size is only an allocation hint: a file may grow after Stat. Read at most
+// 64 KiB, retaining capacity for the next file but never searching stale bytes.
+func readSearchContent(file io.Reader, buffer []byte, sizeHint int64) ([]byte, error) {
+	if cap(buffer) == 0 {
+		size := int(min(max(sizeHint, 0), 65535)) + 1
+		buffer = make([]byte, max(512, size))
+	}
+	buffer = buffer[:cap(buffer)]
+	n := 0
+	for {
+		read, err := io.ReadFull(file, buffer[n:])
+		n += read
+		if err == io.EOF || err == io.ErrUnexpectedEOF {
+			return buffer[:n], nil
+		}
+		if err != nil || n == 65536 {
+			return buffer[:n], err
+		}
+		grown := make([]byte, min(65536, len(buffer)*2))
+		copy(grown, buffer[:n])
+		buffer = grown
+	}
 }

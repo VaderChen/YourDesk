@@ -86,8 +86,9 @@ try {
   await call('Page.addScriptToEvaluateOnNewDocument', {source: `
     window.sent=[];window.controls=[];window.connections=[];window.textSupported=true;window.saveFails=false;window.scanStopped=0;
     window.fixtureSites=[{id:'fixture-peer',name:'Fixture',note:'',signal:'wss://custom.example/ws',terminal:true,desktop:true}];
-    window.displaySelections=[];
+    window.displaySelections=[];window.updateStates=[];
     window.YourDesk={showKeyboard(){},toggleKeyboard(){},closeTerminal(){},desktopLayout(){},
+      setUpdateState(idle,language){window.updateStates.push({idle,language});},
       displayStateJSON(){return JSON.stringify({known:false,count:0,current:-1});},selectDisplay(index){window.displaySelections.push(index);},
       request(raw){const message=JSON.parse(raw);if(message.method==='write')sent.push(message.data);
         setTimeout(()=>window.shellReply?.({id:message.id,result:message.method==='read'?{}:null}),0);},
@@ -228,8 +229,31 @@ try {
   pass('Legacy Host gets an explicit upgrade notice; late capability enables Unicode');
 
   await navigate('index.html', "typeof openConnection==='function'");
+  assert.deepEqual(await evaluate('updateStates.at(-1)'), {idle:true,language:'zh-Hant'});
+  await evaluate("document.getElementById('add').click()");
+  assert.equal(await evaluate('updateStates.at(-1).idle'), false);
+  await evaluate("document.getElementById('site-cancel').click();document.querySelector('#sites .delete').click()");
+  assert.equal(await evaluate('updateStates.at(-1).idle'), false);
+  await evaluate("document.getElementById('delete-cancel').click();showNotice('fixture')");
+  assert.equal(await evaluate('updateStates.at(-1).idle'), false);
+  await evaluate("document.getElementById('notice-close').click()");
+  assert.equal(await evaluate('updateStates.at(-1).idle'), true);
+  for (const language of ['en','ja','ko','zh-Hant']) {
+    await evaluate('document.documentElement.lang='+JSON.stringify(language));
+    assert.equal(await evaluate('updateStates.at(-1).language'), language);
+  }
+  await evaluate("Object.defineProperty(document,'hidden',{value:true,configurable:true});document.dispatchEvent(new Event('visibilitychange'))");
+  assert.equal(await evaluate('updateStates.at(-1).idle'), false);
+  await evaluate("delete document.hidden;document.dispatchEvent(new Event('visibilitychange'))");
+  assert.equal(await evaluate('updateStates.at(-1).idle'), true);
+  await evaluate("window.dispatchEvent(new Event('pagehide'))");
+  assert.equal(await evaluate('updateStates.at(-1).idle'), false);
+  await evaluate("window.dispatchEvent(new Event('pageshow'))");
+  assert.equal(await evaluate('updateStates.at(-1).idle'), true);
+  pass('Updater pauses for site/delete/notice dialogs, background and navigation; follows all four languages');
   await evaluate(`document.querySelector('#sites .terminal').click();document.getElementById('connect-secret').value='fixture-only';document.getElementById('connection-form').dispatchEvent(new Event('submit',{cancelable:true,bubbles:true}));`);
   assert.equal((await evaluate('connections[0]')).signal, 'wss://custom.example/ws');
+  assert.equal(await evaluate('updateStates.at(-1).idle'), false);
   await evaluate(`window.connectionFailed();document.getElementById('connect-room').value='another-peer';document.getElementById('connect-secret').value='fixture-only';document.getElementById('connection-form').dispatchEvent(new Event('submit',{cancelable:true,bubbles:true}));`);
   assert.equal((await evaluate('connections[1]')).signal, '');
   pass('Selected site signaling survives payload and does not leak into a different room');

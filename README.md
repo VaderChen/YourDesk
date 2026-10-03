@@ -43,7 +43,9 @@ IP 白名單預設開啟且只允許 `127.0.0.1`；名單內免 Token、名單�
 
 ## 下載與開始使用
 
-桌面版從 [GitHub Releases](https://github.com/VaderChen/YourDesk/releases/latest) 下載；手機版請使用 [Android 1.26.1002 build 2301 發行頁](https://github.com/VaderChen/YourDesk/releases/tag/1.26.1002-build-2301)。
+本次更新與驗證範圍見 [1.26.1003 build 2028 發行說明](docs/RELEASE-1.26.1003-build-2028.md)。Android 支援[自動偵測與下載更新](docs/ANDROID-UPDATES.md)；既有版本須先手動安裝本版，後續更新安裝仍由 Android 系統確認。
+
+桌面版從 [GitHub Releases](https://github.com/VaderChen/YourDesk/releases/latest) 下載；手機版請使用 [Android 1.26.1003 build 2028 發行頁](https://github.com/VaderChen/YourDesk/releases/tag/1.26.1003-build-2028)。
 
 本文件介紹原始碼提供的功能；已發布安裝包實際包含的功能，請以對應發行說明為準。
 
@@ -53,13 +55,13 @@ IP 白名單預設開啟且只允許 `127.0.0.1`；名單內免 Token、名單�
 | Windows x64 | Portable ZIP |
 | Windows on ARM（WOA） | Portable ZIP |
 | Linux x64／arm64 | CLI Host ZIP（無桌面／REMOTE） |
-| Android 8.0 以上／arm64 | [Android ZIP](https://github.com/VaderChen/YourDesk/releases/download/1.26.1002-build-2301/YourDesk-1.26.1002-build-2301-android-arm64.zip)（解壓縮後安裝正式簽章 APK，手機 Viewer） |
+| Android 8.0 以上／arm64 | [Android ZIP](https://github.com/VaderChen/YourDesk/releases/download/1.26.1003-build-2028/YourDesk-1.26.1003-build-2028-android-arm64.zip)（解壓縮後安裝正式簽章 APK，手機 Viewer） |
 
 1. 在兩台電腦安裝並開啟 YourDesk。
 2. 在快速連線輸入遠端 ID，或選擇已儲存的站台。
 3. 輸入連線密碼後，即可開始操作遠端桌面。
 
-Android 請先解壓縮下載的 ZIP，再在手機安裝其中的 APK，並在被控電腦執行 YourDesk Host。雙指開合／拖移調整可視區，長按為右鍵；工具列百分比選單可切換遠端捲動，頂端選單切換螢幕，喇叭按鈕開啟聲音。手機版尚未提供剪貼簿同步、獨立檔案傳輸或手機被控模式；[本版功能、安裝注意事項與驗證結果](docs/ANDROID-RELEASE-2026-10-01.md)。
+Android 請先解壓縮下載的 ZIP，再在手機安裝其中的 APK，並在被控電腦執行 YourDesk Host。雙指開合／拖移調整可視區，長按為右鍵；工具列百分比選單可切換遠端捲動，頂端選單切換螢幕，喇叭按鈕開啟聲音。手機版尚未提供剪貼簿同步、獨立檔案傳輸或手機被控模式；[本版功能、安裝注意事項與驗證結果](docs/RELEASE-1.26.1003-build-2028.md)。
 
 macOS 使用遠端桌面時需允許「螢幕錄製」與「輔助使用」權限。透過剪貼簿接收遠端檔案時，若詢問「網路卷宗」存取，請允許；曾拒絕時可到「系統設定 → 隱私權與安全性 → 檔案與檔案夾」開啟 YourDesk 的網路卷宗權限，再重新複製檔案。Windows 需要 WebView2 Runtime。目前不支援 Intel Mac，亦未提供 Linux 桌面版。
 

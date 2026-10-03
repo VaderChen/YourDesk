@@ -21,6 +21,7 @@ public final class VideoDecoderHostTest {
   public static void main(String[] args) throws Exception {
     avcAndHevcCsd();
     parserBoundsAndMalformed();
+    parserBufferOwnership();
     fixture(Files.readAllBytes(Path.of(args[0])));
     advertisedPaths();
     formatFilteringAndCandidateFallback();
@@ -74,6 +75,28 @@ public final class VideoDecoderHostTest {
     byte[][] many = new byte[4097][];
     many[0] = SPS; many[1] = PPS; Arrays.fill(many, 2, many.length, IDR);
     check(EncodedVideoFrame.parse(1, 1, 1, wire(2, many), true) == null, "NAL count budget");
+    check(EncodedVideoFrame.parse(1, 1, 1, wire(2, Arrays.copyOf(many, 4096)), true) != null,
+        "exact NAL count limit remains accepted");
+  }
+
+  private static void parserBufferOwnership() {
+    for (int codec : new int[]{1, 2}) {
+      byte[][] nals = codec == 1 ? new byte[][]{SPS, PPS, IDR}
+          : new byte[][]{{0x40, 1, 1}, {0x42, 1, 1, 2}, {0x44, 1, 1}, {0x26, 1, 1}};
+      byte[] payload = wire(nals.length - 1, nals), original = payload.clone();
+      byte[] expected = annex(nals);
+      EncodedVideoFrame parsed = EncodedVideoFrame.parse(codec, 1920, 1080, payload, false);
+      check(parsed != null, "owned frame parsed for codec " + codec);
+      equal(payload, original, "parser does not overwrite caller's wire lengths");
+      byte[] csd0 = parsed.csd0.clone(), csd1 = parsed.csd1 == null ? null : parsed.csd1.clone();
+      Arrays.fill(payload, (byte) 0);
+      equal(parsed.accessUnit, expected, "AU survives caller buffer reuse");
+      equal(parsed.csd0, csd0, "csd-0 survives caller buffer reuse");
+      if (csd1 != null) equal(parsed.csd1, csd1, "csd-1 survives caller buffer reuse");
+      Arrays.fill(parsed.csd0, (byte) 0);
+      if (parsed.csd1 != null) Arrays.fill(parsed.csd1, (byte) 0);
+      equal(parsed.accessUnit, expected, "CSD storage remains independent of AU");
+    }
   }
 
   private static void fixture(byte[] payload) {
