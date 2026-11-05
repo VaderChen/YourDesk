@@ -281,6 +281,17 @@ func Code(platform, name string) (int, bool) {
 	return 0, false
 }
 
+func preserveDarwinControl(name string) bool {
+	switch name {
+	case "left", "right", "up", "down", "home", "end", "pageup", "pagedown", "insert", "delete",
+		"f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f11", "f12",
+		"f13", "f14", "f15", "f16", "f17", "f18", "f19", "f20", "f21", "f22", "f23", "f24":
+		return true
+	default:
+		return false
+	}
+}
+
 // TranslateEvent 將使用者選擇的跨平台修飾鍵映射套用於原始來源事件。
 func TranslateEvent(e Event, target string) (int, error) {
 	name := Name(e.Platform, e.Code)
@@ -294,11 +305,15 @@ func TranslateEvent(e Event, target string) (int, error) {
 			}
 		}
 		if e.Platform == "windows" && target == "darwin" {
-			if name == "leftcontrol" {
+			switch name {
+			case "leftcontrol":
 				name = "leftsuper"
-			}
-			if name == "rightcontrol" {
+			case "rightcontrol":
 				name = "rightsuper"
+			case "leftsuper":
+				name = "leftcontrol"
+			case "rightsuper":
+				name = "rightcontrol"
 			}
 		}
 	}
@@ -315,8 +330,19 @@ func TargetModifiers(e Event, target string) uint64 {
 		if e.Platform == "darwin" && target == "windows" && mods&8 != 0 {
 			mods = (mods &^ 8) | 2
 		}
-		if e.Platform == "windows" && target == "darwin" && mods&2 != 0 {
-			mods = (mods &^ 2) | 8
+		if e.Platform == "windows" && target == "darwin" {
+			ctrl := mods&2 != 0
+			super := mods&8 != 0
+			if ctrl && !super && preserveDarwinControl(Name(e.Platform, e.Code)) {
+				return mods
+			}
+			mods &^= 2 | 8
+			if ctrl {
+				mods |= 8
+			}
+			if super {
+				mods |= 2
+			}
 		}
 	}
 	return mods
@@ -326,8 +352,13 @@ func LegacyKey(platform, target, key string, disabled bool) string {
 		if platform == "darwin" && target == "windows" && key == "meta" {
 			return "control"
 		}
-		if platform == "windows" && target == "darwin" && key == "control" {
-			return "meta"
+		if platform == "windows" && target == "darwin" {
+			if key == "control" {
+				return "meta"
+			}
+			if key == "meta" {
+				return "control"
+			}
 		}
 	}
 	return key

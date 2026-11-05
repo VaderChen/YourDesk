@@ -80,8 +80,12 @@ func (Native) Key(key string, down bool) error {
 		return fmt.Errorf("不支援按鍵 %q", key)
 	}
 	f := uint32(0)
+	switch key {
+	case "delete", "arrowup", "arrowdown", "arrowleft", "arrowright", "home", "end", "pageup", "pagedown", "meta":
+		f |= 1
+	}
 	if !down {
-		f = keyUp
+		f |= keyUp
 	}
 	var d [32]byte
 	binary.LittleEndian.PutUint16(d[0:2], uint16(v))
@@ -155,23 +159,43 @@ func rawKeyOnDesktop(e rawkey.Event) error {
 	return sendRawScan(code, e.Down)
 }
 
+var rawVirtualKeys = map[string]uint16{
+	"escape": 0x1b, "backspace": 0x08, "tab": 0x09, "enter": 0x0d, "space": 0x20,
+	"leftshift": 0xa0, "rightshift": 0xa1, "leftcontrol": 0xa2, "rightcontrol": 0xa3,
+	"leftalt": 0xa4, "rightalt": 0xa5, "leftsuper": 0x5b, "rightsuper": 0x5c, "menu": 0x5d,
+	"capslock": 0x14, "numlock": 0x90, "scrolllock": 0x91, "printscreen": 0x2c,
+	"insert": 0x2d, "delete": 0x2e, "home": 0x24, "end": 0x23, "pageup": 0x21, "pagedown": 0x22,
+	"up": 0x26, "down": 0x28, "left": 0x25, "right": 0x27,
+	"f1": 0x70, "f2": 0x71, "f3": 0x72, "f4": 0x73, "f5": 0x74, "f6": 0x75,
+	"f7": 0x76, "f8": 0x77, "f9": 0x78, "f10": 0x79, "f11": 0x7a, "f12": 0x7b,
+	"f13": 0x7c, "f14": 0x7d, "f15": 0x7e, "f16": 0x7f, "f17": 0x80, "f18": 0x81,
+	"f19": 0x82, "f20": 0x83, "f21": 0x84, "f22": 0x85, "f23": 0x86, "f24": 0x87,
+}
+
 func sendRawScan(code int, down bool) error {
 	var d [32]byte
+	name := rawkey.Name("windows", code)
+	if name == "pause" {
+		binary.LittleEndian.PutUint16(d[0:2], 0x13)
+		flags := uint32(0)
+		if !down {
+			flags = keyUp
+		}
+		binary.LittleEndian.PutUint32(d[4:8], flags)
+		return sendNative(input{typ: inputKeyboard, data: d})
+	}
 	binary.LittleEndian.PutUint16(d[2:4], uint16(code&255))
 	flags := uint32(0x0008) // KEYEVENTF_SCANCODE，交由遠端鍵盤配置與輸入法解讀。
+	if vk, ok := rawVirtualKeys[name]; ok {
+		// 功能鍵、方向鍵、編輯鍵與修飾鍵固定帶上虛擬鍵碼，避免遠端 NumLock 狀態將 E0 方向鍵誤判為數字鍵盤。
+		binary.LittleEndian.PutUint16(d[0:2], vk)
+		flags = 0
+	}
 	if code&256 != 0 {
 		flags |= 1
 	}
 	if !down {
 		flags |= keyUp
-	}
-	if rawkey.Name("windows", code) == "pause" {
-		binary.LittleEndian.PutUint16(d[0:2], 0x13)
-		binary.LittleEndian.PutUint16(d[2:4], 0)
-		flags = 0
-		if !down {
-			flags = keyUp
-		}
 	}
 	binary.LittleEndian.PutUint32(d[4:8], flags)
 	return sendNative(input{typ: inputKeyboard, data: d})

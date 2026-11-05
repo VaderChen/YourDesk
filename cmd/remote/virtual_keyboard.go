@@ -97,6 +97,7 @@ func (g *game) sendVirtualKey(action int) {
 	}
 	events := r.Chord()
 	for i, e := range events {
+		e.DisableMapping = true
 		e.Modifiers |= r.Modifiers & 48
 		if i == len(events)-1 {
 			e.Modifiers &^= 32

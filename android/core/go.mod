@@ -2,6 +2,8 @@ module yourdeskandroid/core
 
 go 1.27
 
+toolchain go1.27.3
+
 require (
 	github.com/coder/websocket v1.8.14
 	github.com/pion/ice/v4 v4.0.10

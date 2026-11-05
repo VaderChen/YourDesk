@@ -9,6 +9,7 @@ import (
 )
 
 func (v *Viewer) resetStreamLocked() {
+	v.rawKeyboardSupported = false
 	v.streamCapabilities = nil
 	v.streamRevision = 0
 	v.streamRequest = nil
@@ -42,6 +43,9 @@ func (v *Viewer) receiveStreamControl(c p2p.Control, generation uint64) {
 		caps.FPSModes = slices.Clone(caps.FPSModes)
 		caps.RateModes = slices.Clone(caps.RateModes)
 		v.streamCapabilities = &caps
+	}
+	if c.Type == "keyboard-capabilities" {
+		v.rawKeyboardSupported = true
 	}
 	if c.Type == "stream-config-result" && c.StreamResult != nil {
 		result := *c.StreamResult

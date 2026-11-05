@@ -25,7 +25,13 @@ static void yd_button_at(double x,double y,int b,int down) { yd_mouse_button(x,y
 static void yd_key(int code,int down) {
  yd_input_modifier_key(code,down);
  CGEventRef e=CGEventCreateKeyboardEvent(NULL,(CGKeyCode)code,down != 0);
- if(e){CGEventSetFlags(e,yd_input_flags());CGEventPost(kCGHIDEventTap,e);CFRelease(e);}
+ if(e){
+  if(code>=54 && code<=63)CGEventSetType(e,kCGEventFlagsChanged);
+  CGEventFlags intrinsic=CGEventGetFlags(e)&(kCGEventFlagMaskSecondaryFn|kCGEventFlagMaskNumericPad|kCGEventFlagMaskHelp|kCGEventFlagMaskNonCoalesced);
+  CGEventSetFlags(e,intrinsic|yd_input_flags());
+  CGEventSetIntegerValueField(e,kCGEventSourceUserData,0x5944524b);
+  CGEventPost(kCGHIDEventTap,e);CFRelease(e);
+ }
 }
 static int yd_modifier_lock(int selector,int on) {
  io_service_t service=IOServiceGetMatchingService(kIOMainPortDefault,IOServiceMatching("IOHIDSystem"));
@@ -39,18 +45,58 @@ static int yd_modifier_lock(int selector,int on) {
 }
 static void yd_raw_key(int code,int down,unsigned long long mods,int repeat,int numeric,unsigned long long nativeFlags) {
  CGEventRef e=CGEventCreateKeyboardEvent(NULL,(CGKeyCode)code,down!=0);
- CGEventFlags flags=0;
- if(mods&1)flags|=kCGEventFlagMaskShift;
- if(mods&2)flags|=kCGEventFlagMaskControl;
- if(mods&4)flags|=kCGEventFlagMaskAlternate;
- if(mods&8)flags|=kCGEventFlagMaskCommand;
+ if(!e)return;
+ CGEventFlags intrinsic=CGEventGetFlags(e)&(kCGEventFlagMaskSecondaryFn|kCGEventFlagMaskNumericPad|kCGEventFlagMaskHelp|kCGEventFlagMaskNonCoalesced);
+ CGEventFlags flags=intrinsic|((CGEventFlags)(nativeFlags&0x207fULL));
+ if(mods&1){
+  flags|=kCGEventFlagMaskShift;
+  if((flags&(NX_DEVICELSHIFTKEYMASK|NX_DEVICERSHIFTKEYMASK))==0)flags|=(code==60)?NX_DEVICERSHIFTKEYMASK:NX_DEVICELSHIFTKEYMASK;
+ }else{
+  flags&=~(CGEventFlags)(NX_DEVICELSHIFTKEYMASK|NX_DEVICERSHIFTKEYMASK);
+ }
+ if(mods&2){
+  flags|=kCGEventFlagMaskControl;
+  if((flags&(NX_DEVICELCTLKEYMASK|NX_DEVICERCTLKEYMASK))==0)flags|=(code==62)?NX_DEVICERCTLKEYMASK:NX_DEVICELCTLKEYMASK;
+ }else{
+  flags&=~(CGEventFlags)(NX_DEVICELCTLKEYMASK|NX_DEVICERCTLKEYMASK);
+ }
+ if(mods&4){
+  flags|=kCGEventFlagMaskAlternate;
+  if((flags&(NX_DEVICELALTKEYMASK|NX_DEVICERALTKEYMASK))==0)flags|=(code==61)?NX_DEVICERALTKEYMASK:NX_DEVICELALTKEYMASK;
+ }else{
+  flags&=~(CGEventFlags)(NX_DEVICELALTKEYMASK|NX_DEVICERALTKEYMASK);
+ }
+ if(mods&8){
+  flags|=kCGEventFlagMaskCommand;
+  if((flags&(NX_DEVICELCMDKEYMASK|NX_DEVICERCMDKEYMASK))==0)flags|=(code==54)?NX_DEVICERCMDKEYMASK:NX_DEVICELCMDKEYMASK;
+ }else{
+  flags&=~(CGEventFlags)(NX_DEVICELCMDKEYMASK|NX_DEVICERCMDKEYMASK);
+ }
  if(mods&16)flags|=kCGEventFlagMaskAlphaShift;
  if(mods&32)flags|=kCGEventFlagMaskSecondaryFn;
  if(numeric)flags|=kCGEventFlagMaskNumericPad;
- if(code==57){
+ if(code>=54 && code<=63){
   CGEventSetType(e,kCGEventFlagsChanged);
-  // 保留 Caps Lock 的實體狀態，讓系統輸入來源處理器辨識按下／放開。
-  flags|=nativeFlags&(NX_ALPHASHIFT_STATELESS_MASK|NX_DEVICE_ALPHASHIFT_STATELESS_MASK);
+  if(code==57){
+   // 保留 Caps Lock 的實體狀態，讓系統輸入來源處理器辨識按下／放開。
+   flags|=nativeFlags&(NX_ALPHASHIFT_STATELESS_MASK|NX_DEVICE_ALPHASHIFT_STATELESS_MASK);
+  }
+ }else{
+  const CGEventFlags chordMask=kCGEventFlagMaskShift|kCGEventFlagMaskControl|kCGEventFlagMaskAlternate|kCGEventFlagMaskCommand;
+  CGEventFlags prev=yd_input_flags();
+  if((prev&chordMask)!=(flags&chordMask)){
+   CGKeyCode modCode=59;
+   if(((prev^flags)&kCGEventFlagMaskCommand)!=0 && ((prev^flags)&kCGEventFlagMaskControl)==0)modCode=55;
+   else if(((prev^flags)&kCGEventFlagMaskAlternate)!=0)modCode=58;
+   else if(((prev^flags)&kCGEventFlagMaskShift)!=0)modCode=56;
+   CGEventRef m=CGEventCreateKeyboardEvent(NULL,modCode,true);
+   if(m){
+    CGEventSetType(m,kCGEventFlagsChanged);
+    CGEventSetFlags(m,flags&(chordMask|kCGEventFlagMaskAlphaShift|0x207fULL));
+    CGEventSetIntegerValueField(m,kCGEventSourceUserData,0x5944524b);
+    CGEventPost(kCGHIDEventTap,m);CFRelease(m);
+   }
+  }
  }
  yd_input_set_modifiers(flags);
  CGEventSetFlags(e,flags);

@@ -12,16 +12,20 @@
 // RawKey 傳入已完成跨平台映射的快照；舊 Key 協議逐鍵更新。
 static _Atomic(uint64_t) inputModifiers=0;
 static const CGEventFlags modifierMask=kCGEventFlagMaskShift|kCGEventFlagMaskControl|
-    kCGEventFlagMaskAlternate|kCGEventFlagMaskCommand|kCGEventFlagMaskAlphaShift|kCGEventFlagMaskSecondaryFn;
+    kCGEventFlagMaskAlternate|kCGEventFlagMaskCommand|kCGEventFlagMaskAlphaShift|kCGEventFlagMaskSecondaryFn|0x207f;
 CGEventFlags yd_input_flags(void) { return (CGEventFlags)atomic_load(&inputModifiers); }
 void yd_input_set_modifiers(CGEventFlags flags) { atomic_store(&inputModifiers,flags&modifierMask); }
 void yd_input_modifier_key(int code,int down) {
     CGEventFlags flag=0;
     switch(code) {
-        case 56: flag=kCGEventFlagMaskShift;break;
-        case 59: flag=kCGEventFlagMaskControl;break;
-        case 58: flag=kCGEventFlagMaskAlternate;break;
-        case 55: flag=kCGEventFlagMaskCommand;break;
+        case 56: flag=kCGEventFlagMaskShift|NX_DEVICELSHIFTKEYMASK;break;
+        case 60: flag=kCGEventFlagMaskShift|NX_DEVICERSHIFTKEYMASK;break;
+        case 59: flag=kCGEventFlagMaskControl|NX_DEVICELCTLKEYMASK;break;
+        case 62: flag=kCGEventFlagMaskControl|NX_DEVICERCTLKEYMASK;break;
+        case 58: flag=kCGEventFlagMaskAlternate|NX_DEVICELALTKEYMASK;break;
+        case 61: flag=kCGEventFlagMaskAlternate|NX_DEVICERALTKEYMASK;break;
+        case 55: flag=kCGEventFlagMaskCommand|NX_DEVICELCMDKEYMASK;break;
+        case 54: flag=kCGEventFlagMaskCommand|NX_DEVICERCMDKEYMASK;break;
     }
     if(down)atomic_fetch_or(&inputModifiers,flag);
     else atomic_fetch_and(&inputModifiers,~(uint64_t)flag);

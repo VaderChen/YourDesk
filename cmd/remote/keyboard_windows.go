@@ -100,9 +100,16 @@ func startRawHook() {
 				if event.Flags&1 != 0 {
 					scan |= 256
 				}
-				// Num Lock 與 Pause 共用低位掃描碼，依原始 VK 補齊 E0。
-				if event.VK == 0x90 {
+				// Num Lock 與 Pause 共用低位掃描碼，依原始 VK 補齊 E0；方向／導覽鍵固定帶上擴充位元。
+				switch event.VK {
+				case 0x90:
 					scan = 0x145
+				case 0x13, 0x03:
+					scan = 69
+				case 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x2d, 0x2e:
+					if scan != 0 {
+						scan |= 256
+					}
 				}
 				down := event.Flags&0x80 == 0
 				repeat := down && held[scan]

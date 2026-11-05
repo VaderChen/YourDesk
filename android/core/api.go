@@ -32,21 +32,22 @@ type Viewer struct {
 	frameMu    sync.Mutex
 	// JPEG 模式會把一張桌面拆成多個區塊影格；不能只保留最後一筆，
 	// 否則 Android 尚未讀取前面的區塊時，合成基底就會缺塊。
-	frames             []*p2p.Frame
-	frameHead          int
-	frameCount         int
-	frameGeneration    uint64
-	frameBytes         int
-	awaitingKeyframe   bool
-	recoveryPending    bool
-	streamSendMu       sync.Mutex
-	streamCapabilities *streamconfig.Capabilities
-	streamRevision     uint64
-	streamRequest      *streamconfig.Request
-	streamResult       *streamconfig.Result
-	streamError        string
-	displaySendMu      sync.Mutex
-	displays           displayState
+	frames               []*p2p.Frame
+	frameHead            int
+	frameCount           int
+	frameGeneration      uint64
+	frameBytes           int
+	awaitingKeyframe     bool
+	recoveryPending      bool
+	streamSendMu         sync.Mutex
+	rawKeyboardSupported bool
+	streamCapabilities   *streamconfig.Capabilities
+	streamRevision       uint64
+	streamRequest        *streamconfig.Request
+	streamResult         *streamconfig.Result
+	streamError          string
+	displaySendMu        sync.Mutex
+	displays             displayState
 }
 
 func NewViewer() *Viewer {
@@ -471,4 +472,11 @@ func (v *Viewer) SendControlJSON(payload string) error {
 		return fmt.Errorf("操作連線尚未就緒")
 	}
 	return input.enqueue(c)
+}
+
+// SupportsRawKeyboard 依 Host 公告判定，舊 Host 保留文字與傳統按鍵路徑。
+func (v *Viewer) SupportsRawKeyboard() bool {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	return v.rawKeyboardSupported
 }

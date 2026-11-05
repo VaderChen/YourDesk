@@ -77,10 +77,10 @@ func (g *game) sendControl(c p2p.Control) error {
 	g.mu.RUnlock()
 	g.idleClose.Input(time.Now(), c.Type, c.X*float64(width), c.Y*float64(height), down)
 	c.Platform = runtime.GOOS
-	c.DisableMapping = g.disableKeyMapping
+	c.DisableMapping = c.DisableMapping || g.disableKeyMapping
 	if c.RawKey != nil {
 		copy := *c.RawKey
-		copy.DisableMapping = g.disableKeyMapping
+		copy.DisableMapping = copy.DisableMapping || g.disableKeyMapping
 		c.RawKey = &copy
 	}
 	g.mu.RLock()

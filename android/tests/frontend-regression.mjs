@@ -84,7 +84,7 @@ try {
   await call('Page.enable');
   await call('Runtime.enable');
   await call('Page.addScriptToEvaluateOnNewDocument', {source: `
-    window.sent=[];window.controls=[];window.connections=[];window.textSupported=true;window.saveFails=false;window.scanStopped=0;
+    window.sent=[];window.controls=[];window.connections=[];window.textSupported=true;window.rawSupported=false;window.saveFails=false;window.scanStopped=0;
     window.fixtureSites=[{id:'fixture-peer',name:'Fixture',note:'',signal:'wss://custom.example/ws',terminal:true,desktop:true}];
     window.displaySelections=[];window.updateStates=[];
     window.YourDesk={showKeyboard(){},toggleKeyboard(){},closeTerminal(){},desktopLayout(){},
@@ -93,7 +93,7 @@ try {
       request(raw){const message=JSON.parse(raw);if(message.method==='write')sent.push(message.data);
         setTimeout(()=>window.shellReply?.({id:message.id,result:message.method==='read'?{}:null}),0);},
       sendControlJSON(raw){controls.push(JSON.parse(raw));return 'ok';},
-      supportsTextInput(){return window.textSupported;},
+      supportsTextInput(){return window.textSupported;},supportsRawKeyboard(){return window.rawSupported;},
       remembered(){return '{}';},rememberCredentials(){return true;},connectSession(raw){connections.push(JSON.parse(raw));},
       loadSites(){return JSON.stringify(window.fixtureSites);},
       saveSite(raw,original){if(window.saveFails)return '儲存失敗';const site=JSON.parse(raw);window.fixtureSites=[site,...window.fixtureSites.filter(item=>SiteModel.identity(item)!==original)];return '';},
@@ -208,6 +208,40 @@ try {
   assert.ok(messages.length > 1);
   assert.ok(messages.every(message => message.type === 'text' && Buffer.byteLength(message.text, 'utf8') <= 16384 && !message.text.includes('\ufffd')));
   pass('Desktop large Unicode paste uses valid <=16 KiB chunks');
+
+  await evaluate('controls=[];rawSupported=true');
+  // 模擬 WebView 沒有收到 Control 按下，但主鍵帶有 Ctrl 狀態。
+  await key('c','KeyC',67,2);
+  let raw = await evaluate('controls');
+  assert.equal(raw.length,2);
+  assert.ok(raw.every(c=>c.type==='raw-key'&&c.rawKey.code===46&&c.rawKey.modifiers===2&&c.rawKey.disableMapping));
+  assert.deepEqual(raw.map(c=>c.rawKey.down),[true,false]);
+  pass('Desktop Ctrl+C carries modifier snapshot without a separate Ctrl down');
+  await evaluate('controls=[]');
+  for(const [name,code,vk,mods,scan,mask] of [
+    ['ArrowLeft','ArrowLeft',37,10,331,3],['F5','F5',116,2,63,2],
+    ['Tab','Tab',9,1,15,4],['@','Digit2',50,10,3,3],
+    ['Delete','Delete',46,2,339,2],['Meta','MetaRight',92,4,348,8]]){
+    await key(name,code,vk,mods);
+    raw=await evaluate('controls.slice(-2)');
+    assert.ok(raw.every(c=>c.rawKey.code===scan&&c.rawKey.modifiers===mask));
+    assert.deepEqual(raw.map(c=>c.rawKey.down),[true,false]);
+  }
+  pass('Desktop physical chords preserve E0, function keys, punctuation and Meta');
+  await evaluate(`controls=[];for(const type of ['keydown','keyup'])window.dispatchEvent(new KeyboardEvent(type,{key:'ArrowRight',ctrlKey:true,bubbles:true,cancelable:true}));`);
+  raw=await evaluate('controls');
+  assert.equal(raw.length,2);
+  assert.ok(raw.every(c=>c.rawKey.code===333&&c.rawKey.modifiers===2));
+  pass('Android events without code retain named navigation chords');
+
+  await evaluate("controls=[];window.dispatchEvent(new Event('blur'))");
+  assert.deepEqual(await evaluate('controls'),[{type:'raw-key-reset'}]);
+  pass('Focus loss clears inferred modifiers even after the main key is released');
+  await evaluate('controls=[]');
+  await call('Input.insertText',{text:'中文'});
+  assert.deepEqual(await evaluate('controls'),[{type:'text',text:'中文'}]);
+  await evaluate('rawSupported=false');
+  pass('Raw keyboard capability preserves IME text and legacy fallback');
 
   await evaluate('controls=[];textSupported=false;window.desktopInputCapabilities(false)');
   await key('a', 'KeyA', 65, 0, 'a');

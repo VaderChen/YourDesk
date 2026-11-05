@@ -41,6 +41,39 @@ try{window.desktopDisplays(JSON.parse(window.YourDesk.displayStateJSON()));}catc
 // 滑鼠與觸控僅由實際繪製影像的原生 View 處理，背景 WebView 不轉送。
 const keyboardProxy=document.getElementById('keyboard-proxy');
 const pressedKeys=new Map();
+let rawKeysUsed=false;
+// KeyboardEvent.code 表示實體位置；以既有 Windows 掃描碼協定傳送，保留 E0 與左右修飾鍵。
+const scanCodes={Escape:1,Minus:12,Equal:13,Backspace:14,Tab:15,BracketLeft:26,BracketRight:27,
+  Enter:28,ControlLeft:29,Semicolon:39,Quote:40,Backquote:41,ShiftLeft:42,Backslash:43,
+  Comma:51,Period:52,Slash:53,ShiftRight:54,NumpadMultiply:55,AltLeft:56,Space:57,CapsLock:58,
+  Pause:69,ScrollLock:70,NumpadSubtract:74,NumpadAdd:78,NumpadDecimal:83,IntlBackslash:86,
+  F11:87,F12:88,NumpadEqual:89,NumpadEnter:284,ControlRight:285,NumpadDivide:309,
+  PrintScreen:311,AltRight:312,NumLock:325,Home:327,ArrowUp:328,PageUp:329,ArrowLeft:331,
+  ArrowRight:333,End:335,ArrowDown:336,PageDown:337,Insert:338,Delete:339,MetaLeft:347,MetaRight:348,ContextMenu:349};
+for(const [letters,start] of [['QWERTYUIOP',16],['ASDFGHJKL',30],['ZXCVBNM',44]])
+  [...letters].forEach((letter,i)=>{scanCodes['Key'+letter]=start+i;});
+[...'1234567890'].forEach((digit,i)=>{scanCodes['Digit'+digit]=2+i;});
+[82,79,80,81,75,76,77,71,72,73].forEach((scan,i)=>{scanCodes['Numpad'+i]=scan;});
+for(let i=1;i<=10;i++)scanCodes['F'+i]=58+i;
+for(let i=13;i<=24;i++)scanCodes['F'+i]=i===24?118:87+i;
+function eventScan(e){
+  if(scanCodes[e.code]!==undefined)return scanCodes[e.code];
+  // 部分 Android 鍵盤沒有 code；僅對不含配置歧義的鍵提供退路。
+  let code=e.key;
+  if(/^[a-z]$/i.test(code))code='Key'+code.toUpperCase();
+  else if(/^[0-9]$/.test(code))code='Digit'+code;
+  else if(code===' ')code='Space';
+  else if(['Shift','Control','Alt','Meta'].includes(code))code+=e.location===2?'Right':'Left';
+  return scanCodes[code];
+}
+function canSendRaw(){try{return window.YourDesk.supportsRawKeyboard?.()===true;}catch{return false;}}
+function rawControl(e,code,down){
+  let modifiers=(e.shiftKey?1:0)|(e.ctrlKey?2:0)|(e.altKey?4:0)|(e.metaKey?8:0);
+  if(e.getModifierState?.('CapsLock'))modifiers|=16;
+  // Android/WebView 未必提供 NumLock 狀態，不宣告「狀態有效」，避免改動遠端鎖定狀態。
+  return {type:'raw-key',rawKey:{platform:'windows',code,modifiers,nativeFlags:0,
+    disableMapping:true,down,repeat:down&&e.repeat===true}};
+}
 let composing=false,compositionTimer;
 let textInputSupported=false;
 window.desktopInputCapabilities=supported=>{textInputSupported=supported===true;};
@@ -58,7 +91,7 @@ function sendLegacyText(value){
   }
   for(const character of value.replace(/\r\n?/g,'\n')){
     const key=character==='\n'?'enter':character==='\t'?'tab':keyName(character);
-    const shift=/[A-Z]/.test(character)&&![...pressedKeys.values()].includes('shift');
+    const shift=/[A-Z]/.test(character)&&![...pressedKeys.values()].some(value=>value.key==='shift'||[42,54].includes(value.rawKey?.code));
     if(shift&&!send({type:'key',key:'shift',down:true}))return;
     const ok=tapKey(key);
     if(shift)send({type:'key',key:'shift',down:false});
@@ -83,7 +116,15 @@ function commitText(){
   if(value)sendText(value);
 }
 function tapKey(key){return send({type:'key',key,down:true})&&send({type:'key',key,down:false});}
-function releaseKeys(){for(const key of pressedKeys.values())send({type:'key',key,down:false});pressedKeys.clear();}
+function releaseKeys(){
+  for(const control of pressedKeys.values()){
+    if(control.rawKey)send({...control,rawKey:{...control.rawKey,down:false,repeat:false,modifiers:0}});
+    else send({...control,down:false});
+  }
+  pressedKeys.clear();
+  if(rawKeysUsed)send({type:'raw-key-reset'});
+  rawKeysUsed=false;
+}
 keyboardProxy.addEventListener('compositionstart',()=>{clearTimeout(compositionTimer);composing=true;});
 keyboardProxy.addEventListener('compositionend',()=>{
   composing=false;
@@ -108,13 +149,25 @@ window.addEventListener('keydown',e=>{
     if(!/^[a-zA-Z0-9 ]$/.test(e.key)){sendLegacyText(e.key);e.preventDefault();return;}
     // 相容舊 Host：保留實體 ASCII 的按下／放開與快捷鍵路徑。
   }
+  const scan=eventScan(e);
+  if(canSendRaw()&&scan!==undefined){
+    const control=rawControl(e,scan,true);
+    if(send(control)){pressedKeys.set(e.code||e.key,control);rawKeysUsed=true;}
+    e.preventDefault();return;
+  }
   if(!printable&&!/^(Enter|Escape|Backspace|Tab|Delete|ArrowUp|ArrowDown|ArrowLeft|ArrowRight|Home|End|PageUp|PageDown|Shift|Control|Alt|Meta|F([1-9]|1[0-2]))$/.test(e.key))return;
-  const key=keyName(e.key);pressedKeys.set(e.code||e.key,key);
-  send({type:'key',key,down:true});e.preventDefault();
+  const control={type:'key',key:keyName(e.key),down:true};
+  if(send(control))pressedKeys.set(e.code||e.key,control);e.preventDefault();
 });
 window.addEventListener('keyup',e=>{
-  const id=e.code||e.key,key=pressedKeys.get(id);
-  if(key){pressedKeys.delete(id);send({type:'key',key,down:false});e.preventDefault();}
+  const id=e.code||e.key,control=pressedKeys.get(id);
+  if(control){
+    pressedKeys.delete(id);
+    send(control.rawKey?rawControl(e,control.rawKey.code,false):{...control,down:false});e.preventDefault();
+  }else if(rawKeysUsed&&[29,285,42,54,56,312,347,348].includes(eventScan(e))){
+    // 修飾鍵按下可能在 WebView 取得焦點前，仍須傳送它的放開。
+    send(rawControl(e,eventScan(e),false));e.preventDefault();
+  }
 });
 window.addEventListener('blur',releaseKeys);
 const reportLayout=()=>window.YourDesk.desktopLayout?.(screenImage.getBoundingClientRect().top,window.innerWidth);

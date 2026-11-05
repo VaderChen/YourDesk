@@ -1768,6 +1768,10 @@ public final class MainActivity extends ComponentActivity {
       runOnUiThread(() -> selectRemoteDisplay(display));
     }
 
+    @JavascriptInterface public boolean supportsRawKeyboard() {
+      return viewer.supportsRawKeyboard();
+    }
+
     @JavascriptInterface public boolean supportsTextInput() {
       return viewer.supportsCommand("input.text-capabilities");
     }
