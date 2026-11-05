@@ -138,7 +138,8 @@ public final class MainActivity extends ComponentActivity {
   private AppUpdater appUpdater;
   private boolean updatePageIdle, updateConnecting;
   private String updateLanguage = "zh-Hant";
-  private boolean foreground;
+  private volatile boolean foreground;
+  private volatile boolean desktopWindowFocused;
   private String homeMessage = "";
   private boolean inTerminal;
   private boolean inDesktop;
@@ -1007,6 +1008,7 @@ public final class MainActivity extends ComponentActivity {
 
   @Override public void onWindowFocusChanged(boolean hasFocus) {
     super.onWindowFocusChanged(hasFocus);
+    desktopWindowFocused=hasFocus;
     if (!hasFocus) cancelDesktopGesture();
   }
 
@@ -1297,6 +1299,13 @@ public final class MainActivity extends ComponentActivity {
       statsLastTrafficNanos = now;
     } catch (Exception ignored) { }
     statsLastSampleNanos = now;
+    if (desktopPageReady && hasWindowFocus()) {
+      String incoming=session.pollClipboardJSON();
+      if (!incoming.isEmpty()) try {
+        String text=new org.json.JSONObject(incoming).getString("text");
+        getSystemService(android.content.ClipboardManager.class).setPrimaryClip(android.content.ClipData.newPlainText("YourDesk",text));
+      } catch (Exception ignored) { }
+    }
     updateStreamResult(session);
     web.evaluateJavascript("window.desktopInputCapabilities&&window.desktopInputCapabilities("
         + session.supportsCommand("input.text-capabilities") + ")", null);
@@ -1754,7 +1763,21 @@ public final class MainActivity extends ComponentActivity {
         if (type.equals("display-select") || type.equals("display-next")) return "native display selection only";
         if (displayInputBlocked) return "螢幕切換中，請等待新畫面";
         if (inputDisplay >= 0) control.put("display", inputDisplay);
-        viewer.sendControlJSON(control.toString());
+        Viewer session=viewer;
+        if (control.optBoolean("pasteShortcut") && session.clipboardPasteModifier()!=0) {
+          if(!foreground || !desktopWindowFocused)return "桌面未取得焦點";
+          int mods=control.optInt("pasteModifiers") & 14;
+          if (mods==session.clipboardPasteModifier()) {
+            android.content.ClipData clip=getSystemService(android.content.ClipboardManager.class).getPrimaryClip();
+            if (clip!=null && clip.getItemCount()>0) {
+              CharSequence text=clip.getItemAt(0).getText();
+              if(text==null)return "手機僅支援文字剪貼簿";
+              session.sendPasteText(text.toString());
+            }
+          }
+        }
+        control.remove("pasteShortcut");control.remove("pasteModifiers");
+        session.sendControlJSON(control.toString());
         return "ok";
       }
       catch (Exception e) { return e.getMessage() == null ? "send failed" : e.getMessage(); }

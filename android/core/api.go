@@ -32,22 +32,25 @@ type Viewer struct {
 	frameMu    sync.Mutex
 	// JPEG 模式會把一張桌面拆成多個區塊影格；不能只保留最後一筆，
 	// 否則 Android 尚未讀取前面的區塊時，合成基底就會缺塊。
-	frames               []*p2p.Frame
-	frameHead            int
-	frameCount           int
-	frameGeneration      uint64
-	frameBytes           int
-	awaitingKeyframe     bool
-	recoveryPending      bool
-	streamSendMu         sync.Mutex
-	rawKeyboardSupported bool
-	streamCapabilities   *streamconfig.Capabilities
-	streamRevision       uint64
-	streamRequest        *streamconfig.Request
-	streamResult         *streamconfig.Result
-	streamError          string
-	displaySendMu        sync.Mutex
-	displays             displayState
+	frames                  []*p2p.Frame
+	frameHead               int
+	frameCount              int
+	frameGeneration         uint64
+	frameBytes              int
+	awaitingKeyframe        bool
+	recoveryPending         bool
+	streamSendMu            sync.Mutex
+	keyboardPlatform        string
+	clipOffered, clipActive bool
+	pendingClip             *string
+	rawKeyboardSupported    bool
+	streamCapabilities      *streamconfig.Capabilities
+	streamRevision          uint64
+	streamRequest           *streamconfig.Request
+	streamResult            *streamconfig.Result
+	streamError             string
+	displaySendMu           sync.Mutex
+	displays                displayState
 }
 
 func NewViewer() *Viewer {
@@ -143,6 +146,7 @@ func (v *Viewer) beginConnect() (context.Context, context.CancelFunc, uint64) {
 	v.peer, v.cancel = nil, cancel
 	v.input = nil
 	v.resetStreamLocked()
+	v.clipOffered, v.clipActive, v.pendingClip, v.keyboardPlatform = false, false, nil, ""
 	v.resetDisplaysLocked()
 	v.frameMu.Lock()
 	v.resetFramesLocked(generation)
@@ -166,6 +170,7 @@ func (v *Viewer) Close() {
 	v.input = nil
 	v.cancel = nil
 	v.resetStreamLocked()
+	v.clipOffered, v.clipActive, v.pendingClip, v.keyboardPlatform = false, false, nil, ""
 	v.resetDisplaysLocked()
 	v.frameMu.Lock()
 	v.resetFramesLocked(v.generation)

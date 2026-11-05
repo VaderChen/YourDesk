@@ -15,6 +15,7 @@ import (
 
 type keyJob struct {
 	generation uint64
+	copyIntent bool
 	paste      bool
 	reset      bool
 	batch      []p2p.Control
@@ -188,7 +189,11 @@ func (s *Sync) resetKeysLocked(reason string, force bool) {
 	}
 	s.keys.Reset(keyJob{generation: s.generation, reset: true})
 }
-func (s *Sync) SendControl(c p2p.Control) error {
+func (s *Sync) SendControl(c p2p.Control) error { return s.enqueueControl(c, false) }
+
+// SendCopyControl 在送出遠端複製前記下本機版本，快速接續的貼上不以本機舊資料覆蓋遠端。
+func (s *Sync) SendCopyControl(c p2p.Control) error { return s.enqueueControl(c, true) }
+func (s *Sync) enqueueControl(c p2p.Control, copyIntent bool) error {
 	s.mu.Lock()
 	if s.peer == nil {
 		s.mu.Unlock()
@@ -212,7 +217,7 @@ func (s *Sync) SendControl(c p2p.Control) error {
 	if c.Type == "move" {
 		limit = 64
 	}
-	if !s.keys.Push(keyJob{control: c, generation: s.generation}, limit) && c.Type != "move" {
+	if !s.keys.Push(keyJob{control: c, copyIntent: copyIntent, generation: s.generation}, limit) && c.Type != "move" {
 		return fmt.Errorf("輸入佇列已滿")
 	}
 	return nil
@@ -223,6 +228,8 @@ func (s *Sync) keyboard(ctx context.Context) {
 
 func (s *Sync) keyboardWithSender(ctx context.Context, send func(p2p.Control) error) {
 	dropPaste := false
+	var copied bool
+	var copyRevision int64
 	var generation uint64
 	for {
 		job, ok := s.keys.Pop(ctx.Done())
@@ -237,6 +244,7 @@ func (s *Sync) keyboardWithSender(ctx context.Context, send func(p2p.Control) er
 		if generation != job.generation {
 			dropPaste = false
 			generation = job.generation
+			copied = false
 		}
 		if job.batch != nil {
 			s.inputInFlight = true
@@ -280,7 +288,11 @@ func (s *Sync) keyboardWithSender(ctx context.Context, send func(p2p.Control) er
 			pasteCtx, cancel := context.WithCancelCause(timeoutCtx)
 			s.pasteCancel = cancel
 			s.mu.Unlock()
-			err := s.waitPasteTransfer(pasteCtx)
+			var err error
+			if !copied || nativeRevision() != copyRevision {
+				err = s.waitPasteTransfer(pasteCtx)
+			}
+
 			cause := context.Cause(pasteCtx)
 			cancel(nil)
 			timeoutCancel()
@@ -313,7 +325,13 @@ func (s *Sync) keyboardWithSender(ctx context.Context, send func(p2p.Control) er
 		}
 		s.inputInFlight = true
 		s.mu.Unlock()
+		if job.copyIntent {
+			copyRevision = nativeRevision()
+		}
 		err := send(c)
+		if job.copyIntent {
+			copied = err == nil
+		}
 		s.mu.Lock()
 		s.inputInFlight = false
 		if err == nil {

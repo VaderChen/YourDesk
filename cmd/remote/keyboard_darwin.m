@@ -1,6 +1,6 @@
 //go:build darwin && cgo
 #import <Cocoa/Cocoa.h>
-#import <Carbon/Carbon.h>
+
 #import <ApplicationServices/ApplicationServices.h>
 #import <dispatch/dispatch.h>
 #include <IOKit/hidsystem/IOLLEvent.h>
@@ -15,7 +15,7 @@ static atomic_bool enabled=false,suspended=false;
 static atomic_bool shortcutGuard=false;
 void yd_keyboard_shortcut_guard(int value){atomic_store(&shortcutGuard,value!=0);}
 static BOOL capsPhysicalDown=NO;
-static void *hotKeyModeToken=NULL;
+static BOOL tappedKeys[128];
 static CFMachPortRef keyEventTap=NULL;
 static CFRunLoopSourceRef keyEventTapSource=NULL;
 static uint64_t modifiers(NSEventModifierFlags f) {
@@ -41,7 +41,7 @@ static BOOL ydViewerCapturingWindow(NSWindow *candidate) {
  Class viewer=NSClassFromString(@"GLFWWindow");
  NSWindow *window=candidate ?: NSApp.keyWindow;
  if(!viewer||!window||![window isKindOfClass:viewer]||!window.keyWindow||window.attachedSheet)return NO;
- if(window.firstResponder!=window.contentView && window.contentView)[window makeFirstResponder:window.contentView];
+ // 只觀察焦點，文字欄位和 WebView 需要自行處理本機編輯與組字。
  return window.firstResponder==window.contentView;
 }
 static void ydRecordKey(int keyCode, BOOL flagsChanged, BOOL isDown, BOOL isRepeat, uint64_t rawFlags) {
@@ -63,27 +63,40 @@ static void ydRecordKey(int keyCode, BOOL flagsChanged, BOOL isDown, BOOL isRepe
  }else{events[count++]=key;}
  pthread_mutex_unlock(&keyMutex);
 }
-static void ydUpdateHotKeyMode(void);
+static void ydUpdateKeyTap(void);
 static CGEventRef ydKeyEventTapCallback(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *refcon) {
  if(type==kCGEventTapDisabledByTimeout||type==kCGEventTapDisabledByUserInput){
-  if(keyEventTap)CGEventTapEnable(keyEventTap,true);
+  if(keyEventTap && ydViewerCapturingWindow(nil))CGEventTapEnable(keyEventTap,true);
   return event;
  }
  if(type!=kCGEventKeyDown&&type!=kCGEventKeyUp&&type!=kCGEventFlagsChanged)return event;
  if(CGEventGetIntegerValueField(event,kCGEventSourceUserData)==0x5944524b)return event;
  int keyCode=(int)CGEventGetIntegerValueField(event,kCGKeyboardEventKeycode);
  uint64_t rawFlags=(uint64_t)CGEventGetFlags(event);
- if(atomic_load(&shortcutGuard) && (rawFlags&kCGEventFlagMaskCommand) && (keyCode==12||keyCode==13))return NULL;
- ydUpdateHotKeyMode();
- if(!ydViewerCapturingWindow(nil))return event;
+ // 系統層只接管遠端 Control 導覽／功能快捷鍵。一般編輯、輸入法及
+ // 修飾鍵交給視窗事件；避免全域停用熱鍵或攔走其他應用程式的輸入。
+ if(!ydViewerCapturingWindow(nil) || keyCode<0 || keyCode>=128)return event;
+ if(type==kCGEventKeyDown){
+  if(!(rawFlags&kCGEventFlagMaskControl))return event;
+  switch(keyCode){
+   case 49:case 96:case 97:case 98:case 99:case 100:case 101:case 103:case 105:
+   case 106:case 107:case 109:case 111:case 113:case 114:case 115:case 116:
+   case 117:case 118:case 119:case 120:case 121:case 122:case 123:case 124:
+   case 125:case 126:case 64:case 79:case 80:case 90:break;
+   default:return event;
+  }
+  tappedKeys[keyCode]=YES;
+ }else if(type==kCGEventKeyUp && tappedKeys[keyCode]){
+  tappedKeys[keyCode]=NO;
+ }else return event;
  BOOL isRepeat=type==kCGEventKeyDown && CGEventGetIntegerValueField(event,kCGKeyboardEventAutorepeat)!=0;
  ydRecordKey(keyCode,type==kCGEventFlagsChanged,type==kCGEventKeyDown,isRepeat,rawFlags);
  return NULL;
 }
-static void ydUpdateHotKeyMode(void) {
+static void ydUpdateKeyTap(void) {
  BOOL active=ydViewerCapturingWindow(nil);
  if(active){
-  if(!hotKeyModeToken)hotKeyModeToken=PushSymbolicHotKeyMode(kHIHotKeyModeAllDisabled);
+
   if(!keyEventTap && AXIsProcessTrusted()){
    CGEventMask mask=CGEventMaskBit(kCGEventKeyDown)|CGEventMaskBit(kCGEventKeyUp)|CGEventMaskBit(kCGEventFlagsChanged);
    keyEventTap=CGEventTapCreate(kCGSessionEventTap,kCGHeadInsertEventTap,kCGEventTapOptionDefault,mask,ydKeyEventTapCallback,NULL);
@@ -93,9 +106,10 @@ static void ydUpdateHotKeyMode(void) {
     CGEventTapEnable(keyEventTap,true);
    }
   }
- }else if(hotKeyModeToken){
-  PopSymbolicHotKeyMode(hotKeyModeToken);
-  hotKeyModeToken=NULL;
+  if(keyEventTap && !CGEventTapIsEnabled(keyEventTap))CGEventTapEnable(keyEventTap,true);
+ }else{
+  memset(tappedKeys,0,sizeof(tappedKeys));
+  if(keyEventTap)CGEventTapEnable(keyEventTap,false);
  }
 }
 int yd_shortcut_released(int code,uint64_t mods){
@@ -105,24 +119,24 @@ int yd_shortcut_released(int code,uint64_t mods){
 void yd_keyboard_suspend(int value){
  atomic_store(&suspended,value!=0);
  if(value){pthread_mutex_lock(&keyMutex);if(count>=1024)count=0;events[count++]=(YDKey){.reset=1};pthread_mutex_unlock(&keyMutex);}
- dispatch_async(dispatch_get_main_queue(),^{ydUpdateHotKeyMode();});
+ dispatch_async(dispatch_get_main_queue(),^{ydUpdateKeyTap();});
 }
 void yd_keyboard_enabled(int value) {
  bool prev=atomic_exchange(&enabled,value!=0);
  if(prev!=(value!=0)){
-  dispatch_async(dispatch_get_main_queue(),^{ydUpdateHotKeyMode();});
+  dispatch_async(dispatch_get_main_queue(),^{ydUpdateKeyTap();});
  }
  static dispatch_once_t once;
  dispatch_once(&once,^{ dispatch_async(dispatch_get_main_queue(),^{
   NSNotificationCenter *nc=NSNotificationCenter.defaultCenter;
   for(NSNotificationName name in @[NSApplicationDidBecomeActiveNotification,NSApplicationDidResignActiveNotification,NSWindowDidBecomeKeyNotification,NSWindowDidResignKeyNotification]){
-   [nc addObserverForName:name object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note){ydUpdateHotKeyMode();}];
+   [nc addObserverForName:name object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note){ydUpdateKeyTap();}];
   }
-  ydUpdateHotKeyMode();
+  ydUpdateKeyTap();
   [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown|NSEventMaskKeyUp|NSEventMaskFlagsChanged handler:^NSEvent *(NSEvent *event){
    if(event.CGEvent && CGEventGetIntegerValueField(event.CGEvent,kCGEventSourceUserData)==0x5944524b)return event;
    if(atomic_load(&shortcutGuard) && (event.modifierFlags&NSEventModifierFlagCommand) && (event.keyCode==12||event.keyCode==13))return nil;
-   ydUpdateHotKeyMode();
+   ydUpdateKeyTap();
    if(!ydViewerCapturingWindow(event.window))return event;
    ydRecordKey(event.keyCode,event.type==NSEventTypeFlagsChanged,event.type==NSEventTypeKeyDown,event.type==NSEventTypeKeyDown&&event.isARepeat,event.modifierFlags);
    // 在 interpretKeyEvents／本機輸入法之前擷取，不讓 遠端顯示 消化組合鍵。

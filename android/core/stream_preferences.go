@@ -25,6 +25,17 @@ func (v *Viewer) receiveStreamControl(c p2p.Control, generation uint64) {
 	if v.generation != generation {
 		return
 	}
+	if c.Type == "clipboard-capabilities" {
+		v.clipOffered = true
+		return
+	}
+	if c.Type == "clipboard-text" {
+		if v.clipActive && validMobileClip(c.Clipboard) {
+			value := string(c.Clipboard)
+			v.pendingClip = &value
+		}
+		return
+	}
 	if c.Type == "displays" {
 		v.receiveDisplaysLocked(c)
 		return
@@ -45,6 +56,7 @@ func (v *Viewer) receiveStreamControl(c p2p.Control, generation uint64) {
 		v.streamCapabilities = &caps
 	}
 	if c.Type == "keyboard-capabilities" {
+		v.keyboardPlatform = c.Platform
 		v.rawKeyboardSupported = true
 	}
 	if c.Type == "stream-config-result" && c.StreamResult != nil {

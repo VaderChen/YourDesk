@@ -50,10 +50,6 @@ func (g *game) updateRawKeys() bool {
 				break
 			}
 		}
-		// 貼上等待獨立剪貼簿通道的接收確認，保留按鍵順序。
-		if event.Down && !event.Repeat && rawkey.Name(event.Platform, event.Code) == "v" && event.Modifiers&(2|8) != 0 && g.clipboard != nil {
-			g.clipboard.Poll(true)
-		}
 		copy := event
 		if err := g.sendControl(p2p.Control{Type: "raw-key", RawKey: &copy}); err == nil {
 			if event.Down {

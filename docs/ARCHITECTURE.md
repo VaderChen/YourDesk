@@ -14,7 +14,7 @@ YourDesk 是以 Go 開發的 P2P 遠端桌面，提供內嵌 HTML／JavaScript�
 
 Android Viewer 位於 `android/`，使用獨立 Go module 與預編譯 AAR，不直接引用桌面 core。接收佇列同時限制 512 張與 32 MiB，溢位清除相依鏈並通知 UI 請求完整影格；JSON／Base64 序列化移到接收鎖外。JPEG 在配置 Bitmap 前檢查真正尺寸；H.264／HEVC 使用 MediaCodec／Surface，重建或缺幀後要求 IDR，候選解碼器耗盡時撤回能力並重新協商。佇列預算不是整個 APP 的記憶體上限，單張 JPEG 仍在 UI thread 解碼。
 
-Android 中文 IME 採獨立 `text` 控制訊息，每筆最多 16 KiB UTF-8；新版 Host 公告 `input.text-capabilities` 並以 macOS／Windows Unicode API 注入，不借用剪貼簿。舊 Host 保留可映射的 ASCII 按鍵，中文明示需更新。Android 的畫質與縮放使用完整 `stream-config` 快照及 Host ACK，不再將所有縮放比例轉成同一個布林旗標。
+Android 前景桌面以有序 control 純文字備援支援雙向剪貼簿（32 KiB）；手機貼上時才讀本機文字。支援原始按鍵時，Android 外接鍵盤字母與標點送掃描碼供遠端 IME 組字；Android 螢幕鍵盤中文 IME 採獨立 `text` 控制訊息，每筆最多 16 KiB UTF-8；新版 Host 公告 `input.text-capabilities` 並以 macOS／Windows Unicode API 注入，不借用剪貼簿。舊 Host 保留可映射的 ASCII 按鍵，中文明示需更新。Android 的畫質與縮放使用完整 `stream-config` 快照及 Host ACK，不再將所有縮放比例轉成同一個布林旗標。
 
 2026-10-01 已重建 Android core，完成 arm64 Release APK 簽章與全部原生庫的 16 KB ELF／ZIP 靜態檢查。站台與加密憑證採相同儲存交易，密碼依信令位址與遠端 ID 隔離；WebView 限定本機資源，背景與工作階段結束會清理影像、相機及輸入狀態。JPEG 與影片共用縮放／可視區座標轉換，右鍵及滾輪由原生輸入路徑處理；多螢幕切換須收到對應確認及新影像才恢復控制。聲音使用獨立 `audio-v1` 通道、MediaCodec 及 AudioTrack。關閉按鈕預設由標題列與安全區錨定，拖曳位置以比例保存，避免隱藏與旋轉累積位移。已於 Android 11 手機完成相關 Smoke 及正式 APK 實際連線；16 KB／Android 16 實機及跨廠 codec 相容性仍須另外驗收。建置、簽章與完整驗證範圍見 [Android 建置](ANDROID-BUILD.md)。
 

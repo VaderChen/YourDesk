@@ -27,8 +27,7 @@ static void yd_key(int code,int down) {
  CGEventRef e=CGEventCreateKeyboardEvent(NULL,(CGKeyCode)code,down != 0);
  if(e){
   if(code>=54 && code<=63)CGEventSetType(e,kCGEventFlagsChanged);
-  CGEventFlags intrinsic=CGEventGetFlags(e)&(kCGEventFlagMaskSecondaryFn|kCGEventFlagMaskNumericPad|kCGEventFlagMaskHelp|kCGEventFlagMaskNonCoalesced);
-  CGEventSetFlags(e,intrinsic|yd_input_flags());
+  CGEventSetFlags(e,yd_input_flags());
   CGEventSetIntegerValueField(e,kCGEventSourceUserData,0x5944524b);
   CGEventPost(kCGHIDEventTap,e);CFRelease(e);
  }
@@ -46,8 +45,8 @@ static int yd_modifier_lock(int selector,int on) {
 static void yd_raw_key(int code,int down,unsigned long long mods,int repeat,int numeric,unsigned long long nativeFlags) {
  CGEventRef e=CGEventCreateKeyboardEvent(NULL,(CGKeyCode)code,down!=0);
  if(!e)return;
- CGEventFlags intrinsic=CGEventGetFlags(e)&(kCGEventFlagMaskSecondaryFn|kCGEventFlagMaskNumericPad|kCGEventFlagMaskHelp|kCGEventFlagMaskNonCoalesced);
- CGEventFlags flags=intrinsic|((CGEventFlags)(nativeFlags&0x207fULL));
+ // 僅採來源事件旗標，避免 Host 當下實體 Fn／數字鍵盤狀態干擾輸入法。
+ CGEventFlags flags=(CGEventFlags)(nativeFlags&0x207fULL);
  if(mods&1){
   flags|=kCGEventFlagMaskShift;
   if((flags&(NX_DEVICELSHIFTKEYMASK|NX_DEVICERSHIFTKEYMASK))==0)flags|=(code==60)?NX_DEVICERSHIFTKEYMASK:NX_DEVICELSHIFTKEYMASK;
@@ -84,15 +83,16 @@ static void yd_raw_key(int code,int down,unsigned long long mods,int repeat,int 
  }else{
   const CGEventFlags chordMask=kCGEventFlagMaskShift|kCGEventFlagMaskControl|kCGEventFlagMaskAlternate|kCGEventFlagMaskCommand;
   CGEventFlags prev=yd_input_flags();
-  if((prev&chordMask)!=(flags&chordMask)){
-   CGKeyCode modCode=59;
-   if(((prev^flags)&kCGEventFlagMaskCommand)!=0 && ((prev^flags)&kCGEventFlagMaskControl)==0)modCode=55;
-   else if(((prev^flags)&kCGEventFlagMaskAlternate)!=0)modCode=58;
-   else if(((prev^flags)&kCGEventFlagMaskShift)!=0)modCode=56;
-   CGEventRef m=CGEventCreateKeyboardEvent(NULL,modCode,true);
+  const CGEventFlags bits[]={kCGEventFlagMaskControl,kCGEventFlagMaskCommand,kCGEventFlagMaskAlternate,kCGEventFlagMaskShift};
+  const CGKeyCode codes[]={59,55,58,56};
+  for(int i=0;i<4;i++){
+   if(((prev^flags)&bits[i])==0)continue;
+   // 修飾狀態轉換必須與實際鍵碼、按下／放開一致，不補送假的 Control。
+   prev=(prev&~bits[i])|(flags&bits[i]);
+   CGEventRef m=CGEventCreateKeyboardEvent(NULL,codes[i],(flags&bits[i])!=0);
    if(m){
     CGEventSetType(m,kCGEventFlagsChanged);
-    CGEventSetFlags(m,flags&(chordMask|kCGEventFlagMaskAlphaShift|0x207fULL));
+    CGEventSetFlags(m,prev&chordMask);
     CGEventSetIntegerValueField(m,kCGEventSourceUserData,0x5944524b);
     CGEventPost(kCGHIDEventTap,m);CFRelease(m);
    }

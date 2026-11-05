@@ -4,6 +4,7 @@ import (
 	"runtime"
 	"time"
 	"yourdesk/internal/p2p"
+	"yourdesk/internal/rawkey"
 )
 
 // 控制通道與影像通道非同步；切換後只接收目標螢幕的完整影格。
@@ -89,6 +90,19 @@ func (g *game) sendControl(c p2p.Control) error {
 	g.mu.RUnlock()
 	if known {
 		c.Display = &selected
+	}
+	if c.RawKey != nil {
+		target, _ := g.remoteKeyboardPlatform.Load().(string)
+		if target != "darwin" && target != "windows" {
+			target = c.RawKey.Platform
+		}
+		action := rawkey.ClipboardShortcut(*c.RawKey, target)
+		if action == "v" {
+			g.clipboard.Poll(true)
+		}
+		if action == "c" || action == "x" {
+			return g.clipboard.SendCopyControl(c)
+		}
 	}
 	return g.clipboard.SendControl(c)
 }

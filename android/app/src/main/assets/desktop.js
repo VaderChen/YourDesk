@@ -141,7 +141,9 @@ keyboardProxy.addEventListener('beforeinput',e=>{
 window.addEventListener('keydown',e=>{
   if(stopped||e.target===displaySelect||isComposition(e))return;
   const printable=[...e.key].length===1;
-  if(printable&&!e.ctrlKey&&!e.metaKey&&!e.altKey){
+  const raw=canSendRaw(), scan=eventScan(e);
+  // 實體字母、標點和空白要由遠端輸入法組字；螢幕鍵盤仍使用 input/composition。
+  if(printable&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!(raw&&scanCodes[e.code]!==undefined)){
     if(canSendText()){
       if(e.target!==keyboardProxy){sendText(e.key);e.preventDefault();}
       return; // 已聚焦 proxy 的一般字元只由 input 送出，避免 keydown 重送。
@@ -149,15 +151,15 @@ window.addEventListener('keydown',e=>{
     if(!/^[a-zA-Z0-9 ]$/.test(e.key)){sendLegacyText(e.key);e.preventDefault();return;}
     // 相容舊 Host：保留實體 ASCII 的按下／放開與快捷鍵路徑。
   }
-  const scan=eventScan(e);
-  if(canSendRaw()&&scan!==undefined){
+  if(raw&&scan!==undefined){
     const control=rawControl(e,scan,true);
-    if(send(control)){pressedKeys.set(e.code||e.key,control);rawKeysUsed=true;}
+    const paste=scan===47&&!e.repeat&&(e.ctrlKey||e.metaKey);
+    if(send(paste?{...control,pasteShortcut:true,pasteModifiers:control.rawKey.modifiers}:control)){pressedKeys.set(e.code||e.key,control);rawKeysUsed=true;}
     e.preventDefault();return;
   }
   if(!printable&&!/^(Enter|Escape|Backspace|Tab|Delete|ArrowUp|ArrowDown|ArrowLeft|ArrowRight|Home|End|PageUp|PageDown|Shift|Control|Alt|Meta|F([1-9]|1[0-2]))$/.test(e.key))return;
   const control={type:'key',key:keyName(e.key),down:true};
-  if(send(control))pressedKeys.set(e.code||e.key,control);e.preventDefault();
+  if(send(control.key==="v"&&!e.repeat&&(e.ctrlKey||e.metaKey)?{...control,pasteShortcut:true,pasteModifiers:(e.ctrlKey?2:0)|(e.metaKey?8:0)|(e.altKey?4:0)}:control))pressedKeys.set(e.code||e.key,control);e.preventDefault();
 });
 window.addEventListener('keyup',e=>{
   const id=e.code||e.key,control=pressedKeys.get(id);

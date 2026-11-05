@@ -283,7 +283,7 @@ func Code(platform, name string) (int, bool) {
 
 func preserveDarwinControl(name string) bool {
 	switch name {
-	case "left", "right", "up", "down", "home", "end", "pageup", "pagedown", "insert", "delete",
+	case "space", "left", "right", "up", "down", "home", "end", "pageup", "pagedown", "insert", "delete",
 		"f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f11", "f12",
 		"f13", "f14", "f15", "f16", "f17", "f18", "f19", "f20", "f21", "f22", "f23", "f24":
 		return true
@@ -362,4 +362,17 @@ func LegacyKey(platform, target, key string, disabled bool) string {
 		}
 	}
 	return key
+}
+
+// ClipboardShortcut 依接收平台套用實際映射；Win+V、Ctrl+Alt+V 不觸發貼上屏障。
+func ClipboardShortcut(e Event, target string) string {
+	name := Name(e.Platform, e.Code)
+	if !e.Down || e.Repeat || (name != "c" && name != "x" && name != "v") {
+		return ""
+	}
+	mods := TargetModifiers(e, target) & (2 | 4 | 8)
+	if (target == "darwin" && mods == 8 || target == "windows" && mods == 2) && (name == "v" || e.Modifiers&1 == 0) {
+		return name
+	}
+	return ""
 }

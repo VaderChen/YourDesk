@@ -92,9 +92,6 @@ func (g *game) sendVirtualKey(action int) {
 		g.sendSecureAttention()
 		return
 	}
-	if r.Key == "v" && r.Modifiers&(2|8) != 0 && g.clipboard != nil {
-		g.clipboard.Poll(true)
-	}
 	events := r.Chord()
 	for i, e := range events {
 		e.DisableMapping = true

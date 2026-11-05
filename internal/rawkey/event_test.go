@@ -76,3 +76,27 @@ func TestTranslateAndModifiers(t *testing.T) {
 		t.Fatalf("windows->darwin leftsuper = %d, want %d, err = %v", got, macLCtrl, err)
 	}
 }
+
+func TestClipboardAndInputSourceChords(t *testing.T) {
+	for _, tc := range []struct {
+		src, dst, key string
+		mods          uint64
+		literal       bool
+		want          string
+	}{
+		{"windows", "windows", "v", 8, false, ""}, {"windows", "windows", "v", 2, false, "v"},
+		{"darwin", "windows", "v", 8, false, "v"}, {"windows", "darwin", "v", 2, false, "v"},
+		{"windows", "darwin", "c", 2, true, ""}, {"darwin", "darwin", "c", 8, false, "c"},
+		{"windows", "windows", "v", 6, false, ""}, {"darwin", "windows", "x", 8, false, "x"},
+	} {
+		code, _ := Code(tc.src, tc.key)
+		e := Event{Platform: tc.src, Code: code, Modifiers: tc.mods, Down: true, DisableMapping: tc.literal}
+		if got := ClipboardShortcut(e, tc.dst); got != tc.want {
+			t.Errorf("%+v: got %q", tc, got)
+		}
+	}
+	space, _ := Code("windows", "space")
+	if got := TargetModifiers(Event{Platform: "windows", Code: space, Modifiers: 2}, "darwin"); got != 2 {
+		t.Errorf("Ctrl+Space: mods=%v", got)
+	}
+}

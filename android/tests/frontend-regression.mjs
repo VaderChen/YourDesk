@@ -218,6 +218,15 @@ try {
   assert.deepEqual(raw.map(c=>c.rawKey.down),[true,false]);
   pass('Desktop Ctrl+C carries modifier snapshot without a separate Ctrl down');
   await evaluate('controls=[]');
+  for(const [k,code,vk] of [['1','Digit1',49],['u','KeyU',85],[' ','Space',32]]) await key(k,code,vk,0,k);
+  assert.deepEqual(await evaluate('controls.map(c=>[c.type,c.rawKey?.code,c.rawKey?.down])'),
+    [2,22,57].flatMap(scan=>[['raw-key',scan,true],['raw-key',scan,false]]));
+  pass('Physical Zhuyin keys and candidate confirmation reach the Host IME as scan codes');
+  await evaluate('controls=[]');
+  await key('v','KeyV',86,2);
+  assert.deepEqual(await evaluate('controls.map(c=>[c.rawKey.down,c.pasteShortcut??false])'),[[true,true],[false,false]]);
+  pass('Only the paste press requests Android clipboard text before forwarding V');
+  await evaluate('controls=[]');
   for(const [name,code,vk,mods,scan,mask] of [
     ['ArrowLeft','ArrowLeft',37,10,331,3],['F5','F5',116,2,63,2],
     ['Tab','Tab',9,1,15,4],['@','Digit2',50,10,3,3],

@@ -3,7 +3,7 @@
 package main
 
 /*
-#cgo LDFLAGS: -framework Carbon -framework ApplicationServices -framework CoreGraphics
+#cgo LDFLAGS: -framework ApplicationServices -framework CoreGraphics
 #include <stdint.h>
 void yd_keyboard_enabled(int enabled);
 int yd_keyboard_pop(int *code,uint64_t *mods,uint64_t *flags,int *down,int *repeat,int *reset);
