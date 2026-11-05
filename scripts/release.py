@@ -331,6 +331,16 @@ def copy_model_licenses(folder):
         shutil.copy2(source, licenses / ('RIFE-' + name))
 
 
+def go_license():
+    root = Path(capture(['go', 'env', 'GOROOT'])).resolve()
+    # 官方工具鏈置於 GOROOT；套件管理器可將授權檔移到安裝根目錄。
+    # 僅接受本工具鏈目錄中的 Go 授權，避免誤帶其他產品的 LICENSE。
+    for candidate in (root / 'LICENSE', root.parent / 'LICENSE'):
+        if candidate.is_file() and 'The Go Authors' in candidate.read_text(encoding='utf-8'):
+            return candidate
+    raise ValueError('找不到目前 Go 工具鏈的授權檔，無法封裝 WinPE')
+
+
 def compile_winpe(folder, version):
     env = environment('windows/amd64', False)
     common = ['-mod=readonly', '-tags', 'winpe']
@@ -345,7 +355,7 @@ def compile_winpe(folder, version):
     copy_project_licenses(folder)
     licenses = folder / 'ThirdPartyLicenses'
     licenses.mkdir(exist_ok=True)
-    shutil.copy2(Path(capture(['go', 'env', 'GOROOT'])) / 'LICENSE', licenses / 'Go-LICENSE')
+    shutil.copy2(go_license(), licenses / 'Go-LICENSE')
     modules = capture(['go', 'list', *common, '-deps', '-f',
                        '{{if .Module}}{{if not .Module.Main}}{{.Module.Path}}@{{.Module.Version}}|{{.Module.Dir}}{{end}}{{end}}',
                        './cmd/winpe'], env=env)

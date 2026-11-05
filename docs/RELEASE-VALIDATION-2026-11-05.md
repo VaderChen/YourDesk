@@ -4,7 +4,7 @@
 
 ## 範圍
 
-本輪合併桌面既有組合按鍵修改與 Android 補齊：macOS Viewer 擷取／本機快捷鍵狀態、macOS Host 修飾旗標、Windows E0 與功能鍵注入、Windows／macOS 映射、虛擬鍵盤明確選鍵，以及 Android 原始鍵能力公告、實體掃描碼／修飾鍵快照／失焦重設。Go 工具鏈固定為既有工作目錄使用的 `go1.27.3`，不更新第三方功能依賴。操作與限制見[系統快捷鍵](SYSTEM-SHORTCUTS.md)與 [Android 建置](ANDROID-BUILD.md)。
+本輪合併桌面既有組合按鍵修改與 Android 補齊：macOS Viewer 擷取／本機快捷鍵狀態、macOS Host 修飾旗標、Windows E0 與功能鍵注入、Windows／macOS 映射、虛擬鍵盤明確選鍵，以及 Android 原始鍵能力公告、實體掃描碼／修飾鍵快照／失焦重設。Go 工具鏈固定為既有工作目錄使用的 `go1.27.3`，不更新第三方功能依賴。WinPE 封裝相容 Go 工具鏈將授權檔放在 GOROOT 或安裝根目錄的配置，確認內容屬於 Go 授權後才納入。操作與限制見[系統快捷鍵](SYSTEM-SHORTCUTS.md)與 [Android 建置](ANDROID-BUILD.md)。
 
 ## Smoke 與發行閘門
 
