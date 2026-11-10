@@ -21,10 +21,10 @@ def build(app, version='1.0', identity='-'):
     mac.mkdir(parents=True, exist_ok=True)
     resources.mkdir(exist_ok=True)
     source = ROOT / 'platform/macos/Siri/YourDeskIntents.swift'
-    sdk = subprocess.check_output(['xcrun', '--show-sdk-path'], text=True).strip()
+    sdk = subprocess.check_output(['xcrun', '--sdk', 'macosx', '--show-sdk-path'], text=True).strip()
     compiler = Path(subprocess.check_output(['xcrun', '--find', 'swiftc'], text=True).strip())
     toolchain = compiler.parents[2]
-    sdk_version = subprocess.check_output(['xcrun', '--show-sdk-version'], text=True).strip()
+    sdk_version = subprocess.check_output(['xcrun', '--sdk', 'macosx', '--show-sdk-version'], text=True).strip()
     if int(sdk_version.split('.')[0]) < 27:
         raise RuntimeError('Siri AI schema 需要 Xcode 27 SDK；不可默默產生缺少新版能力的發行包')
     with tempfile.TemporaryDirectory(prefix='yourdesk-siri-') as folder:
