@@ -43,9 +43,9 @@ IP 白名單預設開啟且只允許 `127.0.0.1`；名單內免 Token、名單�
 
 ## 下載與開始使用
 
-本次更新與驗證範圍見 [1.26.1105 build 2314 發行說明](docs/RELEASE-1.26.1105-build-2314.md)。Android 支援[自動偵測與下載更新](docs/ANDROID-UPDATES.md)；1.26.1003 build 2028 以前的版本須先手動安裝一次，後續更新安裝仍由 Android 系統確認。
+本次更新與驗證範圍見 [1.26.1110 build 1451 發行說明](docs/RELEASE-1.26.1110-build-1451.md)。Android 支援[自動偵測與下載更新](docs/ANDROID-UPDATES.md)；1.26.1003 build 2028 以前的版本須先手動安裝一次，後續更新安裝仍由 Android 系統確認。
 
-桌面版從 [GitHub Releases](https://github.com/VaderChen/YourDesk/releases/latest) 下載；手機版請使用 [Android 1.26.1105 build 2314 發行頁](https://github.com/VaderChen/YourDesk/releases/tag/1.26.1105-build-2314)。
+桌面版從 [GitHub Releases](https://github.com/VaderChen/YourDesk/releases/latest) 下載；手機版請使用 [Android 1.26.1110 build 1451 發行頁](https://github.com/VaderChen/YourDesk/releases/tag/1.26.1110-build-1451)。
 
 本文件介紹原始碼提供的功能；已發布安裝包實際包含的功能，請以對應發行說明為準。
 
@@ -57,13 +57,13 @@ IP 白名單預設開啟且只允許 `127.0.0.1`；名單內免 Token、名單�
 | Windows x64 | Portable ZIP |
 | Windows on ARM（WOA） | Portable ZIP |
 | Linux x64／arm64 | CLI Host ZIP（無桌面／REMOTE） |
-| Android 8.0 以上／arm64 | [Android ZIP](https://github.com/VaderChen/YourDesk/releases/download/1.26.1105-build-2314/YourDesk-1.26.1105-build-2314-android-arm64.zip)（解壓縮後安裝正式簽章 APK，手機 Viewer） |
+| Android 8.0 以上／arm64 | [Android ZIP](https://github.com/VaderChen/YourDesk/releases/download/1.26.1110-build-1451/YourDesk-1.26.1110-build-1451-android-arm64.zip)（解壓縮後安裝正式簽章 APK，手機 Viewer） |
 
 1. 在兩台電腦安裝並開啟 YourDesk。
 2. 在快速連線輸入遠端 ID，或選擇已儲存的站台。
 3. 輸入連線密碼後，即可開始操作遠端桌面。
 
-Android 請先解壓縮下載的 ZIP，再在手機安裝其中的 APK，並在被控電腦執行 YourDesk Host。雙指開合／拖移調整可視區，長按為右鍵；工具列百分比選單可切換遠端捲動，頂端選單切換螢幕，喇叭按鈕開啟聲音。手機版支援前景桌面的純文字剪貼簿（32 KiB），尚未提供圖片／檔案剪貼簿、獨立檔案傳輸或手機被控模式；[本版功能、安裝注意事項與驗證結果](docs/RELEASE-1.26.1105-build-2314.md)。
+Android 請先解壓縮下載的 ZIP，再在手機安裝其中的 APK，並在被控電腦執行 YourDesk Host。雙指開合／拖移調整可視區，長按為右鍵；工具列百分比選單可切換遠端捲動，頂端選單切換螢幕，喇叭按鈕開啟聲音。手機版支援前景桌面的純文字剪貼簿（32 KiB），尚未提供圖片／檔案剪貼簿、獨立檔案傳輸或手機被控模式；[本版功能、安裝注意事項與驗證結果](docs/RELEASE-1.26.1110-build-1451.md)。
 
 macOS 使用遠端桌面時需允許「螢幕錄製」與「輔助使用」權限。透過剪貼簿接收遠端檔案時，若詢問「網路卷宗」存取，請允許；曾拒絕時可到「系統設定 → 隱私權與安全性 → 檔案與檔案夾」開啟 YourDesk 的網路卷宗權限，再重新複製檔案。Windows 需要 WebView2 Runtime。目前不支援 Intel Mac，亦未提供 Linux 桌面版。
 
@@ -104,6 +104,8 @@ macOS 使用遠端桌面時需允許「螢幕錄製」與「輔助使用」權�
 ## 遠端命令列
 
 雙擊站台可選擇桌面或命令列；獨立檔案傳輸使用站台卡片上的專用圖示。命令列使用獨立視窗，可同時操作不同站台；舊版不支援時會提示更新。Linux 請以一般使用者執行，CLI 支援 `-secret "密碼"`，語系依 `LC_ALL → LC_MESSAGES → LANG` 選擇繁中、英、日、韓，不支援時使用英文。Linux ZIP 的 README 提供完整使用方式。
+
+雙端均支援相對逾時時，終端機與共用 P2P 指令不依賴兩台電腦的系統時間一致。混用舊版時仍請同步兩端日期與時間；詳細說明見[遠端命令列](docs/TERMINAL.md)。
 
 ## 支持開發
 

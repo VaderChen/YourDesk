@@ -6,7 +6,7 @@
 
 2026-10-23 更新：Android 與桌面共用的連線生命週期保留 ICE 暫時中斷恢復時間，避免短暫網路波動立即拆線。本輪通過 Android core 真實 P2P 暫斷恢復／持續失聯與 race；先前 10 月 20 日的實機結果屬於歷史版本，不視為本輪裝置長時間驗收。詳見[本輪驗證範圍](RELEASE-VALIDATION-2026-10-23.md)。
 
-一般使用者可下載 [Android 1.26.1105 build 2314](https://github.com/VaderChen/YourDesk/releases/tag/1.26.1105-build-2314)；本次與桌面版合併發行，安裝方式與驗證範圍見[發行說明](RELEASE-1.26.1105-build-2314.md)。自動更新器自 1.26.1003 build 2028 起提供；更早的版本須先手動安裝一次，後續自動偵測與下載，仍由 Android 確認安裝。既有功能與歷史實機結果見 [Android 功能紀錄](ANDROID-RELEASE-2026-10-01.md)。
+一般使用者可下載 [Android 1.26.1110 build 1451](https://github.com/VaderChen/YourDesk/releases/tag/1.26.1110-build-1451)；本次與桌面版合併發行，安裝方式與驗證範圍見[發行說明](RELEASE-1.26.1110-build-1451.md)。自動更新器自 1.26.1003 build 2028 起提供；更早的版本須先手動安裝一次，後續自動偵測與下載，仍由 Android 確認安裝。既有功能與歷史實機結果見 [Android 功能紀錄](ANDROID-RELEASE-2026-10-01.md)。
 
 本版提供 [APK 自動更新](ANDROID-UPDATES.md)：首頁閒置時偵測並下載正式新版，完成驗證後交由 Android 確認安裝。1.26.1003 build 2028 以前的 APK 尚未包含此功能，第一次須手動安裝。
 
@@ -24,7 +24,7 @@ Android Viewer 依 Host 的 `keyboard-capabilities` 公告啟用原始按鍵。�
 
 本版提供 Android 8.0 以上的 arm64 手機 APK，支援遠端桌面、右鍵／遠端捲動、多螢幕切換、遠端聲音、Shell、站台新增／編輯／刪除、加密記憶密碼及 QR 匯入。影像使用 JPEG 與 MediaCodec H.264／HEVC，聲音使用系統 Opus／AAC 解碼與 AudioTrack，並支援 PCM。文字剪貼簿支援前景桌面雙向傳送（32 KiB），不含圖片與檔案；AV1、獨立檔案傳輸與 FFmpeg 軟解碼不在本版範圍。相機為選用功能，沒有相機仍可手動新增站台。
 
-- 版本由 `android/version.properties` 統一管理：`1.26.1105 build 2314`、versionCode `29898194`。每次正式更新必須遞增 versionCode。
+- 版本由 `android/version.properties` 統一管理：`1.26.1110 build 1451`、versionCode `29904891`。每次正式更新必須遞增 versionCode。
 - 正式套件為 `com.yourdesk.android`；Debug 使用 `com.yourdesk.android.debug`，實機測試不覆蓋正式資料。
 - 站台與密碼更新使用一次儲存交易。密碼由 Android Keystore／AES-GCM 保護，依「信令伺服器＋遠端 ID」隔離；刪除站台會清除對應密碼。編輯時留白保留密碼，另有明確的清除選項。
 - QR 僅接受 YourDesk v1 白名單欄位，拒絕密碼、重複欄位與不安全信令位址；掃描後必須確認再儲存。相機拒絕、取消、背景切換均能返回手動操作。
@@ -85,19 +85,19 @@ Android Viewer 依 Host 的 `keyboard-capabilities` 公告啟用原始按鍵。�
 
 ```sh
 python3 scripts/android_release.py build
-python3 scripts/android_release.py verify --apk dist/android/YourDesk-1.26.1105-build-2314-android-arm64.apk
-python3 scripts/android_release.py verify-zip --zip dist/android/YourDesk-1.26.1105-build-2314-android-arm64.zip
+python3 scripts/android_release.py verify --apk dist/android/YourDesk-1.26.1110-build-1451-android-arm64.apk
+python3 scripts/android_release.py verify-zip --zip dist/android/YourDesk-1.26.1110-build-1451-android-arm64.zip
 ```
 
 腳本依序驗證或重建 Go core／CameraX JNI，執行 Wrapper 的 `lintRelease`、`assembleRelease`，以 16 KB ZIP 對齊後簽章，再核對版本、非偵錯狀態、ABI、所有原生 ELF、ZIP 與 v2／v3 簽章。成品驗證成功才替換目標檔，再使用固定檔案清單與 Deflate 壓縮封裝 ZIP，內含原版簽章 APK、四語安裝說明、四語授權文件、BUILD.json 與 SHA256SUMS。每個檔案逐一核對 SHA-256；固定時間與權限使相同輸入產生相同 ZIP。封裝不重簽 APK。
 
 ```text
-dist/android/YourDesk-1.26.1105-build-2314-android-arm64.apk
-dist/android/YourDesk-1.26.1105-build-2314-android-arm64.sha256
-dist/android/YourDesk-1.26.1105-build-2314-android-arm64.json
-dist/android/YourDesk-1.26.1105-build-2314-android-arm64.zip
-dist/android/YourDesk-1.26.1105-build-2314-android-arm64.zip.sha256
-dist/android/YourDesk-1.26.1105-build-2314-android-arm64.zip.json
+dist/android/YourDesk-1.26.1110-build-1451-android-arm64.apk
+dist/android/YourDesk-1.26.1110-build-1451-android-arm64.sha256
+dist/android/YourDesk-1.26.1110-build-1451-android-arm64.json
+dist/android/YourDesk-1.26.1110-build-1451-android-arm64.zip
+dist/android/YourDesk-1.26.1110-build-1451-android-arm64.zip.sha256
+dist/android/YourDesk-1.26.1110-build-1451-android-arm64.zip.json
 ```
 
 GitHub Release 僅上傳 `.zip`、`.zip.sha256`、`.zip.json` 三個檔案。APK 與其原始建置紀錄保留在本機；ZIP 的 JSON 另記錄 `archive.sha256`、大小及逐檔雜湊，頂層 `sha256` 仍為 APK。
@@ -105,8 +105,8 @@ GitHub Release 僅上傳 `.zip`、`.zip.sha256`、`.zip.json` 三個檔案。APK
 已有通過驗證的正式 APK 時，可直接封裝並檢查：
 
 ```sh
-python3 scripts/android_release.py pack --apk dist/android/YourDesk-1.26.1105-build-2314-android-arm64.apk
-python3 scripts/android_release.py verify-zip --zip dist/android/YourDesk-1.26.1105-build-2314-android-arm64.zip
+python3 scripts/android_release.py pack --apk dist/android/YourDesk-1.26.1110-build-1451-android-arm64.apk
+python3 scripts/android_release.py verify-zip --zip dist/android/YourDesk-1.26.1110-build-1451-android-arm64.zip
 ```
 
 `pack` 會重新驗證 APK 簽章並比對旁邊的 `.json` 建置紀錄；若發行時另有補上來源提交資訊的紀錄，可用 `--record <檔案>` 指定，仍須與 APK 的版本、ABI、雜湊及憑證一致。
@@ -186,7 +186,7 @@ android/gradlew -p android :app:connectedDebugAndroidTest \
 
 獨立公開的 Android Release 使用 `android-<版本>` 標籤，附上內含 APK 的 ZIP、ZIP SHA-256 與封裝紀錄，並設定 `latest=false`。桌面更新程式使用 `/releases/latest`，因此該入口維持桌面版；Android 下載入口由 README 明確連至對應發行頁。本機站台、憑證、ADB 備份與使用者桌面截圖不列入提交或發行附件。
 
-發行內文遵循[共同 Release 流程](RELEASE-WORKFLOW.md)，儲存於 `docs/RELEASE-<tag>.md`，從 `## 繁體中文` 開始，依序提供繁體中文、英文、日文、韓文。四語均須包含功能、安裝與升級注意事項、驗證範圍及已知限制；發布後讀回核對。本版發行說明為 [RELEASE-1.26.1105-build-2314.md](RELEASE-1.26.1105-build-2314.md)；獨立 Android 發行範例見 [RELEASE-android-1.26.1001-build-1524.md](RELEASE-android-1.26.1001-build-1524.md)。修正既有發行的翻譯時，只更新內文，保留原 APK、標籤及發布狀態。
+發行內文遵循[共同 Release 流程](RELEASE-WORKFLOW.md)，儲存於 `docs/RELEASE-<tag>.md`，從 `## 繁體中文` 開始，依序提供繁體中文、英文、日文、韓文。四語均須包含功能、安裝與升級注意事項、驗證範圍及已知限制；發布後讀回核對。本版發行說明為 [RELEASE-1.26.1110-build-1451.md](RELEASE-1.26.1110-build-1451.md)；獨立 Android 發行範例見 [RELEASE-android-1.26.1001-build-1524.md](RELEASE-android-1.26.1001-build-1524.md)。修正既有發行的翻譯時，只更新內文，保留原 APK、標籤及發布狀態。
 
 16 KB 靜態檢查不能取代 [16 KB 裝置啟動與 JNI 驗證](https://developer.android.com/guide/practices/page-sizes)。Android 16 實機、其他廠牌解碼器、平板／折疊螢幕、真實通話／耳機／藍牙切換、跨行動網路切換及數小時負載仍需對應環境驗收，不能由單一 Android 11 手機推論全部完成。音訊已驗證非靜音 PCM 與系統播放進度，沒有使用麥克風回錄喇叭輸出。
 

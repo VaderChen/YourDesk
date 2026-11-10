@@ -15,16 +15,18 @@ const CommandVersion = 1
 var ErrCommandUnsupported = errors.New("對端未提供此 P2P 指令")
 
 type CommandCapabilities struct {
+	RelativeTimeout bool     `json:"relativeTimeout,omitempty"`
 	ClipboardWindow uint32   `json:"clipboardWindow,omitempty"`
 	Version         int      `json:"version"`
 	Methods         []string `json:"methods"`
 }
 type CommandRequest struct {
-	Params  json.RawMessage `json:"params,omitempty"`
-	Version int             `json:"version"`
-	ID      uint64          `json:"id"`
-	Method  string          `json:"method"`
-	Expires int64           `json:"expires"`
+	TimeoutMS *int64          `json:"timeoutMs,omitempty"`
+	Params    json.RawMessage `json:"params,omitempty"`
+	Version   int             `json:"version"`
+	ID        uint64          `json:"id"`
+	Method    string          `json:"method"`
+	Expires   int64           `json:"expires"`
 }
 type CommandResponse struct {
 	Version int             `json:"version"`
@@ -60,7 +62,7 @@ func (p *Peer) localCommands() CommandCapabilities {
 		methods = append(methods, name)
 	}
 	sort.Strings(methods)
-	return CommandCapabilities{Version: CommandVersion, Methods: methods, ClipboardWindow: clipboardReceiveWindow}
+	return CommandCapabilities{Version: CommandVersion, Methods: methods, RelativeTimeout: true, ClipboardWindow: clipboardReceiveWindow}
 }
 func (p *Peer) announceCommands() {
 	_ = p.SendControl(Control{Type: "command-capabilities", CommandCapabilities: ptrCapabilities(p.localCommands())})
@@ -130,7 +132,7 @@ func (p *Peer) CallCommandParams(ctx context.Context, method string, params json
 	if !p.SupportsCommand(method) {
 		return CommandResponse{}, ErrCommandUnsupported
 	}
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, commandTimeout)
 	defer cancel()
 	if err := ctx.Err(); err != nil {
 		return CommandResponse{}, interruptedCommand(err)
@@ -145,10 +147,15 @@ func (p *Peer) CallCommandParams(ctx context.Context, method string, params json
 	id := p.commands.sequence
 	ch := make(chan CommandResponse, 1)
 	p.commands.pending[id] = ch
+	relativeTimeout := p.commands.remote.RelativeTimeout
 	p.commands.mu.Unlock()
 	defer func() { p.commands.mu.Lock(); delete(p.commands.pending, id); p.commands.mu.Unlock() }()
 	deadline, _ := ctx.Deadline()
-	if err := p.SendControl(Control{Type: "command-request", CommandRequest: &CommandRequest{Version: CommandVersion, ID: id, Method: method, Expires: deadline.UnixMilli(), Params: params}}); err != nil {
+	request := CommandRequest{Version: CommandVersion, ID: id, Method: method, Expires: deadline.UnixMilli(), Params: params}
+	if err := request.setTimeout(deadline, relativeTimeout); err != nil {
+		return CommandResponse{}, interruptedCommand(err)
+	}
+	if err := p.SendControl(Control{Type: "command-request", CommandRequest: &request}); err != nil {
 		return CommandResponse{}, interruptedCommand(err)
 	}
 	select {
@@ -175,7 +182,7 @@ func (p *Peer) handleCommand(c Control) bool {
 				}
 			}
 			p.commands.mu.Lock()
-			p.commands.remote = CommandCapabilities{Version: v.Version, Methods: append([]string(nil), v.Methods...), ClipboardWindow: v.ClipboardWindow}
+			p.commands.remote = CommandCapabilities{Version: v.Version, Methods: append([]string(nil), v.Methods...), RelativeTimeout: v.RelativeTimeout, ClipboardWindow: v.ClipboardWindow}
 			p.commands.mu.Unlock()
 			p.setClipboardWindow(v.ClipboardWindow)
 		}
@@ -210,12 +217,9 @@ func (p *Peer) handleCommand(c Control) bool {
 			reject("unsupported_version", "不支援的指令版本")
 			return true
 		}
-		if len(r.Params) > 8192 || len(r.Method) > 64 || r.Expires <= 0 || r.Expires > time.Now().Add(30*time.Second).UnixMilli() {
-			reject("invalid_request", "指令格式無效")
-			return true
-		}
-		if r.Expires <= time.Now().UnixMilli() {
-			reject("expired", "指令已逾時")
+		deadline, code, message := commandDeadline(*r, time.Now())
+		if code != "" {
+			reject(code, message)
 			return true
 		}
 		p.commands.mu.Lock()
@@ -252,7 +256,7 @@ func (p *Peer) handleCommand(c Control) bool {
 		p.commands.mu.Unlock()
 		request := *r
 		go func() {
-			ctx, cancel := context.WithDeadline(context.Background(), time.UnixMilli(request.Expires))
+			ctx, cancel := context.WithDeadline(context.Background(), deadline)
 			defer cancel()
 			go func() {
 				select {

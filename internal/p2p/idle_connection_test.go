@@ -53,6 +53,7 @@ func TestLivenessRejectionsAcrossDataChannel(t *testing.T) {
 			if decodeControl(m.Data, &c) == nil {
 				if c.CommandRequest != nil {
 					// 模擬雙端時鐘不同，不改動本機系統時間或正式授權規則。
+					c.CommandRequest.TimeoutMS = nil // 驗證舊版絕對期限的拒絕仍不等於斷線。
 					c.CommandRequest.Expires = time.Now().Add(tc.offset).UnixMilli()
 				}
 				b.handleCommand(c)

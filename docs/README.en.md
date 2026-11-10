@@ -41,9 +41,9 @@ Local endpoint: `http://127.0.0.1:12345/mcp`. Remote windows are hidden by defau
 
 ## Download and start
 
-See the [1.26.1105 build 2314 release notes](RELEASE-1.26.1105-build-2314.md) for changes and validation limits. Android supports [automatic update detection/download](ANDROID-UPDATES.md). Versions before 1.26.1003 build 2028 require one manual upgrade; Android still confirms every update installation.
+See the [1.26.1110 build 1451 release notes](RELEASE-1.26.1110-build-1451.md) for changes and validation limits. Android supports [automatic update detection/download](ANDROID-UPDATES.md). Versions before 1.26.1003 build 2028 require one manual upgrade; Android still confirms every update installation.
 
-Download desktop packages from [GitHub Releases](https://github.com/VaderChen/YourDesk/releases/latest). For the phone Viewer, use the [Android release](https://github.com/VaderChen/YourDesk/releases/tag/1.26.1105-build-2314).
+Download desktop packages from [GitHub Releases](https://github.com/VaderChen/YourDesk/releases/latest). For the phone Viewer, use the [Android release](https://github.com/VaderChen/YourDesk/releases/tag/1.26.1110-build-1451).
 
 | Platform | Package |
 | --- | --- |
@@ -51,13 +51,13 @@ Download desktop packages from [GitHub Releases](https://github.com/VaderChen/Yo
 | Windows x64 | Portable ZIP |
 | Windows on ARM | Portable ZIP |
 | Linux x64 / arm64 | CLI Host ZIP (no desktop / REMOTE) |
-| Android 8.0+ / arm64 | [Android ZIP](https://github.com/VaderChen/YourDesk/releases/download/1.26.1105-build-2314/YourDesk-1.26.1105-build-2314-android-arm64.zip) — extract it, then install the signed APK (phone Viewer) |
+| Android 8.0+ / arm64 | [Android ZIP](https://github.com/VaderChen/YourDesk/releases/download/1.26.1110-build-1451/YourDesk-1.26.1110-build-1451-android-arm64.zip) — extract it, then install the signed APK (phone Viewer) |
 
 1. Install and open YourDesk on both computers.
 2. Enter the remote ID or select a saved connection.
 3. Enter the connection password to start.
 
-For Android, extract the ZIP and install the included APK on your phone. Run YourDesk Host on the remote computer. See the [Android release notes](RELEASE-1.26.1105-build-2314.md#english) for features, upgrade instructions and validation limits.
+For Android, extract the ZIP and install the included APK on your phone. Run YourDesk Host on the remote computer. See the [Android release notes](RELEASE-1.26.1110-build-1451.md#english) for features, upgrade instructions and validation limits.
 
 For remote desktop control on macOS, allow Screen Recording and Accessibility permissions. Dedicated file transfer does not start screen capture or keyboard/mouse control; normal filesystem permissions still apply. When receiving remote files via the clipboard, allow Network Volumes access if prompted. If previously denied, enable it for YourDesk under System Settings → Privacy & Security → Files and Folders, then copy the files again. Windows requires WebView2 Runtime. Intel Macs and Linux desktop packages are currently unsupported. Direct IP connections are also available after enabling them in the remote computer's security settings. Connections are encrypted and require networks that permit direct connectivity.
 
@@ -99,6 +99,8 @@ Thanks to the authors of FSR, QuickSRNet/SESR and RIFE. Full [FSR](FSR-LICENSE.t
 ## Remote terminal
 
 Choose GUI (Desktop) or CMD (Terminal), or double-click a site to choose between those two modes. Dedicated file transfer uses its own icon between CMD and GUI, not this double-click menu. Independent terminal windows support multiple sites; unsupported older peers show an update prompt. Run Linux as a regular user. CLI supports `-secret "password"`; `LC_ALL → LC_MESSAGES → LANG` selects Traditional Chinese, English, Japanese or Korean, with English fallback. See the ZIP README for usage.
+
+When both ends support relative timeouts, terminal and shared P2P commands do not require matching system clocks. When using an older peer, synchronize the date and time on both devices. See [remote terminal details](TERMINAL.md).
 
 ## Support development
 

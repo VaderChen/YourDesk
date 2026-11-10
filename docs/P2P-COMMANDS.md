@@ -36,8 +36,8 @@
 
 控制訊息包含下列類型：
 
-- `command-capabilities`：version 與實際支援的方法名稱；通道開啟及新 handler 註冊時公告。選用的 `clipboardWindow` 為每類剪貼簿訊息的未消費上限，目前為 32；缺省／零不啟用額度流控。
-- `command-request`：version、單一 Peer 內遞增 ID、method、expires、選用 params。
+- `command-capabilities`：version 與實際支援的方法名稱；通道開啟及新 handler 註冊時公告。選用的 `relativeTimeout: true` 表示接收端支援相對逾時預算；`clipboardWindow` 為每類剪貼簿訊息的未消費上限，目前為 32；缺省／零不啟用額度流控。
+- `command-request`：version、單一 Peer 內遞增 ID、method、expires、選用 timeoutMs 與 params。
 - `command-response`：對應 ID、結果或結構化錯誤代碼。
 - `clipboard-credit`：`clipboardConsumed` 為普通剪貼簿資料累計消費量，`clipboardPriorityConsumed` 為 pull 資料（binary type 2）、`pull-read`、`pull-error` 與 `ack` 的累計消費量。兩類各自使用 `clipboardWindow` 額度；它不是傳輸成功 ack。普通類含 hello、傳輸中繼資料、offer 與 binary type 1 資料。累計值在同一個 Peer 內不重設，重複／倒退／超過送出量的值不增加額度。
 
@@ -46,9 +46,13 @@
 
 指令版本為 1，預設呼叫逾時五秒，最多 32 個待回覆請求；接收端最多並行四項指令，回覆內容最多 16 KiB。每個 Peer 保留最近序號範圍內的結果，重複請求回傳已存結果或 in_progress；超出範圍的舊序號不重新執行。
 
-常見錯誤為 unsupported_version、unsupported_method、expired_or_invalid、stale_request、busy、in_progress、failed、invalid_result。排入傳送佇列不等於執行成功；逾時或斷線會回報結果未確認。沒有自動重送副作用指令，呼叫者不能在結果未知時盲目換新 ID 重試。
+常見錯誤為 unsupported_version、unsupported_method、invalid_request、expired、stale_request、busy、in_progress、failed、invalid_result；舊版也可能回報 expired_or_invalid。排入傳送佇列不等於執行成功；逾時或斷線會回報結果未確認。沒有自動重送副作用指令，呼叫者不能在結果未知時盲目換新 ID 重試。
 
-expires 使用 Unix 毫秒，雙端系統時間需要合理同步；接收端不接受超過未來 30 秒的期限。handler 接收可取消 context，必須配合期限及 Peer 結束。新增功能僅在 handler 實際註冊後公告，能力清單不包含尚未實作項目。
+雙端支援 `relativeTimeout` 時，呼叫端將本機剩餘預算送為 `timeoutMs`（1–5000 毫秒），接收端從收到請求時以自身單調時鐘建立 handler 期限，不比較兩端牆鐘。這避免 Windows／macOS 等端點時鐘不一致時，將合法的 `terminal.open`、檔案操作或心跳誤拒為 `invalid_request`／`expired`。桌面及 Android core 使用相同規則。
+
+呼叫端仍以自身 context 限制整體等待；接收端預算從收到請求起算，不能推知封包在網路中已花費多少時間。因此呼叫端逾時仍表示「結果未確認」，不可自動重送有副作用的指令。序號去重、並行數與舊序號拒絕保持不變；重複請求不延長已執行 handler 的期限。Peer 關閉會取消 handler。
+
+為相容舊版，`expires`（Unix 毫秒）仍保留；對端未公告 `relativeTimeout` 時，不傳 `timeoutMs`。缺少相對預算的請求沿用原有絕對期限檢查，雙端時間仍須合理同步，接收端不接受超過未來 30 秒的期限。新版接收端會在期限超出範圍時提示同步系統時間或更新雙端，而非籠統顯示格式無效。**只有雙端更新後，才能使用不依賴時鐘同步的流程。** handler 必須配合 context 取消。新增功能僅在 handler 實際註冊後公告，能力清單不包含尚未實作項目。
 
 舊版端點不公告此協定時，`SupportsCommand` 為 false，`CallCommand` 直接回報不支援。遠端顯示保留舊版影格恢復及本機關閉行為；不要求所有使用者同時更新。
 
